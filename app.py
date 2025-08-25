@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 from urllib.parse import quote
 from urllib.error import HTTPError, URLError
+import plotly.express as px
 
 # ──────────────────────────────────────────────────────────────────────────────
 # PAGE
@@ -18,22 +19,17 @@ st.caption("EDA • Viability Scoring • Forecasting • Comparisons • Scenar
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 
 FILES = {
-    "world_bank": "world_bank_data_with_scores_and_continent (1).csv",
-    # NEW: your cleaned CSV
-    "capex_csv": "capex_EDA_cleaned_filled (9).csv",
-    # Fallback: original Excel (kept just in case)
-    "capex_xlsx": "capex_EDA (3).xlsx",
+    "wb":   "world_bank_data_with_scores_and_continent (1).csv",
+    "cap":  "capex_EDA_cleaned_filled (9).csv",
 }
 
 def url_for(fname: str) -> str:
-    # percent‑encode spaces/parentheses etc.
-    return f"{RAW_BASE}/{quote(fname)}"
+    return f"{RAW_BASE}/{quote(fname)}"  # percent‑encode spaces/()
 
 # ──────────────────────────────────────────────────────────────────────────────
 # HELPERS
 # ──────────────────────────────────────────────────────────────────────────────
 def find_col(cols, *candidates):
-    """Return the first matching column (case-insensitive exact, then contains)."""
     lower = {c.lower(): c for c in cols}
     for cand in candidates:
         if cand.lower() in lower:
@@ -45,37 +41,31 @@ def find_col(cols, *candidates):
     return None
 
 def numify(x):
-    if pd.isna(x):
-        return np.nan
-    if isinstance(x, (int, float, np.integer, np.floating)):
-        return float(x)
+    if pd.isna(x): return np.nan
+    if isinstance(x, (int, float, np.integer, np.floating)): return float(x)
     s = str(x).replace(",", "").strip()
-    try:
-        return float(s)
-    except Exception:
-        return np.nan
+    try: return float(s)
+    except Exception: return np.nan
 
 # ──────────────────────────────────────────────────────────────────────────────
 # LOADERS
 # ──────────────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=True)
 def load_world_bank() -> pd.DataFrame:
-    """Load CSV with country, year, continent, grade (A/A+ used for a metric)."""
-    url = url_for(FILES["world_bank"])
+    url = url_for(FILES["wb"])
     try:
         df = pd.read_csv(url)
     except (HTTPError, URLError, FileNotFoundError) as e:
-        raise RuntimeError(f"Failed to fetch world bank CSV at {url}: {e}")
+        raise RuntimeError(f"Failed to fetch World Bank CSV at {url}: {e}")
 
-    # Normalize key columns
     country = find_col(df.columns, "country", "country_name", "Country Name")
     year    = find_col(df.columns, "year")
     cont    = find_col(df.columns, "continent", "region")
     grade   = find_col(df.columns, "grade", "letter_grade")
 
-    missing = [k for k, v in {"country": country, "year": year, "continent": cont}.items() if v is None]
+    missing = [k for k,v in {"country":country, "year":year, "continent":cont}.items() if v is None]
     if missing:
-        raise ValueError(f"World bank CSV missing columns: {missing}. Found: {list(df.columns)}")
+        raise ValueError(f"World Bank CSV missing columns: {missing}. Found: {list(df.columns)}")
 
     df = df.rename(columns={
         country: "country",
@@ -84,84 +74,61 @@ def load_world_bank() -> pd.DataFrame:
         **({grade: "grade"} if grade else {})
     })
     df["year"] = pd.to_numeric(df["year"], errors="coerce").astype("Int64")
-    if "grade" not in df.columns:
-        df["grade"] = np.nan
-    df["country"] = df["country"].astype(str).str.strip()
+    if "grade" not in df.columns: df["grade"] = np.nan
+    df["country"]   = df["country"].astype(str).str.strip()
     df["continent"] = df["continent"].astype(str).str.strip()
     return df
 
 @st.cache_data(show_spinner=True)
 def load_capex() -> pd.DataFrame:
     """
-    Prefer the new CSV (capex_EDA_cleaned_filled (9).csv) shaped like:
+    Reads the cleaned wide CSV and melts year columns into (country, year, capex).
+    Columns present like:
     'Source Country' | 2021 | 2022 | 2023 | 2024 | Total | Grade | Calculated Total
-    If CSV isn't reachable, fall back to the original Excel and melt similarly.
     """
-    # Try CSV first
-    csv_url = url_for(FILES["capex_csv"])
+    url = url_for(FILES["cap"])
     try:
-        df = pd.read_csv(csv_url)
-        source_country = find_col(df.columns, "Source Country", "Source Co", "Country", "country_name", "country")
-        if source_country is None:
-            raise ValueError("CSV found but no 'Source Country' column detected.")
-        df.columns = [str(c).strip() for c in df.columns]
-        year_cols = [c for c in df.columns if str(c).isdigit() and len(str(c)) == 4]
-        if not year_cols:
-            raise ValueError("CSV found but no 4-digit year columns detected.")
-        melted = df.melt(
-            id_vars=[source_country],
-            value_vars=year_cols,
-            var_name="year",
-            value_name="capex"
-        ).rename(columns={source_country: "country"})
-        melted["year"] = pd.to_numeric(melted["year"], errors="coerce").astype("Int64")
-        melted["capex"] = melted["capex"].map(numify)
-        melted["country"] = melted["country"].astype(str).str.strip()
-        return melted
-    except Exception as e_csv:
-        st.warning(f"CAPEX CSV load failed ({e_csv}). Falling back to Excel…")
+        df = pd.read_csv(url)
+    except (HTTPError, URLError, FileNotFoundError) as e:
+        raise RuntimeError(f"Failed to fetch CAPEX CSV at {url}: {e}")
 
-    # Fallback: Excel (same melt logic)
-    xls_url = url_for(FILES["capex_xlsx"])
-    try:
-        xls = pd.ExcelFile(xls_url)
-        df_x = pd.read_excel(xls, sheet_name=0)
-        df_x.columns = [str(c).strip() for c in df_x.columns]
-        source_country = find_col(df_x.columns, "Source Country", "Source Co", "Country", "country_name", "country")
-        if source_country is None:
-            raise ValueError("Excel CAPEX: 'Source Country' column not found.")
-        year_cols = [c for c in df_x.columns if str(c).isdigit() and len(str(c)) == 4]
-        if not year_cols:
-            raise ValueError("Excel CAPEX: no 4-digit year columns detected.")
-        melted = df_x.melt(
-            id_vars=[source_country],
-            value_vars=year_cols,
-            var_name="year",
-            value_name="capex"
-        ).rename(columns={source_country: "country"})
-        melted["year"] = pd.to_numeric(melted["year"], errors="coerce").astype("Int64")
-        melted["capex"] = melted["capex"].map(numify)
-        melted["country"] = melted["country"].astype(str).str.strip()
-        return melted
-    except Exception as e_xlsx:
-        raise ValueError(f"Could not load CAPEX from CSV or Excel.\nCSV error: {e_csv}\nXLSX error: {e_xlsx}")
+    df.columns = [str(c).strip() for c in df.columns]
+    src = find_col(df.columns, "Source Country", "Source Co", "Country")
+    if not src:
+        raise ValueError("CAPEX CSV must include a 'Source Country' column.")
+
+    year_cols = [c for c in df.columns if str(c).isdigit() and len(str(c)) == 4]
+    if not year_cols:
+        raise ValueError("CAPEX CSV has no 4‑digit year columns (e.g., 2021, 2022…).")
+
+    melted = df.melt(
+        id_vars=[src],
+        value_vars=year_cols,
+        var_name="year",
+        value_name="capex"
+    ).rename(columns={src: "country"})
+
+    melted["year"]   = pd.to_numeric(melted["year"], errors="coerce").astype("Int64")
+    melted["capex"]  = melted["capex"].map(numify)
+    melted["country"] = melted["country"].astype(str).str.strip()
+    return melted
 
 wb   = load_world_bank()
 capx = load_capex()
 
 # ──────────────────────────────────────────────────────────────────────────────
 # FILTERS (Year • Continent • Country)
+# Years come from the UNION of both datasets so 2024 appears (CAPEX has it)
 # ──────────────────────────────────────────────────────────────────────────────
-years = sorted([int(y) for y in wb["year"].dropna().unique()])
+years_union = sorted(set(wb["year"].dropna().astype(int)).union(set(capx["year"].dropna().astype(int))))
 c1, c2, c3 = st.columns([1, 1, 2], gap="small")
 
 with c1:
-    sel_year = st.selectbox("Year", years, index=len(years)-1 if years else 0)
+    sel_year = st.selectbox("Year", years_union, index=len(years_union)-1 if years_union else 0)
 
 with c2:
-    conts = ["All"] + sorted(
-        wb.loc[wb["year"] == sel_year, "continent"].dropna().astype(str).unique().tolist()
-    )
+    # continent options are from WB for the selected year
+    conts = ["All"] + sorted(wb.loc[wb["year"] == sel_year, "continent"].dropna().astype(str).unique().tolist())
     sel_cont = st.selectbox("Continent", conts, index=0)
 
 with c3:
@@ -171,6 +138,7 @@ with c3:
     countries = ["All"] + sorted(wb_scope["country"].dropna().astype(str).unique().tolist())
     sel_country = st.selectbox("Country", countries, index=0)
 
+# Filter WB for tiles/charts that depend on grades
 def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     if "year" in out.columns:
@@ -181,51 +149,95 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
         out = out[out["country"].astype(str) == sel_country]
     return out
 
-# CAPEX has no continent column; only year/country filters apply
-capx_f = capx[(capx["year"] == sel_year)]
+wb_f = apply_filters(wb)
+
+# Filter CAPEX by year + map continent via WB for optional continent filter
+capx_f = capx[capx["year"] == sel_year]
 if sel_cont != "All":
-    # keep CAPEX rows whose country belongs to the selected continent (via WB mapping)
     valid_countries = set(wb_scope["country"].unique())
     capx_f = capx_f[capx_f["country"].isin(valid_countries)]
 if sel_country != "All":
     capx_f = capx_f[capx_f["country"].astype(str) == sel_country]
 
-wb_f = apply_filters(wb)
-
 # ──────────────────────────────────────────────────────────────────────────────
-# METRICS (tiles)
+# KPI TILES
 # ──────────────────────────────────────────────────────────────────────────────
-def metric_global_capex(df: pd.DataFrame) -> float:
-    # sum of country CAPEX for the filtered year (ignores NaNs)
+def kpi_global_capex(df: pd.DataFrame) -> float:
     return float(np.nansum(df["capex"])) if not df.empty else 0.0
 
-def metric_countries_tracked(df: pd.DataFrame) -> int:
-    # number of distinct countries with a CAPEX value for the filtered year
-    if df.empty:
-        return 0
+def kpi_countries_tracked(df: pd.DataFrame) -> int:
+    if df.empty: return 0
     return int(df.loc[df["capex"].notna(), "country"].nunique())
 
-def metric_aa_plus(df: pd.DataFrame) -> int:
-    if df.empty or "grade" not in df.columns:
-        return 0
+def kpi_aa_plus(df: pd.DataFrame) -> int:
+    if df.empty or "grade" not in df.columns: return 0
     return int(df[df["grade"].astype(str).isin(["A", "A+"])]["country"].nunique())
 
 m1, m2, m3 = st.columns(3, gap="large")
 with m1:
-    st.metric("Global CAPEX (latest, $B)", f"{metric_global_capex(capx_f):,.0f}")
+    st.metric("Global CAPEX (latest, $B)", f"{kpi_global_capex(capx_f):,.0f}")
 with m2:
-    st.metric("# Countries Tracked", f"{metric_countries_tracked(capx_f):,}")
+    st.metric("# Countries Tracked", f"{kpi_countries_tracked(capx_f):,}")
 with m3:
-    st.metric("A/A+ Countries", f"{metric_aa_plus(wb_f):,}")
+    st.metric("A/A+ Countries", f"{kpi_aa_plus(wb_f):,}")
 
 st.markdown(
     "<div style='color:#94a3b8; font-size:0.9rem;'>"
-    "Metrics reflect current filters • Data loaded directly from GitHub.</div>",
+    "Data loads from GitHub • Year list merges WB+CAPEX (so 2024 is available when only CAPEX supports it).</div>",
     unsafe_allow_html=True,
 )
 
+# ──────────────────────────────────────────────────────────────────────────────
+# VISUALS
+#   1) Global CAPEX Trend (line) — sums CAPEX by year; respects Continent/Country
+#   2) Grade Distribution (bar) — counts A+/A/B/C/D for selected year (WB only)
+# ──────────────────────────────────────────────────────────────────────────────
+v1, v2 = st.columns((3, 2), gap="large")
+
+with v1:
+    # Apply continent/country filter to CAPEX for ALL years (trend)
+    capx_for_trend = capx.copy()
+    if sel_cont != "All":
+        valid_countries_all = set(wb[wb["continent"].astype(str) == sel_cont]["country"].unique())
+        capx_for_trend = capx_for_trend[capx_for_trend["country"].isin(valid_countries_all)]
+    if sel_country != "All":
+        capx_for_trend = capx_for_trend[capx_for_trend["country"].astype(str) == sel_country]
+
+    trend = (
+        capx_for_trend.groupby("year", as_index=False)["capex"]
+        .sum()
+        .sort_values("year")
+    )
+    fig = px.line(trend, x="year", y="capex", markers=True,
+                  labels={"year": "", "capex": "Global CAPEX ($B)"},
+                  title="Global CAPEX Trend")
+    fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=380)
+    st.plotly_chart(fig, use_container_width=True)
+
+with v2:
+    grades = ["A+", "A", "B", "C", "D"]
+    if wb_f.empty or "grade" not in wb_f.columns:
+        st.info("No grade data for this year/selection.")
+    else:
+        dist = (
+            wb_f.assign(grade=wb_f["grade"].astype(str))
+                .loc[wb_f["grade"].astype(str).isin(grades)]
+                .groupby("grade", as_index=False)["country"].nunique()
+                .rename(columns={"country": "count"})
+        )
+        # ensure all grade buckets appear
+        dist = dist.set_index("grade").reindex(grades, fill_value=0).reset_index()
+        bar = px.bar(dist, x="grade", y="count",
+                     labels={"grade": "", "count": "Number of countries"},
+                     title="Grade Distribution")
+        bar.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=380)
+        st.plotly_chart(bar, use_container_width=True)
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Optional debug
+# ──────────────────────────────────────────────────────────────────────────────
 with st.expander("Debug (optional)"):
-    st.write("World Bank rows (filtered):", len(wb_f))
+    st.write("Years available (union):", years_union)
+    st.write("WB rows (filtered):", len(wb_f))
     st.write("CAPEX rows (filtered):", len(capx_f))
     st.dataframe(capx_f.head(10))
