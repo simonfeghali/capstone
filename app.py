@@ -18,9 +18,11 @@ st.caption("EDA • Viability Scoring • Forecasting • Comparisons • Scenar
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 
 FILES = {
-    # Use your exact filenames from the repo
     "world_bank": "world_bank_data_with_scores_and_continent (1).csv",
-    "capex_eda": "capex_EDA (3).xlsx",
+    # NEW: your cleaned CSV
+    "capex_csv": "capex_EDA_cleaned_filled (9).csv",
+    # Fallback: original Excel (kept just in case)
+    "capex_xlsx": "capex_EDA (3).xlsx",
 }
 
 def url_for(fname: str) -> str:
@@ -84,51 +86,68 @@ def load_world_bank() -> pd.DataFrame:
     df["year"] = pd.to_numeric(df["year"], errors="coerce").astype("Int64")
     if "grade" not in df.columns:
         df["grade"] = np.nan
-    # ensure string columns are clean
     df["country"] = df["country"].astype(str).str.strip()
     df["continent"] = df["continent"].astype(str).str.strip()
     return df
 
 @st.cache_data(show_spinner=True)
-def load_capex_wide_to_long() -> pd.DataFrame:
+def load_capex() -> pd.DataFrame:
     """
-    Your Excel is wide:
-    - 'Source Country' | 2021 | 2022 | 2023 | 2024 | Total | Grade
-    We melt the 4-digit year columns to a tidy long table: (country, year, capex).
+    Prefer the new CSV (capex_EDA_cleaned_filled (9).csv) shaped like:
+    'Source Country' | 2021 | 2022 | 2023 | 2024 | Total | Grade | Calculated Total
+    If CSV isn't reachable, fall back to the original Excel and melt similarly.
     """
-    xls = pd.ExcelFile(url_for(FILES["capex_eda"]))
-    # read first sheet (or change index if needed)
-    df = pd.read_excel(xls, sheet_name=0)
-    if df is None or df.empty:
-        raise ValueError("CAPEX sheet is empty.")
+    # Try CSV first
+    csv_url = url_for(FILES["capex_csv"])
+    try:
+        df = pd.read_csv(csv_url)
+        source_country = find_col(df.columns, "Source Country", "Source Co", "Country", "country_name", "country")
+        if source_country is None:
+            raise ValueError("CSV found but no 'Source Country' column detected.")
+        df.columns = [str(c).strip() for c in df.columns]
+        year_cols = [c for c in df.columns if str(c).isdigit() and len(str(c)) == 4]
+        if not year_cols:
+            raise ValueError("CSV found but no 4-digit year columns detected.")
+        melted = df.melt(
+            id_vars=[source_country],
+            value_vars=year_cols,
+            var_name="year",
+            value_name="capex"
+        ).rename(columns={source_country: "country"})
+        melted["year"] = pd.to_numeric(melted["year"], errors="coerce").astype("Int64")
+        melted["capex"] = melted["capex"].map(numify)
+        melted["country"] = melted["country"].astype(str).str.strip()
+        return melted
+    except Exception as e_csv:
+        st.warning(f"CAPEX CSV load failed ({e_csv}). Falling back to Excel…")
 
-    df.columns = [str(c).strip() for c in df.columns]
-    source_country = find_col(df.columns, "Source Country", "Country", "country_name", "country")
-    if source_country is None:
-        raise ValueError("Expected a 'Source Country' column in the CAPEX sheet.")
+    # Fallback: Excel (same melt logic)
+    xls_url = url_for(FILES["capex_xlsx"])
+    try:
+        xls = pd.ExcelFile(xls_url)
+        df_x = pd.read_excel(xls, sheet_name=0)
+        df_x.columns = [str(c).strip() for c in df_x.columns]
+        source_country = find_col(df_x.columns, "Source Country", "Source Co", "Country", "country_name", "country")
+        if source_country is None:
+            raise ValueError("Excel CAPEX: 'Source Country' column not found.")
+        year_cols = [c for c in df_x.columns if str(c).isdigit() and len(str(c)) == 4]
+        if not year_cols:
+            raise ValueError("Excel CAPEX: no 4-digit year columns detected.")
+        melted = df_x.melt(
+            id_vars=[source_country],
+            value_vars=year_cols,
+            var_name="year",
+            value_name="capex"
+        ).rename(columns={source_country: "country"})
+        melted["year"] = pd.to_numeric(melted["year"], errors="coerce").astype("Int64")
+        melted["capex"] = melted["capex"].map(numify)
+        melted["country"] = melted["country"].astype(str).str.strip()
+        return melted
+    except Exception as e_xlsx:
+        raise ValueError(f"Could not load CAPEX from CSV or Excel.\nCSV error: {e_csv}\nXLSX error: {e_xlsx}")
 
-    # identify year columns by 'YYYY'
-    year_cols = [c for c in df.columns if str(c).isdigit() and len(str(c)) == 4]
-    if not year_cols:
-        raise ValueError("Could not find year columns (e.g., 2021, 2022, 2023, 2024) in CAPEX sheet.")
-
-    melted = df.melt(
-        id_vars=[source_country],
-        value_vars=year_cols,
-        var_name="year",
-        value_name="capex"
-    ).rename(columns={source_country: "country"})
-
-    melted["year"] = pd.to_numeric(melted["year"], errors="coerce").astype("Int64")
-    melted["capex"] = melted["capex"].map(numify)
-    melted["country"] = melted["country"].astype(str).str.strip()
-
-    # optional: drop rows where country is blank
-    melted = melted[melted["country"].str.len() > 0]
-    return melted
-
-wb = load_world_bank()
-capx = load_capex_wide_to_long()
+wb   = load_world_bank()
+capx = load_capex()
 
 # ──────────────────────────────────────────────────────────────────────────────
 # FILTERS (Year • Continent • Country)
@@ -162,8 +181,12 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
         out = out[out["country"].astype(str) == sel_country]
     return out
 
-# Note: CAPEX file has no continent—filters are Year/Country only.
+# CAPEX has no continent column; only year/country filters apply
 capx_f = capx[(capx["year"] == sel_year)]
+if sel_cont != "All":
+    # keep CAPEX rows whose country belongs to the selected continent (via WB mapping)
+    valid_countries = set(wb_scope["country"].unique())
+    capx_f = capx_f[capx_f["country"].isin(valid_countries)]
 if sel_country != "All":
     capx_f = capx_f[capx_f["country"].astype(str) == sel_country]
 
@@ -197,13 +220,11 @@ with m3:
 
 st.markdown(
     "<div style='color:#94a3b8; font-size:0.9rem;'>"
-    "Metrics reflect current filters • Data is loaded directly from GitHub.</div>",
+    "Metrics reflect current filters • Data loaded directly from GitHub.</div>",
     unsafe_allow_html=True,
 )
 
-# ──────────────────────────────────────────────────────────────────────────────
-# (Optional) Debug toggle
-# ──────────────────────────────────────────────────────────────────────────────
+# Optional debug
 with st.expander("Debug (optional)"):
     st.write("World Bank rows (filtered):", len(wb_f))
     st.write("CAPEX rows (filtered):", len(capx_f))
