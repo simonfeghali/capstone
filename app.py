@@ -17,9 +17,10 @@ st.caption("EDA • Viability Scoring • Forecasting • Comparisons • Scenar
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 
 FILES = {
-    "world_bank": "world_bank_data_with_scores_and_continent.csv",
-    "capex_eda": "capex_EDA (3).xlsx",  # note: space + parentheses
+    "world_bank": "world_bank_data_with_scores_and_continent (1).csv",
+    "capex_eda": "capex_EDA (3).xlsx",
 }
+
 
 def url_for(fname: str) -> str:
     # Percent‑encode the path segment so spaces () etc. work with raw.githubusercontent
