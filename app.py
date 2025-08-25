@@ -1,8 +1,9 @@
-import io
+# app.py
 import numpy as np
 import pandas as pd
 import streamlit as st
 from urllib.parse import quote
+from urllib.error import HTTPError, URLError
 
 # ──────────────────────────────────────────────────────────────────────────────
 # PAGE
@@ -17,47 +18,62 @@ st.caption("EDA • Viability Scoring • Forecasting • Comparisons • Scenar
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 
 FILES = {
+    # Use your exact filenames from the repo
     "world_bank": "world_bank_data_with_scores_and_continent (1).csv",
     "capex_eda": "capex_EDA (3).xlsx",
 }
 
-
 def url_for(fname: str) -> str:
-    # Percent‑encode the path segment so spaces () etc. work with raw.githubusercontent
+    # percent‑encode spaces/parentheses etc.
     return f"{RAW_BASE}/{quote(fname)}"
 
 # ──────────────────────────────────────────────────────────────────────────────
-# UTILITIES
+# HELPERS
 # ──────────────────────────────────────────────────────────────────────────────
 def find_col(cols, *candidates):
-    """Find a column by case-insensitive exact then contains match."""
-    lower_map = {c.lower(): c for c in cols}
-    for c in candidates:
-        key = c.lower()
-        if key in lower_map:
-            return lower_map[key]
-    for c in candidates:
-        key = c.lower()
-        for col in cols:
-            if key in col.lower():
-                return col
+    """Return the first matching column (case-insensitive exact, then contains)."""
+    lower = {c.lower(): c for c in cols}
+    for cand in candidates:
+        if cand.lower() in lower:
+            return lower[cand.lower()]
+    for cand in candidates:
+        for c in cols:
+            if cand.lower() in c.lower():
+                return c
     return None
 
+def numify(x):
+    if pd.isna(x):
+        return np.nan
+    if isinstance(x, (int, float, np.integer, np.floating)):
+        return float(x)
+    s = str(x).replace(",", "").strip()
+    try:
+        return float(s)
+    except Exception:
+        return np.nan
+
 # ──────────────────────────────────────────────────────────────────────────────
-# LOAD DATA
+# LOADERS
 # ──────────────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=True)
 def load_world_bank() -> pd.DataFrame:
-    df = pd.read_csv(url_for(FILES["world_bank"]))
-    # Standardize
+    """Load CSV with country, year, continent, grade (A/A+ used for a metric)."""
+    url = url_for(FILES["world_bank"])
+    try:
+        df = pd.read_csv(url)
+    except (HTTPError, URLError, FileNotFoundError) as e:
+        raise RuntimeError(f"Failed to fetch world bank CSV at {url}: {e}")
+
+    # Normalize key columns
     country = find_col(df.columns, "country", "country_name", "Country Name")
     year    = find_col(df.columns, "year")
     cont    = find_col(df.columns, "continent", "region")
     grade   = find_col(df.columns, "grade", "letter_grade")
 
-    missing = [k for k,v in {"country":country,"year":year,"continent":cont}.items() if v is None]
+    missing = [k for k, v in {"country": country, "year": year, "continent": cont}.items() if v is None]
     if missing:
-        raise ValueError(f"Missing columns in world_bank CSV: {missing}")
+        raise ValueError(f"World bank CSV missing columns: {missing}. Found: {list(df.columns)}")
 
     df = df.rename(columns={
         country: "country",
@@ -68,41 +84,51 @@ def load_world_bank() -> pd.DataFrame:
     df["year"] = pd.to_numeric(df["year"], errors="coerce").astype("Int64")
     if "grade" not in df.columns:
         df["grade"] = np.nan
+    # ensure string columns are clean
+    df["country"] = df["country"].astype(str).str.strip()
+    df["continent"] = df["continent"].astype(str).str.strip()
     return df
 
 @st.cache_data(show_spinner=True)
-def load_capex() -> pd.DataFrame:
-    # Find a sheet that contains Year + CAPEX (any name containing 'capex')
+def load_capex_wide_to_long() -> pd.DataFrame:
+    """
+    Your Excel is wide:
+    - 'Source Country' | 2021 | 2022 | 2023 | 2024 | Total | Grade
+    We melt the 4-digit year columns to a tidy long table: (country, year, capex).
+    """
     xls = pd.ExcelFile(url_for(FILES["capex_eda"]))
-    chosen = None
-    for sh in xls.sheet_names:
-        try:
-            df = pd.read_excel(xls, sheet_name=sh)
-        except Exception:
-            continue
-        if df is None or df.empty:
-            continue
-        year = find_col(df.columns, "year")
-        capex = next((c for c in df.columns if "capex" in c.lower()), None)
-        if year and capex:
-            country = find_col(df.columns, "country", "country_name")
-            cont    = find_col(df.columns, "continent", "region")
-            df = df.rename(columns={
-                year: "year",
-                capex: "capex",
-                **({country: "country"} if country else {}),
-                **({cont: "continent"} if cont else {}),
-            })
-            df["year"]  = pd.to_numeric(df["year"], errors="coerce").astype("Int64")
-            df["capex"] = pd.to_numeric(df["capex"], errors="coerce")
-            chosen = df
-            break
-    if chosen is None:
-        raise ValueError("Could not find a (Year, CAPEX*) table in 'capex_EDA (3).xlsx'.")
-    return chosen
+    # read first sheet (or change index if needed)
+    df = pd.read_excel(xls, sheet_name=0)
+    if df is None or df.empty:
+        raise ValueError("CAPEX sheet is empty.")
 
-wb   = load_world_bank()
-capx = load_capex()
+    df.columns = [str(c).strip() for c in df.columns]
+    source_country = find_col(df.columns, "Source Country", "Country", "country_name", "country")
+    if source_country is None:
+        raise ValueError("Expected a 'Source Country' column in the CAPEX sheet.")
+
+    # identify year columns by 'YYYY'
+    year_cols = [c for c in df.columns if str(c).isdigit() and len(str(c)) == 4]
+    if not year_cols:
+        raise ValueError("Could not find year columns (e.g., 2021, 2022, 2023, 2024) in CAPEX sheet.")
+
+    melted = df.melt(
+        id_vars=[source_country],
+        value_vars=year_cols,
+        var_name="year",
+        value_name="capex"
+    ).rename(columns={source_country: "country"})
+
+    melted["year"] = pd.to_numeric(melted["year"], errors="coerce").astype("Int64")
+    melted["capex"] = melted["capex"].map(numify)
+    melted["country"] = melted["country"].astype(str).str.strip()
+
+    # optional: drop rows where country is blank
+    melted = melted[melted["country"].str.len() > 0]
+    return melted
+
+wb = load_world_bank()
+capx = load_capex_wide_to_long()
 
 # ──────────────────────────────────────────────────────────────────────────────
 # FILTERS (Year • Continent • Country)
@@ -114,13 +140,15 @@ with c1:
     sel_year = st.selectbox("Year", years, index=len(years)-1 if years else 0)
 
 with c2:
-    conts = ["All"] + sorted(wb.loc[wb["year"]==sel_year, "continent"].dropna().astype(str).unique().tolist())
+    conts = ["All"] + sorted(
+        wb.loc[wb["year"] == sel_year, "continent"].dropna().astype(str).unique().tolist()
+    )
     sel_cont = st.selectbox("Continent", conts, index=0)
 
 with c3:
-    wb_scope = wb[wb["year"]==sel_year].copy()
+    wb_scope = wb[wb["year"] == sel_year].copy()
     if sel_cont != "All":
-        wb_scope = wb_scope[wb_scope["continent"].astype(str)==sel_cont]
+        wb_scope = wb_scope[wb_scope["continent"].astype(str) == sel_cont]
     countries = ["All"] + sorted(wb_scope["country"].dropna().astype(str).unique().tolist())
     sel_country = st.selectbox("Country", countries, index=0)
 
@@ -134,25 +162,28 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
         out = out[out["country"].astype(str) == sel_country]
     return out
 
-wb_f   = apply_filters(wb)
-capx_f = apply_filters(capx)
+# Note: CAPEX file has no continent—filters are Year/Country only.
+capx_f = capx[(capx["year"] == sel_year)]
+if sel_country != "All":
+    capx_f = capx_f[capx_f["country"].astype(str) == sel_country]
+
+wb_f = apply_filters(wb)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # METRICS (tiles)
 # ──────────────────────────────────────────────────────────────────────────────
 def metric_global_capex(df: pd.DataFrame) -> float:
-    if "country" in df.columns and df["country"].notna().any():
-        return float(np.nansum(df["capex"]))
-    return float(np.nanmax(df["capex"]))
+    # sum of country CAPEX for the filtered year (ignores NaNs)
+    return float(np.nansum(df["capex"])) if not df.empty else 0.0
 
 def metric_countries_tracked(df: pd.DataFrame) -> int:
-    if "country" in df.columns:
-        return int(df["country"].dropna().nunique())
-    # Fallback to world-bank scope if CAPEX sheet has no per-country rows
-    return int(wb_f["country"].dropna().nunique())
+    # number of distinct countries with a CAPEX value for the filtered year
+    if df.empty:
+        return 0
+    return int(df.loc[df["capex"].notna(), "country"].nunique())
 
 def metric_aa_plus(df: pd.DataFrame) -> int:
-    if "grade" not in df.columns:
+    if df.empty or "grade" not in df.columns:
         return 0
     return int(df[df["grade"].astype(str).isin(["A", "A+"])]["country"].nunique())
 
@@ -166,6 +197,14 @@ with m3:
 
 st.markdown(
     "<div style='color:#94a3b8; font-size:0.9rem;'>"
-    "Metrics reflect current filters • Data loaded from GitHub.</div>",
+    "Metrics reflect current filters • Data is loaded directly from GitHub.</div>",
     unsafe_allow_html=True,
 )
+
+# ──────────────────────────────────────────────────────────────────────────────
+# (Optional) Debug toggle
+# ──────────────────────────────────────────────────────────────────────────────
+with st.expander("Debug (optional)"):
+    st.write("World Bank rows (filtered):", len(wb_f))
+    st.write("CAPEX rows (filtered):", len(capx_f))
+    st.dataframe(capx_f.head(10))
