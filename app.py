@@ -19,17 +19,19 @@ st.caption("EDA • Viability Scoring • Forecasting • Comparisons • Scenar
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 
 FILES = {
-    "wb":   "world_bank_data_with_scores_and_continent (1).csv",
-    "cap":  "capex_EDA_cleaned_filled (9).csv",
+    "wb":  "world_bank_data_with_scores_and_continent (1).csv",
+    "cap": "capex_EDA_cleaned_filled (9).csv",
 }
 
 def url_for(fname: str) -> str:
-    return f"{RAW_BASE}/{quote(fname)}"  # percent‑encode spaces/()
+    # Percent‑encode spaces and parentheses so raw.githubusercontent works
+    return f"{RAW_BASE}/{quote(fname)}"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # HELPERS
 # ──────────────────────────────────────────────────────────────────────────────
 def find_col(cols, *candidates):
+    """Return the first matching column (case-insensitive exact first, then contains)."""
     lower = {c.lower(): c for c in cols}
     for cand in candidates:
         if cand.lower() in lower:
@@ -58,22 +60,27 @@ def load_world_bank() -> pd.DataFrame:
     except (HTTPError, URLError, FileNotFoundError) as e:
         raise RuntimeError(f"Failed to fetch World Bank CSV at {url}: {e}")
 
+    # Expected: country, year, continent, (score?), grade
     country = find_col(df.columns, "country", "country_name", "Country Name")
     year    = find_col(df.columns, "year")
     cont    = find_col(df.columns, "continent", "region")
+    # score column could have many names
+    score   = find_col(df.columns, "score", "viability_score", "composite_score", "overall_score")
     grade   = find_col(df.columns, "grade", "letter_grade")
 
     missing = [k for k,v in {"country":country, "year":year, "continent":cont}.items() if v is None]
     if missing:
-        raise ValueError(f"World Bank CSV missing columns: {missing}. Found: {list(df.columns)}")
+        raise ValueError(f"World Bank CSV missing required columns: {missing}. Found: {list(df.columns)}")
 
     df = df.rename(columns={
         country: "country",
         year: "year",
         cont: "continent",
-        **({grade: "grade"} if grade else {})
+        **({score: "score"} if score else {}),
+        **({grade: "grade"} if grade else {}),
     })
     df["year"] = pd.to_numeric(df["year"], errors="coerce").astype("Int64")
+    if "score" not in df.columns: df["score"] = np.nan
     if "grade" not in df.columns: df["grade"] = np.nan
     df["country"]   = df["country"].astype(str).str.strip()
     df["continent"] = df["continent"].astype(str).str.strip()
@@ -83,7 +90,7 @@ def load_world_bank() -> pd.DataFrame:
 def load_capex() -> pd.DataFrame:
     """
     Reads the cleaned wide CSV and melts year columns into (country, year, capex).
-    Columns present like:
+    Columns like:
     'Source Country' | 2021 | 2022 | 2023 | 2024 | Total | Grade | Calculated Total
     """
     url = url_for(FILES["cap"])
@@ -108,8 +115,8 @@ def load_capex() -> pd.DataFrame:
         value_name="capex"
     ).rename(columns={src: "country"})
 
-    melted["year"]   = pd.to_numeric(melted["year"], errors="coerce").astype("Int64")
-    melted["capex"]  = melted["capex"].map(numify)
+    melted["year"]    = pd.to_numeric(melted["year"], errors="coerce").astype("Int64")
+    melted["capex"]   = melted["capex"].map(numify)
     melted["country"] = melted["country"].astype(str).str.strip()
     return melted
 
@@ -118,7 +125,7 @@ capx = load_capex()
 
 # ──────────────────────────────────────────────────────────────────────────────
 # FILTERS (Year • Continent • Country)
-# Years come from the UNION of both datasets so 2024 appears (CAPEX has it)
+# Years from UNION of both datasets so 2024 appears (CAPEX has it)
 # ──────────────────────────────────────────────────────────────────────────────
 years_union = sorted(set(wb["year"].dropna().astype(int)).union(set(capx["year"].dropna().astype(int))))
 c1, c2, c3 = st.columns([1, 1, 2], gap="small")
@@ -127,7 +134,6 @@ with c1:
     sel_year = st.selectbox("Year", years_union, index=len(years_union)-1 if years_union else 0)
 
 with c2:
-    # continent options are from WB for the selected year
     conts = ["All"] + sorted(wb.loc[wb["year"] == sel_year, "continent"].dropna().astype(str).unique().tolist())
     sel_cont = st.selectbox("Continent", conts, index=0)
 
@@ -138,11 +144,9 @@ with c3:
     countries = ["All"] + sorted(wb_scope["country"].dropna().astype(str).unique().tolist())
     sel_country = st.selectbox("Country", countries, index=0)
 
-# Filter WB for tiles/charts that depend on grades
 def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
-    if "year" in out.columns:
-        out = out[out["year"] == sel_year]
+    if "year" in out.columns: out = out[out["year"] == sel_year]
     if sel_cont != "All" and "continent" in out.columns:
         out = out[out["continent"].astype(str) == sel_cont]
     if sel_country != "All" and "country" in out.columns:
@@ -151,7 +155,7 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
 
 wb_f = apply_filters(wb)
 
-# Filter CAPEX by year + map continent via WB for optional continent filter
+# CAPEX by selected year; map continent via WB when filtering by continent
 capx_f = capx[capx["year"] == sel_year]
 if sel_cont != "All":
     valid_countries = set(wb_scope["country"].unique())
@@ -181,21 +185,13 @@ with m2:
 with m3:
     st.metric("A/A+ Countries", f"{kpi_aa_plus(wb_f):,}")
 
-st.markdown(
-    "<div style='color:#94a3b8; font-size:0.9rem;'>"
-    "Data loads from GitHub • Year list merges WB+CAPEX (so 2024 is available when only CAPEX supports it).</div>",
-    unsafe_allow_html=True,
-)
-
 # ──────────────────────────────────────────────────────────────────────────────
-# VISUALS
-#   1) Global CAPEX Trend (line) — sums CAPEX by year; respects Continent/Country
-#   2) Grade Distribution (bar) — counts A+/A/B/C/D for selected year (WB only)
+# VISUALS: Global CAPEX Trend • Grade Distribution
 # ──────────────────────────────────────────────────────────────────────────────
 v1, v2 = st.columns((3, 2), gap="large")
 
 with v1:
-    # Apply continent/country filter to CAPEX for ALL years (trend)
+    # CAPEX trend over all years, filtered by continent/country
     capx_for_trend = capx.copy()
     if sel_cont != "All":
         valid_countries_all = set(wb[wb["continent"].astype(str) == sel_cont]["country"].unique())
@@ -203,11 +199,7 @@ with v1:
     if sel_country != "All":
         capx_for_trend = capx_for_trend[capx_for_trend["country"].astype(str) == sel_country]
 
-    trend = (
-        capx_for_trend.groupby("year", as_index=False)["capex"]
-        .sum()
-        .sort_values("year")
-    )
+    trend = (capx_for_trend.groupby("year", as_index=False)["capex"].sum().sort_values("year"))
     fig = px.line(trend, x="year", y="capex", markers=True,
                   labels={"year": "", "capex": "Global CAPEX ($B)"},
                   title="Global CAPEX Trend")
@@ -221,17 +213,87 @@ with v2:
     else:
         dist = (
             wb_f.assign(grade=wb_f["grade"].astype(str))
-                .loc[wb_f["grade"].astype(str).isin(grades)]
-                .groupby("grade", as_index=False)["country"].nunique()
-                .rename(columns={"country": "count"})
+               .loc[wb_f["grade"].astype(str).isin(grades)]
+               .groupby("grade", as_index=False)["country"].nunique()
+               .rename(columns={"country": "count"})
         )
-        # ensure all grade buckets appear
         dist = dist.set_index("grade").reindex(grades, fill_value=0).reset_index()
         bar = px.bar(dist, x="grade", y="count",
                      labels={"grade": "", "count": "Number of countries"},
                      title="Grade Distribution")
         bar.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=380)
         st.plotly_chart(bar, use_container_width=True)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# NEW: Top Countries table (Country • Grade • Score • YoY % • CAPEX ($B))
+# ──────────────────────────────────────────────────────────────────────────────
+st.markdown("### Top Countries  \n_Score vs. CAPEX_")
+
+# Build YoY% from CAPEX
+prev_year = sel_year - 1
+cap_curr = capx[capx["year"] == sel_year][["country", "capex"]].rename(columns={"capex": "capex_curr"})
+cap_prev = capx[capx["year"] == prev_year][["country", "capex"]].rename(columns={"capex": "capex_prev"})
+
+cap_join = cap_curr.merge(cap_prev, on="country", how="left")
+cap_join["yoy_pct"] = np.where(
+    cap_join["capex_prev"].abs() > 0,
+    (cap_join["capex_curr"] - cap_join["capex_prev"]) / cap_join["capex_prev"],
+    np.nan
+)
+
+# Take WB for selected year: country, grade, score (if exists)
+wb_cols = ["country"]
+if "grade" in wb.columns: wb_cols.append("grade")
+if "score" in wb.columns: wb_cols.append("score")
+
+wb_year = wb[wb["year"] == sel_year][wb_cols].copy()
+
+# Merge WB with CAPEX; filter by selected continent/country
+if sel_cont != "All":
+    wb_year = wb_year.merge(wb_scope[["country"]].drop_duplicates(), on="country", how="inner")
+if sel_country != "All":
+    wb_year = wb_year[wb_year["country"].astype(str) == sel_country]
+
+top_tbl = wb_year.merge(cap_join, on="country", how="left")
+
+# Choose ranking: prefer by 'score' desc; if score missing, by capex_curr desc
+if "score" in top_tbl.columns and top_tbl["score"].notna().any():
+    top_tbl = top_tbl.sort_values(["score", "capex_curr"], ascending=[False, False])
+else:
+    top_tbl = top_tbl.sort_values("capex_curr", ascending=False)
+
+# Format and display (limit to 6 like your mock)
+def fmt_pct(x):
+    return "" if pd.isna(x) else f"{x*100:,.1f}%"
+
+def fmt_num(x):
+    return "" if pd.isna(x) else f"{x:,.0f}"
+
+show_cols = []
+show_cols.append("country")
+if "grade" in top_tbl.columns: show_cols.append("grade")
+if "score" in top_tbl.columns: show_cols.append("score")
+show_cols += ["yoy_pct", "capex_curr"]
+
+nice = top_tbl[show_cols].head(6).rename(columns={
+    "country": "Country",
+    "grade": "Grade",
+    "score": "Score",
+    "yoy_pct": "YoY %",
+    "capex_curr": "CAPEX ($B)"
+})
+
+# Apply simple formatting
+if "Score" in nice.columns:
+    nice["Score"] = nice["Score"].map(lambda v: "" if pd.isna(v) else f"{v:,.0f}" if abs(v) > 1 else f"{v:,.2f}")
+nice["YoY %"] = nice["YoY %"].map(fmt_pct)
+nice["CAPEX ($B)"] = nice["CAPEX ($B)"].map(fmt_num)
+
+st.dataframe(
+    nice,
+    hide_index=True,
+    use_container_width=True
+)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Optional debug
