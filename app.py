@@ -27,7 +27,7 @@ st.markdown(
 # DATA (GitHub raw)
 # ──────────────────────────────────────────────────────────────────────────────
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
-WB_FILE  = "world_bank_data_with_scores_and_continent (1).csv"
+WB_FILE  = "world_bank_data_with_scores_and_continent.csv"
 
 def gh_raw_url(fname: str) -> str:
     return f"{RAW_BASE}/{quote(fname)}"
