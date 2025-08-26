@@ -304,7 +304,7 @@ with tab_scoring:
                     cont_bar,
                     x="score", y="continent", orientation="h",
                     color="score", color_continuous_scale="Blues",
-                    labels={"score": "", "continent": ""},
+                    labels({"score": "", "continent": ""}),
                     title=f"Continent Viability Score — {scoring_year}"
                 )
                 fig_cont.update_coloraxes(showscale=False)
@@ -361,7 +361,6 @@ with tab_eda:
     if isinstance(sel_year_any, int):
         capx_eda = capx_eda[capx_eda["year"] == sel_year_any]
 
-    # Flags for layout decisions
     country_selected = sel_country != "All"
 
     # ── TOP ROW: CAPEX Trend • CAPEX Map
@@ -371,7 +370,6 @@ with tab_eda:
         if trend.empty:
             st.info("No CAPEX data for the selected filters.")
         else:
-            # dynamic title
             if country_selected:
                 trend_title = f"{sel_country} CAPEX Trend"
             elif sel_cont != "All":
@@ -412,11 +410,8 @@ with tab_eda:
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
             st.plotly_chart(fig, use_container_width=True)
 
-    # ── BOTTOM ROW
-    # If a country is selected, suppress the ranking/grade plots —
-    # they aren’t useful in this scenario.
+    # ── BOTTOM ROW (hidden when a single country is selected)
     if not country_selected:
-        # If Grade == All we show CAPEX Trend by Grade, else we keep just the other two
         show_grade_trend = (sel_grade_eda == "All")
 
         if show_grade_trend:
@@ -498,6 +493,8 @@ with tab_eda:
                         labels={"growth_abs": "", "country": ""},
                         title=f"Top 10 Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]"
                     )
-                    fig.update_coloraxes(showscale(False))
+                    # ✅ FIXED: keyword, not function call
+                    fig.update_coloraxes(showscale=False)
                     fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                    st.plotly_chart(fig, use_container_width(True))
+                    # ✅ FIXED: keyword, not function call
+                    st.plotly_chart(fig, use_container_width=True)
