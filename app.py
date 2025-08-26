@@ -75,7 +75,6 @@ def load_scoring() -> pd.DataFrame:
     df["country"]   = df["country"].astype(str).str.strip()
     df["continent"] = df["continent"].astype(str).str.strip()
 
-    # order grades and keep only A+,A,B,C,D
     order = ["A+", "A", "B", "C", "D"]
     df["grade"] = df["grade"].astype(str).str.strip()
     df.loc[~df["grade"].isin(order), "grade"] = np.nan
@@ -86,7 +85,7 @@ def load_scoring() -> pd.DataFrame:
 wb = load_scoring()
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FILTERS (safe, no post-widget state mutation)
+# FILTERS (safe defaults; no post-widget mutation)
 # ──────────────────────────────────────────────────────────────────────────────
 years = sorted(wb["year"].dropna().astype(int).unique().tolist())
 c1, c2, c3 = st.columns([1, 1, 2], gap="small")
@@ -94,7 +93,6 @@ c1, c2, c3 = st.columns([1, 1, 2], gap="small")
 with c1:
     sel_year = st.selectbox("Year", years, index=0, key="year")
 
-# figure out *desired* continent if a country is already chosen from last run
 prev_country = st.session_state.get("country", "All")
 desired_cont = None
 if prev_country != "All":
@@ -102,22 +100,17 @@ if prev_country != "All":
     if not lookup.empty:
         desired_cont = lookup.iloc[0]
 
-# continent options and default index
 cont_options = ["All"] + sorted(wb.loc[wb["year"] == sel_year, "continent"].dropna().unique().tolist())
 default_cont = desired_cont if (desired_cont in cont_options) else st.session_state.get("continent", "All")
 if default_cont not in cont_options:
     default_cont = "All"
-
 with c2:
     sel_cont = st.selectbox("Continent", cont_options, index=cont_options.index(default_cont), key="continent")
 
-# countries depend on selected continent
 wb_scope = wb[wb["year"] == sel_year].copy()
 if sel_cont != "All":
     wb_scope = wb_scope[wb_scope["continent"] == sel_cont]
 country_options = ["All"] + sorted(wb_scope["country"].unique().tolist())
-
-# default country: keep previous if still valid
 default_country = prev_country if prev_country in country_options else "All"
 with c3:
     sel_country = st.selectbox("Country", country_options, index=country_options.index(default_country), key="country")
@@ -143,7 +136,7 @@ with tab_scoring:
     )
     st.subheader(where_title)
 
-    # ── KPI row (shown ABOVE plots when a country is selected)
+    # KPIs (shown ABOVE plots when a country is selected)
     if st.session_state.country != "All":
         ctry_rows = wb[(wb["year"] == st.session_state.year) & (wb["country"] == st.session_state.country)]
         country_score = float(ctry_rows["score"].mean()) if not ctry_rows.empty else np.nan
@@ -161,10 +154,10 @@ with tab_scoring:
             label = f"{ctry_cont} Avg Score" if ctry_cont else "Continent Avg Score"
             st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
 
-    # ── TOP: YoY line • Choropleth map
+    # TOP ROW: YoY line • Map
     t1, t2 = st.columns([1, 2], gap="large")
 
-    # Year-over-Year Viability Score (use string x to keep integer ticks)
+    # YoY line (no gridlines; x = categorical '2021','2022','2023')
     with t1:
         if st.session_state.country != "All":
             base = wb[wb["country"] == st.session_state.country]
@@ -184,10 +177,13 @@ with tab_scoring:
             labels={"year_str": "", "score": "Mean score"},
             title=title
         )
+        # enforce category axis and remove gridlines
+        fig_line.update_xaxes(type="category", categoryorder="array", categoryarray=yoy_df["year_str"].tolist(), showgrid=False)
+        fig_line.update_yaxes(showgrid=False)
         fig_line.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=340)
         st.plotly_chart(fig_line, use_container_width=True)
 
-    # Choropleth Map (blue gradient + zoom to selection)
+    # Choropleth Map (blue gradient + zoom)
     with t2:
         map_df = apply_filters(wb)[["country", "score"]].copy()
         if map_df.empty:
@@ -202,7 +198,6 @@ with tab_scoring:
                 title="Global Performance Map",
             )
             fig_map.update_coloraxes(showscale=True)
-
             scope_map = {
                 "Africa": "africa", "Asia": "asia", "Europe": "europe",
                 "North America": "north america", "South America": "south america",
@@ -212,15 +207,14 @@ with tab_scoring:
             fig_map.update_geos(scope=current_scope, projection_type="natural earth", showcountries=True, showcoastlines=True)
             if st.session_state.continent != "All" or st.session_state.country != "All":
                 fig_map.update_geos(fitbounds="locations")
-
             fig_map.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=410)
             st.plotly_chart(fig_map, use_container_width=True)
 
-    # ── BOTTOM: charts if no specific country; KPIs already shown above otherwise
+    # BOTTOM: charts if no specific country
     if st.session_state.country == "All":
         b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
 
-        # Top 10 Performing Countries — blue gradient
+        # Top 10 (remove numbers on bars)
         with b1:
             top_base = apply_filters(wb)[["country", "score"]].dropna()
             top10 = top_base.sort_values("score", ascending=False).head(10)
@@ -232,15 +226,17 @@ with tab_scoring:
                     x="score", y="country", orientation="h",
                     color="score", color_continuous_scale="Blues",
                     labels={"score": "", "country": ""},
-                    title="Top 10 Performing Countries",
-                    text=top10["score"].round(3),
+                    title="Top 10 Performing Countries"
                 )
                 fig_top.update_coloraxes(showscale=False)
+                # hide value labels and x-axis ticks if you want a cleaner card look
+                fig_top.update_traces(text=None)
+                # keep axis ticks? If you want none, uncomment next line:
+                # fig_top.update_xaxes(showticklabels=False)
                 fig_top.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                fig_top.update_traces(textposition="outside", cliponaxis=False)
                 st.plotly_chart(fig_top, use_container_width=True)
 
-        # Grade Distribution — all blues (A+ darkest → D lightest)
+        # Grade Distribution (blues)
         with b2:
             donut_base = apply_filters(wb)
             if donut_base.empty or donut_base["grade"].isna().all():
@@ -255,7 +251,7 @@ with tab_scoring:
                 ).set_index("grade").reindex(grades, fill_value=0).reset_index()
 
                 blues = px.colors.sequential.Blues
-                shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]  # dark->light
+                shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]
                 color_map = {g: c for g, c in zip(grades, shades)}
 
                 fig_donut = px.pie(
@@ -266,7 +262,7 @@ with tab_scoring:
                 fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
                 st.plotly_chart(fig_donut, use_container_width=True)
 
-        # Continent Viability Score — blue gradient
+        # Continent bars (remove numbers on bars)
         with b3:
             cont_base = wb[wb["year"] == st.session_state.year].copy()
             if st.session_state.continent != "All":
@@ -280,15 +276,16 @@ with tab_scoring:
                     cont_bar, x="score", y="continent", orientation="h",
                     color="score", color_continuous_scale="Blues",
                     labels={"score": "", "continent": ""},
-                    title="Continent Viability Score",
-                    text=cont_bar["score"].round(3),
+                    title="Continent Viability Score"
                 )
                 fig_cont.update_coloraxes(showscale=False)
+                fig_cont.update_traces(text=None)
+                # Optional: hide x-axis tick numbers too
+                # fig_cont.update_xaxes(showticklabels=False)
                 fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                fig_cont.update_traces(textposition="outside", cliponaxis=False)
                 st.plotly_chart(fig_cont, use_container_width=True)
 
-    # ── Indicator Weights (fixed table)
+    # Indicator Weights: sort DESC and hide row index
     st.markdown("### Indicator Weights (%)")
     weights = pd.DataFrame({
         "Indicator": [
@@ -307,5 +304,6 @@ with tab_scoring:
             "Total reserves in months of imports",
         ],
         "Weight (%)": [10, 8, 6, 6, 5, 5, 5, 12, 10, 8, 9, 8, 8],
-    })
-    st.table(weights)
+    }).sort_values("Weight (%)", ascending=False, kind="mergesort")
+    # Use dataframe widget to hide index
+    st.dataframe(weights, hide_index=True, use_container_width=True)
