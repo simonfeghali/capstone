@@ -267,10 +267,13 @@ with tab_scoring:
             top10 = wb_year_df[["country", "score"]].dropna().sort_values("score", ascending=False).head(10)
             if top10.empty: st.info("No countries available for Top 10 with this filter.")
             else:
-                fig_top = px.bar(top10.sort_values("score"), x="score", y="country", orientation="h",
-                                 color="score", color_continuous_scale="Blues",
-                                 labels({"score": "", "country": ""}),
-                                 title=f"Top 10 Performing Countries — {scoring_year}")
+                fig_top = px.bar(
+                    top10.sort_values("score"),
+                    x="score", y="country", orientation="h",
+                    color="score", color_continuous_scale="Blues",
+                    labels={"score": "", "country": ""},
+                    title=f"Top 10 Performing Countries — {scoring_year}"
+                )
                 fig_top.update_coloraxes(showscale=False)
                 fig_top.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig_top, use_container_width=True)
@@ -297,15 +300,18 @@ with tab_scoring:
             cont_bar = cont_base.groupby("continent", as_index=False)["score"].mean().sort_values("score", ascending=True)
             if cont_bar.empty: st.info("No continent data for this selection.")
             else:
-                fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
-                                  color="score", color_continuous_scale="Blues",
-                                  labels({"score": "", "continent": ""}),
-                                  title=f"Continent Viability Score — {scoring_year}")
+                fig_cont = px.bar(
+                    cont_bar,
+                    x="score", y="continent", orientation="h",
+                    color="score", color_continuous_scale="Blues",
+                    labels={"score": "", "continent": ""},
+                    title=f"Continent Viability Score — {scoring_year}"
+                )
                 fig_cont.update_coloraxes(showscale=False)
                 fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig_cont, use_container_width=True)
 
-    # ── Indicator Weights ONLY in Scoring tab ────────────────────────────────
+    # Indicator Weights ONLY in Scoring tab
     st.markdown("### Indicator Weights (%)")
     weights = pd.DataFrame({
         "Indicator": [
@@ -355,7 +361,7 @@ with tab_eda:
     if isinstance(sel_year_any, int):
         capx_eda = capx_eda[capx_eda["year"] == sel_year_any]
 
-    # ── TOP ROW: Global CAPEX Trend • CAPEX Map
+    # TOP ROW: Global CAPEX Trend • CAPEX Map
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
         trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
@@ -392,8 +398,7 @@ with tab_eda:
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
             st.plotly_chart(fig, use_container_width=True)
 
-    # ── BOTTOM ROW:
-    # If a grade is selected (!= All), HIDE the "CAPEX Trend by Grade"
+    # BOTTOM ROW:
     show_grade_trend = (sel_grade_eda == "All")
 
     if show_grade_trend:
@@ -411,9 +416,13 @@ with tab_eda:
         top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
         if top10.empty: st.info("No CAPEX data for Top 10 with this filter.")
         else:
-            fig = px.bar(top10.sort_values("capex"), x="capex", y="country", orientation="h",
-                         color="capex", color_continuous_scale="Blues",
-                         labels({"capex": "", "country": ""}), title=title_top10)
+            fig = px.bar(
+                top10.sort_values("capex"),
+                x="capex", y="country", orientation="h",
+                color="capex", color_continuous_scale="Blues",
+                labels={"capex": "", "country": ""},
+                title=title_top10
+            )
             fig.update_coloraxes(showscale=False)
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
             st.plotly_chart(fig, use_container_width=True)
@@ -462,11 +471,13 @@ with tab_eda:
                 joined = start.merge(end, on="country", how="inner")
                 joined["growth_abs"] = joined["capex_end"] - joined["capex_start"]
                 label_grade = f"(Grade {sel_grade_eda})" if sel_grade_eda != "All" else "(All Grades)"
-                fig = px.bar(joined.sort_values("growth_abs").tail(10),
-                             x="growth_abs", y="country", orientation="h",
-                             color="growth_abs", color_continuous_scale="Blues",
-                             labels({"growth_abs": "", "country": ""}),
-                             title=f"Top 10 Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]")
+                fig = px.bar(
+                    joined.sort_values("growth_abs").tail(10),
+                    x="growth_abs", y="country", orientation="h",
+                    color="growth_abs", color_continuous_scale="Blues",
+                    labels={"growth_abs": "", "country": ""},
+                    title=f"Top 10 Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]"
+                )
                 fig.update_coloraxes(showscale=False)
                 fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig, use_container_width=True)
