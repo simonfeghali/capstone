@@ -28,10 +28,10 @@ st.markdown(
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 
 FILES = {
-    "wb":  "world_bank_data_with_scores_and_continent.csv",
+    "wb":  "world_bank_data_with_scores_and_continent (1).csv",
     "cap_csv": "capex_EDA_cleaned_filled.csv",
-    "cap_csv_alt": "capex_EDA_cleaned_filled.csv",
-    "cap_xlsx": "capex_EDA.xlsx",
+    "cap_csv_alt": "capex_EDA_cleaned_filled (9).csv",
+    "cap_xlsx": "capex_EDA (3).xlsx",
 }
 
 def gh_raw_url(fname: str) -> str:
@@ -143,45 +143,34 @@ def load_capex_long() -> pd.DataFrame:
 wb   = load_world_bank()
 capx = load_capex_long()
 
-# Join continent into CAPEX for all years (used throughout EDA)
+# Join continent into CAPEX for all years (used in EDA)
 wb_year_cc = wb[["year", "country", "continent"]].dropna()
 capx_enriched = capx.merge(wb_year_cc, on=["year", "country"], how="left")
 
 # ──────────────────────────────────────────────────────────────────────────────
-# SINGLE FILTER ROW (shared UI)
-# Year supports All + CAPEX years (e.g., 2024). Scoring safely falls back if needed.
-# Grade (EDA) is only used by the EDA tab.
+# GLOBAL FILTER ROW (shared)
+# Year supports All + CAPEX years (e.g., 2024). Grade control will live INSIDE EDA tab only.
 # ──────────────────────────────────────────────────────────────────────────────
 years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
 years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
 years_all = ["All"] + sorted(set(years_wb).union(years_cap))  # includes 2024 if present
 
-c1, c2, c4, c3 = st.columns([1, 1, 1, 2], gap="small")
+c1, c2, c3 = st.columns([1, 1, 2], gap="small")
 
 with c1:
     sel_year_any = st.selectbox("Year", years_all, index=0, key="year_any")
 
-# For continent/country options, fall back to a valid WB year if needed (so Scoring never breaks)
-valid_year_for_wb = None
-if isinstance(sel_year_any, int) and sel_year_any in years_wb:
-    valid_year_for_wb = sel_year_any
-else:
-    valid_year_for_wb = max(years_wb)
+# choose a valid WB year for the Scoring tab if the selected year isn't in WB
+valid_year_for_wb = sel_year_any if (isinstance(sel_year_any, int) and sel_year_any in years_wb) else max(years_wb)
 
-# continent options derived from WB at a valid year
+# continent & country options derived from WB at a valid year
 cont_options = ["All"] + sorted(wb.loc[wb["year"] == valid_year_for_wb, "continent"].dropna().unique().tolist())
-# try to preserve previous continent if possible
 default_cont = st.session_state.get("continent", "All")
 if default_cont not in cont_options:
     default_cont = "All"
 with c2:
     sel_cont = st.selectbox("Continent", cont_options, index=cont_options.index(default_cont), key="continent")
 
-# Grade (EDA only) — Scoring ignores this
-with c4:
-    sel_grade_eda = st.selectbox("Grade (EDA)", ["All", "A+", "A", "B", "C", "D"], index=0, key="grade_eda")
-
-# country options depend on continent and valid WB year
 wb_scope = wb[wb["year"] == valid_year_for_wb].copy()
 if sel_cont != "All":
     wb_scope = wb_scope[wb_scope["continent"] == sel_cont]
@@ -193,33 +182,15 @@ with c3:
     sel_country = st.selectbox("Country", country_options, index=country_options.index(default_country), key="country")
 
 # Helpers
-def filt_wb_single_year(df: pd.DataFrame, year_any) -> pd.DataFrame:
+def filt_wb_single_year(df: pd.DataFrame, year_any) -> tuple[pd.DataFrame, int]:
     """Filter WB for Scoring. 'All' or unsupported year -> fallback to most recent WB year."""
-    if isinstance(year_any, int) and year_any in years_wb:
-        yy = year_any
-    else:
-        yy = max(years_wb)
+    yy = int(year_any) if (isinstance(year_any, int) and year_any in years_wb) else max(years_wb)
     out = df[df["year"] == yy].copy()
     if sel_cont != "All":
         out = out[out["continent"] == sel_cont]
     if sel_country != "All":
         out = out[out["country"] == sel_country]
     return out, yy
-
-def filt_capx_for_eda(df: pd.DataFrame, year_any, aggregate_all_when_all=True) -> pd.DataFrame:
-    """Filter CAPEX for EDA. If year_any == 'All' and aggregate_all_when_all is True, do NOT reduce;
-       we keep all years and aggregate downstream where needed."""
-    out = df.copy()
-    if sel_cont != "All":
-        out = out[out["continent"] == sel_cont]
-    if sel_country != "All":
-        out = out[out["country"] == sel_country]
-    if sel_grade_eda != "All" and "grade" in out.columns:
-        out = out[out["grade"] == sel_grade_eda]
-    # NOTE: When 'All', we keep all years (no filter here).
-    if isinstance(year_any, int):
-        out = out[out["year"] == year_any]
-    return out
 
 # ──────────────────────────────────────────────────────────────────────────────
 # TABS
@@ -377,15 +348,18 @@ with tab_scoring:
     st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# EDA TAB (CAPEX dataset) — uses same first-row filters + Grade (EDA)
-# Year=All => aggregate across ALL years (not only 2024)
+# EDA TAB (CAPEX dataset)
+# Grade filter is SHOWN ONLY HERE and applied to all EDA visuals.
+# Year = All => aggregate across ALL years (not just 2024).
 # =============================================================================
 with tab_eda:
     st.caption("Exploratory Data Analysis • (CAPEX)")
 
-    # Filter frames for EDA
-    # If sel_year_any == 'All' -> keep all years here and aggregate in each chart.
-    # If it's a specific year -> filter to that year here.
+    # EDA-only Grade filter
+    gcol = st.columns([1])[0]
+    sel_grade_eda = gcol.selectbox("Grade (EDA)", ["All", "A+", "A", "B", "C", "D"], index=0, key="grade_eda")
+
+    # Apply continent/country/grade filters; keep ALL years if Year == "All"
     capx_eda = capx_enriched.copy()
     if sel_cont != "All":
         capx_eda = capx_eda[capx_eda["continent"] == sel_cont]
@@ -393,8 +367,10 @@ with tab_eda:
         capx_eda = capx_eda[capx_eda["country"] == sel_country]
     if sel_grade_eda != "All" and "grade" in capx_eda.columns:
         capx_eda = capx_eda[capx_eda["grade"] == sel_grade_eda]
+    if isinstance(sel_year_any, int):
+        capx_eda = capx_eda[capx_eda["year"] == sel_year_any]
 
-    # ── TOP: Global CAPEX Trend (always spans all years given the filters) • CAPEX Map
+    # ── TOP: Global CAPEX Trend (spans filtered years) • CAPEX Map
     e1, e2 = st.columns([1.6, 2], gap="large")
 
     with e1:
@@ -414,13 +390,12 @@ with tab_eda:
             st.plotly_chart(fig, use_container_width=True)
 
     with e2:
+        # For Year=All, aggregate per country across all remaining years
         if isinstance(sel_year_any, int):
-            map_df = capx_eda[capx_eda["year"] == sel_year_any]
+            map_df = capx_eda.copy()
             map_title = f"CAPEX Map — {sel_year_any}"
         else:
-            # All years: aggregate capex across years per country
-            map_df = (capx_eda.groupby(["country"], as_index=False)["capex"]
-                               .sum())
+            map_df = (capx_eda.groupby("country", as_index=False)["capex"].sum())
             map_title = "CAPEX Map — All Years (aggregated)"
         if map_df.empty:
             st.info("No CAPEX data for this selection.")
@@ -440,16 +415,15 @@ with tab_eda:
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
             st.plotly_chart(fig, use_container_width=True)
 
-    # ── BOTTOM: Top 10 by CAPEX (level), CAPEX Trend by Grade, Top 10 by CAPEX Growth
+    # ── BOTTOM: Top 10 CAPEX (level), CAPEX Trend by Grade, Top 10 CAPEX Growth
     b1, b2, b3 = st.columns([1.2, 1.2, 1.6], gap="large")
 
     # Top 10 Countries by CAPEX (level)
     with b1:
         if isinstance(sel_year_any, int):
-            level_df = capx_eda[capx_eda["year"] == sel_year_any]
+            level_df = capx_eda.copy()
             title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
         else:
-            # All years: aggregate per country across all years
             level_df = (capx_eda.groupby("country", as_index=False)["capex"].sum())
             title_top10 = "Top 10 Countries by CAPEX — All Years (aggregated)"
         top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
@@ -466,11 +440,14 @@ with tab_eda:
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
             st.plotly_chart(fig, use_container_width=True)
 
-    # CAPEX Trend by Grade (multi-line; always all years, honoring filters)
+    # CAPEX Trend by Grade (multi-line; only observed grades shown)
     with b2:
         if "grade" in capx_eda.columns and not capx_eda.empty:
-            tg = (capx_eda.groupby(["year", "grade"], as_index=False)["capex"]
-                           .sum().sort_values("year"))
+            # use observed=True to avoid empty categories; or cast to string
+            tg = (capx_eda.assign(grade=capx_eda["grade"].astype(str))
+                           .groupby(["year", "grade"], as_index=False, observed=True)["capex"]
+                           .sum()
+                           .sort_values("year"))
             if tg.empty:
                 st.info("No CAPEX data for grade trend.")
             else:
@@ -493,7 +470,7 @@ with tab_eda:
 
     # Top 10 Countries by CAPEX Growth (first→last available year, dynamic by Grade)
     with b3:
-        growth_base = capx_eda.copy()  # already filtered by continent/country/grade; keep all years
+        growth_base = capx_eda.copy()  # already filtered by continent/country/grade; keep all remaining years
         if growth_base.empty:
             st.info("No CAPEX data for growth ranking.")
         else:
@@ -507,7 +484,6 @@ with tab_eda:
                 end   = agg[agg["year"] == last_year][["country", "capex"]].rename(columns={"capex": "capex_end"})
                 joined = start.merge(end, on="country", how="inner")
                 joined["growth_abs"] = joined["capex_end"] - joined["capex_start"]
-                # Use absolute growth; switch to % if preferred
                 topg = joined.sort_values("growth_abs", ascending=False).head(10)
                 label_grade = f"(Grade {sel_grade_eda})" if sel_grade_eda != "All" else "(All Grades)"
                 fig = px.bar(topg.sort_values("growth_abs"),
