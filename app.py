@@ -75,79 +75,115 @@ def load_scoring() -> pd.DataFrame:
     df["country"]   = df["country"].astype(str).str.strip()
     df["continent"] = df["continent"].astype(str).str.strip()
 
-    order = pd.CategoricalDtype(categories=["A+", "A", "B", "C", "D"], ordered=True)
+    # order grades and keep only A+,A,B,C,D
+    order = ["A+", "A", "B", "C", "D"]
     df["grade"] = df["grade"].astype(str).str.strip()
-    df["grade"] = df["grade"].where(df["grade"].isin(order.categories), other=np.nan).astype(order)
+    df.loc[~df["grade"].isin(order), "grade"] = np.nan
+    df["grade"] = pd.Categorical(df["grade"], categories=order, ordered=True)
 
     return df
 
 wb = load_scoring()
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FILTERS (Year • Continent • Country)
+# FILTERS + AUTO-SYNC CONTINENT WITH COUNTRY
 # ──────────────────────────────────────────────────────────────────────────────
 years = sorted(wb["year"].dropna().astype(int).unique().tolist())
+
 c1, c2, c3 = st.columns([1, 1, 2], gap="small")
-
 with c1:
-    sel_year = st.selectbox("Year", years, index=0)
+    sel_year = st.selectbox("Year", years, index=0, key="year")
 
+cont_options = ["All"] + sorted(wb.loc[wb["year"] == sel_year, "continent"].dropna().unique().tolist())
+if "continent" not in st.session_state or st.session_state.continent not in cont_options:
+    st.session_state.continent = "All"
 with c2:
-    conts = ["All"] + sorted(wb.loc[wb["year"] == sel_year, "continent"].dropna().unique().tolist())
-    sel_cont = st.selectbox("Continent", conts, index=0)
+    sel_cont = st.selectbox("Continent", cont_options, key="continent")
 
+wb_scope = wb[wb["year"] == sel_year].copy()
+if sel_cont != "All":
+    wb_scope = wb_scope[wb_scope["continent"] == sel_cont]
+country_options = ["All"] + sorted(wb_scope["country"].unique().tolist())
+if "country" not in st.session_state or st.session_state.country not in country_options:
+    st.session_state.country = "All"
 with c3:
-    wb_scope = wb[wb["year"] == sel_year].copy()
-    if sel_cont != "All":
-        wb_scope = wb_scope[wb_scope["continent"] == sel_cont]
-    countries = ["All"] + sorted(wb_scope["country"].unique().tolist())
-    sel_country = st.selectbox("Country", countries, index=0)
+    sel_country = st.selectbox("Country", country_options, key="country")
+
+# Auto-set Continent when a specific country is chosen
+if st.session_state.country != "All":
+    cont_lookup = wb[(wb["year"] == sel_year) & (wb["country"] == st.session_state.country)]["continent"].dropna()
+    if not cont_lookup.empty:
+        desired_cont = cont_lookup.iloc[0]
+        if st.session_state.continent != desired_cont:
+            st.session_state.continent = desired_cont
+            st.rerun()
 
 def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
     out = df[df["year"] == sel_year].copy()
-    if sel_cont != "All":
-        out = out[out["continent"] == sel_cont]
-    if sel_country != "All":
-        out = out[out["country"] == sel_country]
+    if st.session_state.continent != "All":
+        out = out[out["continent"] == st.session_state.continent]
+    if st.session_state.country != "All":
+        out = out[out["country"] == st.session_state.country]
     return out
 
 # ──────────────────────────────────────────────────────────────────────────────
-# SCORING (single tab)
+# SCORING
 # ──────────────────────────────────────────────────────────────────────────────
 tab_scoring, = st.tabs(["Scoring"])
 
 with tab_scoring:
-    where_title = sel_country if sel_country != "All" else (sel_cont if sel_cont != "All" else "Worldwide")
+    where_title = (
+        st.session_state.country
+        if st.session_state.country != "All"
+        else (st.session_state.continent if st.session_state.continent != "All" else "Worldwide")
+    )
     st.subheader(where_title)
 
-    # ── TOP ROW: (left) YoY Viability line • (right) Global map
+    # ── KPI row (shown ABOVE plots when a country is selected)
+    if st.session_state.country != "All":
+        ctry_rows = wb[(wb["year"] == st.session_state.year) & (wb["country"] == st.session_state.country)]
+        country_score = float(ctry_rows["score"].mean()) if not ctry_rows.empty else np.nan
+        country_grade = ctry_rows["grade"].astype(str).dropna().iloc[0] if not ctry_rows.empty and ctry_rows["grade"].notna().any() else "-"
+
+        ctry_cont = ctry_rows["continent"].dropna().iloc[0] if not ctry_rows.empty and ctry_rows["continent"].notna().any() else None
+        cont_avg = float(wb[(wb["year"] == st.session_state.year) & (wb["continent"] == ctry_cont)]["score"].mean()) if ctry_cont else np.nan
+
+        k1, k2, k3 = st.columns(3, gap="large")
+        with k1:
+            st.metric("Country Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
+        with k2:
+            st.metric("Grade", country_grade)
+        with k3:
+            label = f"{ctry_cont} Avg Score" if ctry_cont else "Continent Avg Score"
+            st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
+
+    # ── TOP: YoY line • Choropleth map
     t1, t2 = st.columns([1, 2], gap="large")
 
-    # Year-over-Year Viability Score
+    # Year-over-Year Viability Score (use string x to enforce integer ticks)
     with t1:
-        if sel_country != "All":
-            yoy_df = (wb[wb["country"] == sel_country]
-                      .groupby("year", as_index=False)["score"].mean()
-                      .sort_values("year"))
-            title = f"Year-over-Year Viability Score — {sel_country}"
-        elif sel_cont != "All":
-            yoy_df = (wb[wb["continent"] == sel_cont]
-                      .groupby("year", as_index=False)["score"].mean()
-                      .sort_values("year"))
-            title = f"Year-over-Year Viability Score — {sel_cont}"
+        if st.session_state.country != "All":
+            base = wb[wb["country"] == st.session_state.country]
+            title = f"Year-over-Year Viability Score — {st.session_state.country}"
+        elif st.session_state.continent != "All":
+            base = wb[wb["continent"] == st.session_state.continent]
+            title = f"Year-over-Year Viability Score — {st.session_state.continent}"
         else:
-            yoy_df = wb.groupby("year", as_index=False)["score"].mean().sort_values("year")
+            base = wb.copy()
             title = "Year-over-Year Viability Score — Global"
 
+        yoy_df = base.groupby("year", as_index=False)["score"].mean().sort_values("year")
+        yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)  # <— force nice integer labels
+
         fig_line = px.line(
-            yoy_df, x="year", y="score", markers=True,
-            labels={"year": "", "score": "Mean score"},
+            yoy_df, x="year_str", y="score", markers=True,
+            labels={"year_str": "", "score": "Mean score"},
             title=title
         )
         fig_line.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=340)
         st.plotly_chart(fig_line, use_container_width=True)
 
-    # Global Performance Map (selected year + filters)
+    # Choropleth Map (blue gradient + zoom to selection)
     with t2:
         map_df = apply_filters(wb)[["country", "score"]].copy()
         if map_df.empty:
@@ -161,14 +197,28 @@ with tab_scoring:
                 color_continuous_scale="Blues",
                 title="Global Performance Map",
             )
+            fig_map.update_coloraxes(showscale=True)
+
+            # Zoom behavior
+            scope_map = {
+                "Africa": "africa", "Asia": "asia", "Europe": "europe",
+                "North America": "north america", "South America": "south america",
+                "Oceania": "world", "All": "world"
+            }
+            current_scope = scope_map.get(st.session_state.continent, "world")
+            fig_map.update_geos(scope=current_scope, projection_type="natural earth", showcountries=True, showcoastlines=True)
+            # Zoom to the displayed locations when continent or country is selected
+            if st.session_state.continent != "All" or st.session_state.country != "All":
+                fig_map.update_geos(fitbounds="locations")
+
             fig_map.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=410)
             st.plotly_chart(fig_map, use_container_width=True)
 
-    # ── BOTTOM: charts by default; KPIs if a country is selected
-    if sel_country == "All":
+    # ── BOTTOM: Charts if no specific country; KPIs already shown above otherwise
+    if st.session_state.country == "All":
         b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
 
-        # Top 10 Performing Countries
+        # Top 10 Performing Countries — blue gradient
         with b1:
             top_base = apply_filters(wb)[["country", "score"]].dropna()
             top10 = top_base.sort_values("score", ascending=False).head(10)
@@ -178,15 +228,17 @@ with tab_scoring:
                 fig_top = px.bar(
                     top10.sort_values("score"),
                     x="score", y="country", orientation="h",
+                    color="score", color_continuous_scale="Blues",
                     labels={"score": "", "country": ""},
                     title="Top 10 Performing Countries",
                     text=top10["score"].round(3),
                 )
+                fig_top.update_coloraxes(showscale=False)
                 fig_top.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 fig_top.update_traces(textposition="outside", cliponaxis=False)
                 st.plotly_chart(fig_top, use_container_width=True)
 
-        # Grade Distribution (donut)
+        # Grade Distribution — all blues (A+ darkest → D lightest)
         with b2:
             donut_base = apply_filters(wb)
             if donut_base.empty or donut_base["grade"].isna().all():
@@ -200,17 +252,23 @@ with tab_scoring:
                               .rename(columns={"country": "count"})
                 ).set_index("grade").reindex(grades, fill_value=0).reset_index()
 
+                blues = px.colors.sequential.Blues
+                shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]  # dark->light
+                color_map = {g: c for g, c in zip(grades, shades)}
+
                 fig_donut = px.pie(
-                    donut, names="grade", values="count", hole=0.55, title="Grade Distribution"
+                    donut, names="grade", values="count", hole=0.55,
+                    title="Grade Distribution", color="grade",
+                    color_discrete_map=color_map
                 )
                 fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
                 st.plotly_chart(fig_donut, use_container_width=True)
 
-        # Continent Viability Score (bar)
+        # Continent Viability Score — blue gradient
         with b3:
-            cont_base = wb[wb["year"] == sel_year].copy()
-            if sel_cont != "All":
-                cont_base = cont_base[cont_base["continent"] == sel_cont]
+            cont_base = wb[wb["year"] == st.session_state.year].copy()
+            if st.session_state.continent != "All":
+                cont_base = cont_base[cont_base["continent"] == st.session_state.continent]
             cont_bar = (cont_base.groupby("continent", as_index=False)["score"].mean()
                                   .sort_values("score", ascending=True))
             if cont_bar.empty:
@@ -218,37 +276,34 @@ with tab_scoring:
             else:
                 fig_cont = px.bar(
                     cont_bar, x="score", y="continent", orientation="h",
+                    color="score", color_continuous_scale="Blues",
                     labels={"score": "", "continent": ""},
                     title="Continent Viability Score",
                     text=cont_bar["score"].round(3),
                 )
+                fig_cont.update_coloraxes(showscale=False)
                 fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 fig_cont.update_traces(textposition="outside", cliponaxis=False)
                 st.plotly_chart(fig_cont, use_container_width=True)
 
-    else:
-        # ── KPI mode when a *country* is selected
-        # Country’s score & grade for the selected year
-        ctry_rows = wb[(wb["year"] == sel_year) & (wb["country"] == sel_country)]
-        country_score = float(ctry_rows["score"].mean()) if not ctry_rows.empty else np.nan
-        country_grade = ctry_rows["grade"].astype(str).dropna().iloc[0] if not ctry_rows.empty and ctry_rows["grade"].notna().any() else "-"
-
-        # Determine that country's continent, then continent average score (same year)
-        if not ctry_rows.empty and ctry_rows["continent"].notna().any():
-            ctry_cont = ctry_rows["continent"].dropna().iloc[0]
-        else:
-            ctry_cont = sel_cont if sel_cont != "All" else None
-
-        if ctry_cont:
-            cont_avg = float(wb[(wb["year"] == sel_year) & (wb["continent"] == ctry_cont)]["score"].mean())
-        else:
-            cont_avg = np.nan
-
-        k1, k2, k3 = st.columns(3, gap="large")
-        with k1:
-            st.metric("Country Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
-        with k2:
-            st.metric("Grade", country_grade)
-        with k3:
-            label = f"{ctry_cont} Avg Score" if ctry_cont else "Continent Avg Score"
-            st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
+    # ── Indicator Weights (fixed table)
+    st.markdown("### Indicator Weights (%)")
+    weights = pd.DataFrame({
+        "Indicator": [
+            "GDP growth (annual %)",
+            "GDP per capita, PPP (current international $)",
+            "Current account balance (% of GDP)",
+            "Foreign direct investment, net outflows (% of GDP)",
+            "Inflation, consumer prices (annual %)",
+            "Exports of goods and services (% of GDP)",
+            "Imports of goods and services (% of GDP)",
+            "Political Stability and Absence of Violence/Terrorism: Estimate",
+            "Government Effectiveness: Estimate",
+            "Control of Corruption: Estimate",
+            "Access to electricity (% of population)",
+            "Individuals using the Internet (% of population)",
+            "Total reserves in months of imports",
+        ],
+        "Weight (%)": [10, 8, 6, 6, 5, 5, 5, 12, 10, 8, 9, 8, 8],
+    })
+    st.table(weights)
