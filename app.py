@@ -361,16 +361,28 @@ with tab_eda:
     if isinstance(sel_year_any, int):
         capx_eda = capx_eda[capx_eda["year"] == sel_year_any]
 
-    # TOP ROW: Global CAPEX Trend • CAPEX Map
+    # Flags for layout decisions
+    country_selected = sel_country != "All"
+
+    # ── TOP ROW: CAPEX Trend • CAPEX Map
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
         trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
-        if trend.empty: st.info("No CAPEX data for the selected filters.")
+        if trend.empty:
+            st.info("No CAPEX data for the selected filters.")
         else:
+            # dynamic title
+            if country_selected:
+                trend_title = f"{sel_country} CAPEX Trend"
+            elif sel_cont != "All":
+                trend_title = f"{sel_cont} CAPEX Trend"
+            else:
+                trend_title = "Global CAPEX Trend"
+
             trend["year_str"] = trend["year"].astype(int).astype(str)
             fig = px.line(trend, x="year_str", y="capex", markers=True,
-                          labels={"year_str": "", "capex": "Global CAPEX ($B)"},
-                          title="Global CAPEX Trend")
+                          labels={"year_str": "", "capex": "CAPEX ($B)"},
+                          title=trend_title)
             fig.update_xaxes(type="category", categoryorder="array",
                              categoryarray=trend["year_str"].tolist(), showgrid=False)
             fig.update_yaxes(showgrid=False)
@@ -383,7 +395,8 @@ with tab_eda:
         else:
             map_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
             map_title = "CAPEX Map — All Years (aggregated)"
-        if map_df.empty: st.info("No CAPEX data for this selection.")
+        if map_df.empty:
+            st.info("No CAPEX data for this selection.")
         else:
             fig = px.choropleth(map_df, locations="country", locationmode="country names",
                                 color="capex", color_continuous_scale="Blues", title=map_title)
@@ -394,90 +407,97 @@ with tab_eda:
             current_scope = scope_map.get(sel_cont, "world")
             fig.update_geos(scope=current_scope, projection_type="natural earth",
                             showcountries=True, showcoastlines=True)
-            if sel_cont != "All" or sel_country != "All": fig.update_geos(fitbounds="locations")
+            if sel_cont != "All" or sel_country != "All":
+                fig.update_geos(fitbounds="locations")
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
             st.plotly_chart(fig, use_container_width=True)
 
-    # BOTTOM ROW:
-    show_grade_trend = (sel_grade_eda == "All")
+    # ── BOTTOM ROW
+    # If a country is selected, suppress the ranking/grade plots —
+    # they aren’t useful in this scenario.
+    if not country_selected:
+        # If Grade == All we show CAPEX Trend by Grade, else we keep just the other two
+        show_grade_trend = (sel_grade_eda == "All")
 
-    if show_grade_trend:
-        b1, b2, b3 = st.columns([1.2, 1.2, 1.6], gap="large")
-    else:
-        b1, b3 = st.columns([1.2, 1.6], gap="large")
-
-    # Top 10 Countries by CAPEX (level)
-    with b1:
-        if isinstance(sel_year_any, int):
-            level_df = capx_eda.copy(); title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
+        if show_grade_trend:
+            b1, b2, b3 = st.columns([1.2, 1.2, 1.6], gap="large")
         else:
-            level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
-            title_top10 = "Top 10 Countries by CAPEX — All Years (aggregated)"
-        top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
-        if top10.empty: st.info("No CAPEX data for Top 10 with this filter.")
-        else:
-            fig = px.bar(
-                top10.sort_values("capex"),
-                x="capex", y="country", orientation="h",
-                color="capex", color_continuous_scale="Blues",
-                labels={"capex": "", "country": ""},
-                title=title_top10
-            )
-            fig.update_coloraxes(showscale=False)
-            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-            st.plotly_chart(fig, use_container_width=True)
+            b1, b3 = st.columns([1.2, 1.6], gap="large")
 
-    # CAPEX Trend by Grade (ONLY when Grade == All)
-    if show_grade_trend:
-        with b2:
-            if "grade" in capx_eda.columns and not capx_eda.empty:
-                tg = (capx_eda.assign(grade=capx_eda["grade"].astype(str))
-                               .groupby(["year", "grade"], as_index=False, observed=True)["capex"]
-                               .sum()
-                               .sort_values("year"))
-                if tg.empty: st.info("No CAPEX data for grade trend.")
-                else:
-                    tg["year_str"] = tg["year"].astype(int).astype(str)
-                    blues = px.colors.sequential.Blues
-                    shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]
-                    grades = ["A+", "A", "B", "C", "D"]
-                    cmap = {g:c for g,c in zip(grades, shades)}
-                    fig = px.line(tg, x="year_str", y="capex", color="grade",
-                                  color_discrete_map=cmap,
-                                  labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
-                                  title="CAPEX Trend by Grade")
-                    fig.update_xaxes(type="category", categoryorder="array",
-                                     categoryarray=sorted(tg["year_str"].unique().tolist()), showgrid=False)
-                    fig.update_yaxes(showgrid=False)
-                    fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                    st.plotly_chart(fig, use_container_width=True)
+        # Top 10 Countries by CAPEX (level)
+        with b1:
+            if isinstance(sel_year_any, int):
+                level_df = capx_eda.copy(); title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
             else:
-                st.info("No CAPEX data for grade trend.")
-
-    # Top 10 Countries by CAPEX Growth
-    with b3:
-        growth_base = capx_eda.copy()
-        if growth_base.empty:
-            st.info("No CAPEX data for growth ranking.")
-        else:
-            agg = growth_base.groupby(["country", "year"], as_index=False)["capex"].sum()
-            first_year = int(agg["year"].min()) if not agg.empty else None
-            last_year  = int(agg["year"].max()) if not agg.empty else None
-            if first_year is None or last_year is None or first_year == last_year:
-                st.info("Not enough years to compute growth.")
+                level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
+                title_top10 = "Top 10 Countries by CAPEX — All Years (aggregated)"
+            top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
+            if top10.empty:
+                st.info("No CAPEX data for Top 10 with this filter.")
             else:
-                start = agg[agg["year"] == first_year][["country", "capex"]].rename(columns={"capex": "capex_start"})
-                end   = agg[agg["year"] == last_year][["country", "capex"]].rename(columns={"capex": "capex_end"})
-                joined = start.merge(end, on="country", how="inner")
-                joined["growth_abs"] = joined["capex_end"] - joined["capex_start"]
-                label_grade = f"(Grade {sel_grade_eda})" if sel_grade_eda != "All" else "(All Grades)"
                 fig = px.bar(
-                    joined.sort_values("growth_abs").tail(10),
-                    x="growth_abs", y="country", orientation="h",
-                    color="growth_abs", color_continuous_scale="Blues",
-                    labels={"growth_abs": "", "country": ""},
-                    title=f"Top 10 Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]"
+                    top10.sort_values("capex"),
+                    x="capex", y="country", orientation="h",
+                    color="capex", color_continuous_scale="Blues",
+                    labels={"capex": "", "country": ""},
+                    title=title_top10
                 )
                 fig.update_coloraxes(showscale=False)
                 fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig, use_container_width=True)
+
+        # CAPEX Trend by Grade (ONLY when Grade == All)
+        if show_grade_trend:
+            with b2:
+                if "grade" in capx_eda.columns and not capx_eda.empty:
+                    tg = (capx_eda.assign(grade=capx_eda["grade"].astype(str))
+                                   .groupby(["year", "grade"], as_index=False, observed=True)["capex"]
+                                   .sum()
+                                   .sort_values("year"))
+                    if tg.empty:
+                        st.info("No CAPEX data for grade trend.")
+                    else:
+                        tg["year_str"] = tg["year"].astype(int).astype(str)
+                        blues = px.colors.sequential.Blues
+                        shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]
+                        grades = ["A+", "A", "B", "C", "D"]
+                        cmap = {g: c for g, c in zip(grades, shades)}
+                        fig = px.line(tg, x="year_str", y="capex", color="grade",
+                                      color_discrete_map=cmap,
+                                      labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
+                                      title="CAPEX Trend by Grade")
+                        fig.update_xaxes(type="category", categoryorder="array",
+                                         categoryarray=sorted(tg["year_str"].unique().tolist()), showgrid=False)
+                        fig.update_yaxes(showgrid=False)
+                        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+                        st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("No CAPEX data for grade trend.")
+
+        # Top 10 Countries by CAPEX Growth
+        with b3:
+            growth_base = capx_eda.copy()
+            if growth_base.empty:
+                st.info("No CAPEX data for growth ranking.")
+            else:
+                agg = growth_base.groupby(["country", "year"], as_index=False)["capex"].sum()
+                first_year = int(agg["year"].min()) if not agg.empty else None
+                last_year  = int(agg["year"].max()) if not agg.empty else None
+                if first_year is None or last_year is None or first_year == last_year:
+                    st.info("Not enough years to compute growth.")
+                else:
+                    start = agg[agg["year"] == first_year][["country", "capex"]].rename(columns={"capex": "capex_start"})
+                    end   = agg[agg["year"] == last_year][["country", "capex"]].rename(columns={"capex": "capex_end"})
+                    joined = start.merge(end, on="country", how="inner")
+                    joined["growth_abs"] = joined["capex_end"] - joined["capex_start"]
+                    label_grade = f"(Grade {sel_grade_eda})" if sel_grade_eda != "All" else "(All Grades)"
+                    fig = px.bar(
+                        joined.sort_values("growth_abs").tail(10),
+                        x="growth_abs", y="country", orientation="h",
+                        color="growth_abs", color_continuous_scale="Blues",
+                        labels={"growth_abs": "", "country": ""},
+                        title=f"Top 10 Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]"
+                    )
+                    fig.update_coloraxes(showscale(False))
+                    fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+                    st.plotly_chart(fig, use_container_width(True))
