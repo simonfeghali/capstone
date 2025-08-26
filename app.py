@@ -28,10 +28,10 @@ st.markdown(
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 
 FILES = {
-    "wb":  "world_bank_data_with_scores_and_continent (1).csv",
+    "wb":  "world_bank_data_with_scores_and_continent.csv",
     "cap_csv": "capex_EDA_cleaned_filled.csv",
-    "cap_csv_alt": "capex_EDA_cleaned_filled (9).csv",
-    "cap_xlsx": "capex_EDA (3).xlsx",
+    "cap_csv_alt": "capex_EDA_cleaned_filled.csv",
+    "cap_xlsx": "capex_EDA.xlsx",
 }
 
 def gh_raw_url(fname: str) -> str:
