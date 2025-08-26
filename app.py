@@ -36,10 +36,12 @@ def gh_raw_url(fname: str) -> str:
 def find_col(cols, *cands):
     low = {c.lower(): c for c in cols}
     for c in cands:
-        if c.lower() in low: return low[c.lower()]
+        if c.lower() in low:
+            return low[c.lower()]
     for c in cands:
         for col in cols:
-            if c.lower() in col.lower(): return col
+            if c.lower() in col.lower():
+                return col
     return None
 
 @st.cache_data(show_spinner=True)
@@ -68,8 +70,10 @@ def load_world_bank() -> pd.DataFrame:
         **({grade: "grade"} if grade else {}),
     })
     df["year"] = pd.to_numeric(df["year"], errors="coerce").astype("Int64")
-    if "score" not in df.columns: df["score"] = np.nan
-    if "grade" not in df.columns: df["grade"] = np.nan
+    if "score" not in df.columns:
+        df["score"] = np.nan
+    if "grade" not in df.columns:
+        df["grade"] = np.nan
     df["country"]   = df["country"].astype(str).str.strip()
     df["continent"] = df["continent"].astype(str).str.strip()
 
@@ -90,7 +94,8 @@ def _melt_capex_wide(df: pd.DataFrame) -> pd.DataFrame:
         raise ValueError("CAPEX: no 4-digit year columns detected.")
     id_vars = [src]
     grade_col = find_col(cols, "Grade")
-    if grade_col: id_vars.append(grade_col)
+    if grade_col:
+        id_vars.append(grade_col)
 
     melted = df.melt(
         id_vars=id_vars,
@@ -101,11 +106,15 @@ def _melt_capex_wide(df: pd.DataFrame) -> pd.DataFrame:
     melted["year"] = pd.to_numeric(melted["year"], errors="coerce").astype("Int64")
 
     def numify(x):
-        if pd.isna(x): return np.nan
-        if isinstance(x, (int, float, np.integer, np.floating)): return float(x)
+        if pd.isna(x):
+            return np.nan
+        if isinstance(x, (int, float, np.integer, np.floating)):
+            return float(x)
         s = str(x).replace(",", "").strip()
-        try: return float(s)
-        except Exception: return np.nan
+        try:
+            return float(s)
+        except Exception:
+            return np.nan
 
     melted["capex"]   = melted["capex"].map(numify)
     melted["country"] = melted["country"].astype(str).str.strip()
@@ -247,9 +256,11 @@ with tab_scoring:
         if map_df.empty:
             st.info("No data for this selection.")
         else:
-            fig_map = px.choropleth(map_df, locations="country", locationmode="country names",
-                                    color="score", color_continuous_scale="Blues",
-                                    title=f"Global Performance Map — {scoring_year}")
+            fig_map = px.choropleth(
+                map_df, locations="country", locationmode="country names",
+                color="score", color_continuous_scale="Blues",
+                title=f"Global Performance Map — {scoring_year}"
+            )
             fig_map.update_coloraxes(showscale=True)
             scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
                          "North America":"north america","South America":"south america",
@@ -266,7 +277,8 @@ with tab_scoring:
         b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
         with b1:
             top10 = wb_year_df[["country", "score"]].dropna().sort_values("score", ascending=False).head(10)
-            if top10.empty: st.info("No countries available for Top 10 with this filter.")
+            if top10.empty:
+                st.info("No countries available for Top 10 with this filter.")
             else:
                 fig_top = px.bar(
                     top10.sort_values("score"),
@@ -280,26 +292,32 @@ with tab_scoring:
                 st.plotly_chart(fig_top, use_container_width=True)
         with b2:
             donut_base = wb_year_df.copy()
-            if donut_base.empty or donut_base["grade"].isna().all(): st.info("No grade data for this selection.")
+            if donut_base.empty or donut_base["grade"].isna().all():
+                st.info("No grade data for this selection.")
             else:
                 grades = ["A+", "A", "B", "C", "D"]
-                donut = (donut_base.assign(grade=donut_base["grade"].astype(str))
-                                     .loc[lambda d: d["grade"].isin(grades)]
-                                     .groupby("grade", as_index=False)["country"].nunique()
-                                     .rename(columns={"country": "count"})
-                        ).set_index("grade").reindex(grades, fill_value=0).reset_index()
+                donut = (
+                    donut_base.assign(grade=donut_base["grade"].astype(str))
+                    .loc[lambda d: d["grade"].isin(grades)]
+                    .groupby("grade", as_index=False)["country"].nunique()
+                    .rename(columns={"country": "count"})
+                ).set_index("grade").reindex(grades, fill_value=0).reset_index()
                 shades = [px.colors.sequential.Blues[-1-i] for i in range(5)]
-                cmap = {g:c for g, c in zip(grades, shades)}
-                fig_donut = px.pie(donut, names="grade", values="count", hole=0.55,
-                                   title=f"Grade Distribution — {scoring_year}",
-                                   color="grade", color_discrete_map=cmap)
+                cmap = {g: c for g, c in zip(grades, shades)}
+                fig_donut = px.pie(
+                    donut, names="grade", values="count", hole=0.55,
+                    title=f"Grade Distribution — {scoring_year}",
+                    color="grade", color_discrete_map=cmap
+                )
                 fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
                 st.plotly_chart(fig_donut, use_container_width=True)
         with b3:
             cont_base = wb[wb["year"] == scoring_year].copy()
-            if sel_cont != "All": cont_base = cont_base[cont_base["continent"] == sel_cont]
+            if sel_cont != "All":
+                cont_base = cont_base[cont_base["continent"] == sel_cont]
             cont_bar = cont_base.groupby("continent", as_index=False)["score"].mean().sort_values("score", ascending=True)
-            if cont_bar.empty: st.info("No continent data for this selection.")
+            if cont_bar.empty:
+                st.info("No continent data for this selection.")
             else:
                 fig_cont = px.bar(
                     cont_bar,
@@ -357,8 +375,10 @@ with tab_eda:
 
     # Filter CAPEX with continent/country/grade; keep all years if Year == All
     capx_eda = capx_enriched.copy()
-    if sel_cont != "All":    capx_eda = capx_eda[capx_eda["continent"] == sel_cont]
-    if sel_country != "All": capx_eda = capx_eda[capx_eda["country"] == sel_country]
+    if sel_cont != "All":
+        capx_eda = capx_eda[capx_eda["continent"] == sel_cont]
+    if sel_country != "All":
+        capx_eda = capx_eda[capx_eda["country"] == sel_country]
     if sel_grade_eda != "All" and "grade" in capx_eda.columns:
         capx_eda = capx_eda[capx_eda["grade"] == sel_grade_eda]
     if isinstance(sel_year_any, int):
@@ -371,21 +391,31 @@ with tab_eda:
     e1, e2 = st.columns([1.2, 2], gap="large")
 
     with e1:
-        # >>> KPI CARD: if country & specific year => centered, big number, bold title
+        # >>> KPI CARD: title LEFT-aligned, number+unit CENTERED
         if country_selected and specific_year_selected:
             cap_val = float(capx_eda["capex"].sum()) if not capx_eda.empty else np.nan
             value = "-" if np.isnan(cap_val) else f"{cap_val:,.1f}"
 
             st.markdown(
                 f"""
-                <div style="text-align:center; padding:22px 8px;">
-                  <div style="font-weight:700; font-size:22px;">
+                <div style="padding:22px 8px;">
+                  <!-- Title: left aligned -->
+                  <div style="font-weight:800; font-size:22px; text-align:left;">
                     {sel_country} CAPEX — {sel_year_any}
                   </div>
-                  <div style="font-weight:800; font-size:72px; line-height:1; margin-top:10px;">
-                    {value}
+
+                  <!-- Number + unit: centered -->
+                  <div style="
+                      display:flex;
+                      flex-direction:column;
+                      align-items:center;
+                      justify-content:center;
+                      margin-top:8px;">
+                    <div style="font-weight:900; font-size:76px; line-height:1;">
+                      {value}
+                    </div>
+                    <div style="opacity:0.7; font-size:14px;">$B</div>
                   </div>
-                  <div style="opacity:0.7; font-size:14px; margin-top:4px;">$B</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -403,9 +433,11 @@ with tab_eda:
                     trend_title = "Global CAPEX Trend"
 
                 trend["year_str"] = trend["year"].astype(int).astype(str)
-                fig = px.line(trend, x="year_str", y="capex", markers=True,
-                              labels={"year_str": "", "capex": "CAPEX ($B)"},
-                              title=trend_title)
+                fig = px.line(
+                    trend, x="year_str", y="capex", markers=True,
+                    labels={"year_str": "", "capex": "CAPEX ($B)"},
+                    title=trend_title
+                )
                 fig.update_xaxes(type="category", categoryorder="array",
                                  categoryarray=trend["year_str"].tolist(), showgrid=False)
                 fig.update_yaxes(showgrid=False)
@@ -414,15 +446,18 @@ with tab_eda:
 
     with e2:
         if isinstance(sel_year_any, int):
-            map_df = capx_eda.copy(); map_title = f"CAPEX Map — {sel_year_any}"
+            map_df = capx_eda.copy()
+            map_title = f"CAPEX Map — {sel_year_any}"
         else:
             map_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
             map_title = "CAPEX Map — All Years (aggregated)"
         if map_df.empty:
             st.info("No CAPEX data for this selection.")
         else:
-            fig = px.choropleth(map_df, locations="country", locationmode="country names",
-                                color="capex", color_continuous_scale="Blues", title=map_title)
+            fig = px.choropleth(
+                map_df, locations="country", locationmode="country names",
+                color="capex", color_continuous_scale="Blues", title=map_title
+            )
             fig.update_coloraxes(showscale=True)
             scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
                          "North America":"north america","South America":"south america",
@@ -447,7 +482,8 @@ with tab_eda:
         # Top 10 Countries by CAPEX (level)
         with b1:
             if isinstance(sel_year_any, int):
-                level_df = capx_eda.copy(); title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
+                level_df = capx_eda.copy()
+                title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
             else:
                 level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
                 title_top10 = "Top 10 Countries by CAPEX — All Years (aggregated)"
@@ -470,10 +506,12 @@ with tab_eda:
         if show_grade_trend:
             with b2:
                 if "grade" in capx_eda.columns and not capx_eda.empty:
-                    tg = (capx_eda.assign(grade=capx_eda["grade"].astype(str))
-                                   .groupby(["year", "grade"], as_index=False, observed=True)["capex"]
-                                   .sum()
-                                   .sort_values("year"))
+                    tg = (
+                        capx_eda.assign(grade=capx_eda["grade"].astype(str))
+                        .groupby(["year", "grade"], as_index=False, observed=True)["capex"]
+                        .sum()
+                        .sort_values("year")
+                    )
                     if tg.empty:
                         st.info("No CAPEX data for grade trend.")
                     else:
@@ -482,10 +520,12 @@ with tab_eda:
                         shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]
                         grades = ["A+", "A", "B", "C", "D"]
                         cmap = {g: c for g, c in zip(grades, shades)}
-                        fig = px.line(tg, x="year_str", y="capex", color="grade",
-                                      color_discrete_map=cmap,
-                                      labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
-                                      title="CAPEX Trend by Grade")
+                        fig = px.line(
+                            tg, x="year_str", y="capex", color="grade",
+                            color_discrete_map=cmap,
+                            labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
+                            title="CAPEX Trend by Grade"
+                        )
                         fig.update_xaxes(type="category", categoryorder="array",
                                          categoryarray=sorted(tg["year_str"].unique().tolist()), showgrid=False)
                         fig.update_yaxes(showgrid=False)
