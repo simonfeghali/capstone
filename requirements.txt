@@ -1,5 +1,12 @@
-streamlit>=1.34
-pandas>=2.0
-numpy>=1.24
-plotly>=5.20
-requests>=2.31
+# Core app
+streamlit
+pandas
+numpy
+plotly
+
+# Excel support (keep if you might read .xlsx at any point)
+openpyxl
+xlrd
+
+# (Optional but harmless) HTTP utilities used indirectly by pandas/plotly
+requests
