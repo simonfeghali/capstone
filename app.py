@@ -86,37 +86,41 @@ def load_scoring() -> pd.DataFrame:
 wb = load_scoring()
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FILTERS + AUTO-SYNC CONTINENT WITH COUNTRY
+# FILTERS (safe, no post-widget state mutation)
 # ──────────────────────────────────────────────────────────────────────────────
 years = sorted(wb["year"].dropna().astype(int).unique().tolist())
-
 c1, c2, c3 = st.columns([1, 1, 2], gap="small")
+
 with c1:
     sel_year = st.selectbox("Year", years, index=0, key="year")
 
-cont_options = ["All"] + sorted(wb.loc[wb["year"] == sel_year, "continent"].dropna().unique().tolist())
-if "continent" not in st.session_state or st.session_state.continent not in cont_options:
-    st.session_state.continent = "All"
-with c2:
-    sel_cont = st.selectbox("Continent", cont_options, key="continent")
+# figure out *desired* continent if a country is already chosen from last run
+prev_country = st.session_state.get("country", "All")
+desired_cont = None
+if prev_country != "All":
+    lookup = wb[(wb["year"] == sel_year) & (wb["country"] == prev_country)]["continent"].dropna()
+    if not lookup.empty:
+        desired_cont = lookup.iloc[0]
 
+# continent options and default index
+cont_options = ["All"] + sorted(wb.loc[wb["year"] == sel_year, "continent"].dropna().unique().tolist())
+default_cont = desired_cont if (desired_cont in cont_options) else st.session_state.get("continent", "All")
+if default_cont not in cont_options:
+    default_cont = "All"
+
+with c2:
+    sel_cont = st.selectbox("Continent", cont_options, index=cont_options.index(default_cont), key="continent")
+
+# countries depend on selected continent
 wb_scope = wb[wb["year"] == sel_year].copy()
 if sel_cont != "All":
     wb_scope = wb_scope[wb_scope["continent"] == sel_cont]
 country_options = ["All"] + sorted(wb_scope["country"].unique().tolist())
-if "country" not in st.session_state or st.session_state.country not in country_options:
-    st.session_state.country = "All"
-with c3:
-    sel_country = st.selectbox("Country", country_options, key="country")
 
-# Auto-set Continent when a specific country is chosen
-if st.session_state.country != "All":
-    cont_lookup = wb[(wb["year"] == sel_year) & (wb["country"] == st.session_state.country)]["continent"].dropna()
-    if not cont_lookup.empty:
-        desired_cont = cont_lookup.iloc[0]
-        if st.session_state.continent != desired_cont:
-            st.session_state.continent = desired_cont
-            st.rerun()
+# default country: keep previous if still valid
+default_country = prev_country if prev_country in country_options else "All"
+with c3:
+    sel_country = st.selectbox("Country", country_options, index=country_options.index(default_country), key="country")
 
 def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
     out = df[df["year"] == sel_year].copy()
@@ -160,7 +164,7 @@ with tab_scoring:
     # ── TOP: YoY line • Choropleth map
     t1, t2 = st.columns([1, 2], gap="large")
 
-    # Year-over-Year Viability Score (use string x to enforce integer ticks)
+    # Year-over-Year Viability Score (use string x to keep integer ticks)
     with t1:
         if st.session_state.country != "All":
             base = wb[wb["country"] == st.session_state.country]
@@ -173,7 +177,7 @@ with tab_scoring:
             title = "Year-over-Year Viability Score — Global"
 
         yoy_df = base.groupby("year", as_index=False)["score"].mean().sort_values("year")
-        yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)  # <— force nice integer labels
+        yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)
 
         fig_line = px.line(
             yoy_df, x="year_str", y="score", markers=True,
@@ -199,7 +203,6 @@ with tab_scoring:
             )
             fig_map.update_coloraxes(showscale=True)
 
-            # Zoom behavior
             scope_map = {
                 "Africa": "africa", "Asia": "asia", "Europe": "europe",
                 "North America": "north america", "South America": "south america",
@@ -207,14 +210,13 @@ with tab_scoring:
             }
             current_scope = scope_map.get(st.session_state.continent, "world")
             fig_map.update_geos(scope=current_scope, projection_type="natural earth", showcountries=True, showcoastlines=True)
-            # Zoom to the displayed locations when continent or country is selected
             if st.session_state.continent != "All" or st.session_state.country != "All":
                 fig_map.update_geos(fitbounds="locations")
 
             fig_map.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=410)
             st.plotly_chart(fig_map, use_container_width=True)
 
-    # ── BOTTOM: Charts if no specific country; KPIs already shown above otherwise
+    # ── BOTTOM: charts if no specific country; KPIs already shown above otherwise
     if st.session_state.country == "All":
         b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
 
