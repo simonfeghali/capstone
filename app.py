@@ -371,12 +371,25 @@ with tab_eda:
     e1, e2 = st.columns([1.2, 2], gap="large")
 
     with e1:
-        # NEW: If country & specific year -> show KPI instead of 1-point trend
+        # >>> KPI CARD: if country & specific year => centered, big number, bold title
         if country_selected and specific_year_selected:
             cap_val = float(capx_eda["capex"].sum()) if not capx_eda.empty else np.nan
-            label = f"{sel_country} CAPEX — {sel_year_any}"
             value = "-" if np.isnan(cap_val) else f"{cap_val:,.1f}"
-            st.metric(label, value)  # units are $B from the dataset
+
+            st.markdown(
+                f"""
+                <div style="text-align:center; padding:22px 8px;">
+                  <div style="font-weight:700; font-size:22px;">
+                    {sel_country} CAPEX — {sel_year_any}
+                  </div>
+                  <div style="font-weight:800; font-size:72px; line-height:1; margin-top:10px;">
+                    {value}
+                  </div>
+                  <div style="opacity:0.7; font-size:14px; margin-top:4px;">$B</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
         else:
             trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
             if trend.empty:
