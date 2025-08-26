@@ -340,7 +340,7 @@ with tab_scoring:
 with tab_eda:
     st.caption("Exploratory Data Analysis • (CAPEX)")
 
-    # EDA-only Grade selector
+    # EDA-only Grade selector (auto when specific year + country)
     grade_options = ["All", "A+", "A", "B", "C", "D"]
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
@@ -348,10 +348,12 @@ with tab_eda:
         if not g_rows.empty and g_rows["grade"].notna().any():
             gval = str(g_rows["grade"].dropna().iloc[0])
             if gval in grade_options:
-                auto_grade = gval  # only auto if year is specific
-    sel_grade_eda = st.selectbox("Grade (EDA)", grade_options,
-                                 index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
-                                 key="grade_eda")
+                auto_grade = gval
+    sel_grade_eda = st.selectbox(
+        "Grade (EDA)", grade_options,
+        index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
+        key="grade_eda"
+    )
 
     # Filter CAPEX with continent/country/grade; keep all years if Year == All
     capx_eda = capx_enriched.copy()
@@ -363,30 +365,39 @@ with tab_eda:
         capx_eda = capx_eda[capx_eda["year"] == sel_year_any]
 
     country_selected = sel_country != "All"
+    specific_year_selected = isinstance(sel_year_any, int)
 
-    # ── TOP ROW: CAPEX Trend • CAPEX Map
-    e1, e2 = st.columns([1.6, 2], gap="large")
+    # ── TOP ROW: KPI or Trend • CAPEX Map
+    e1, e2 = st.columns([1.2, 2], gap="large")
+
     with e1:
-        trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
-        if trend.empty:
-            st.info("No CAPEX data for the selected filters.")
+        # NEW: If country & specific year -> show KPI instead of 1-point trend
+        if country_selected and specific_year_selected:
+            cap_val = float(capx_eda["capex"].sum()) if not capx_eda.empty else np.nan
+            label = f"{sel_country} CAPEX — {sel_year_any}"
+            value = "-" if np.isnan(cap_val) else f"{cap_val:,.1f}"
+            st.metric(label, value)  # units are $B from the dataset
         else:
-            if country_selected:
-                trend_title = f"{sel_country} CAPEX Trend"
-            elif sel_cont != "All":
-                trend_title = f"{sel_cont} CAPEX Trend"
+            trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
+            if trend.empty:
+                st.info("No CAPEX data for the selected filters.")
             else:
-                trend_title = "Global CAPEX Trend"
+                if country_selected:
+                    trend_title = f"{sel_country} CAPEX Trend"
+                elif sel_cont != "All":
+                    trend_title = f"{sel_cont} CAPEX Trend"
+                else:
+                    trend_title = "Global CAPEX Trend"
 
-            trend["year_str"] = trend["year"].astype(int).astype(str)
-            fig = px.line(trend, x="year_str", y="capex", markers=True,
-                          labels={"year_str": "", "capex": "CAPEX ($B)"},
-                          title=trend_title)
-            fig.update_xaxes(type="category", categoryorder="array",
-                             categoryarray=trend["year_str"].tolist(), showgrid=False)
-            fig.update_yaxes(showgrid=False)
-            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=360)
-            st.plotly_chart(fig, use_container_width=True)
+                trend["year_str"] = trend["year"].astype(int).astype(str)
+                fig = px.line(trend, x="year_str", y="capex", markers=True,
+                              labels={"year_str": "", "capex": "CAPEX ($B)"},
+                              title=trend_title)
+                fig.update_xaxes(type="category", categoryorder="array",
+                                 categoryarray=trend["year_str"].tolist(), showgrid=False)
+                fig.update_yaxes(showgrid=False)
+                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=360)
+                st.plotly_chart(fig, use_container_width=True)
 
     with e2:
         if isinstance(sel_year_any, int):
