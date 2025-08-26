@@ -1,22 +1,5 @@
-# Dashboard and Web App
-streamlit
-altair          # (built-in to Streamlit, but safe to include)
-plotly          # for interactive charts
-
-# Data Handling
-pandas
-numpy
-openpyxl        # to read Excel (capex_EDA.xlsx)
-xlrd            # legacy Excel support (if needed)
-
-# Visualization
-matplotlib
-seaborn
-
-# Machine Learning / Stats
-scikit-learn
-statsmodels     # for ARIMA, time-series models
-
-# Utility
-requests        # fetching from GitHub URLs
-urllib3
+streamlit>=1.34
+pandas>=2.0
+numpy>=1.24
+plotly>=5.20
+requests>=2.31
