@@ -151,7 +151,7 @@ c1, c2, c3 = st.columns([1, 1, 2], gap="small")
 with c1:
     sel_year_any = st.selectbox("Year", years_all, index=0, key="year_any")
 
-# Auto-continent suggestion if a country is already selected
+# Auto-continent suggestion if a country is already selected (use case 2)
 prev_country = st.session_state.get("country", "All")
 suggested_cont = None
 if prev_country != "All":
@@ -162,10 +162,11 @@ if prev_country != "All":
     if not rows.empty and rows["continent"].notna().any():
         suggested_cont = rows["continent"].dropna().iloc[0]
 
-# Build continent options from a valid WB year
+# Build continent options from a valid WB year so Scoring never breaks
 valid_year_for_wb = sel_year_any if (isinstance(sel_year_any, int) and sel_year_any in years_wb) else max(years_wb)
 cont_options = ["All"] + sorted(wb.loc[wb["year"] == valid_year_for_wb, "continent"].dropna().unique().tolist())
 
+# default continent: suggested (if available and in options) else last selection
 saved_cont = st.session_state.get("continent", "All")
 default_cont = suggested_cont if (suggested_cont in cont_options) else (saved_cont if saved_cont in cont_options else "All")
 
@@ -304,7 +305,7 @@ with tab_scoring:
                     cont_bar,
                     x="score", y="continent", orientation="h",
                     color="score", color_continuous_scale="Blues",
-                    labels({"score": "", "continent": ""}),
+                    labels={"score": "", "continent": ""},
                     title=f"Continent Viability Score — {scoring_year}"
                 )
                 fig_cont.update_coloraxes(showscale=False)
@@ -493,8 +494,6 @@ with tab_eda:
                         labels={"growth_abs": "", "country": ""},
                         title=f"Top 10 Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]"
                     )
-                    # ✅ FIXED: keyword, not function call
                     fig.update_coloraxes(showscale=False)
                     fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                    # ✅ FIXED: keyword, not function call
                     st.plotly_chart(fig, use_container_width=True)
