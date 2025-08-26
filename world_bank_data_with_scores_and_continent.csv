@@ -1,0 +1,409 @@
+Country Name,Country Code,Year,Composite_Score,Grade,Continent
+Albania,ALB,2021,0.483526518,C,Europe
+Algeria,DZA,2021,0.432169878,C,Africa
+Angola,AGO,2021,0.334836888,D,Africa
+Antigua and Barbuda,ATG,2021,0.510300074,B,North America
+Argentina,ARG,2021,0.470285764,C,South America
+Armenia,ARM,2021,0.451003103,C,Asia
+Australia,AUS,2021,0.598681652,A,Oceania
+Austria,AUT,2021,0.610669092,A,Europe
+Azerbaijan,AZE,2021,0.463628945,C,Asia
+"Bahamas, The",BHS,2021,0.558318574,B,North America
+Bahrain,BHR,2021,0.539554536,B,Asia
+Bangladesh,BGD,2021,0.36280939,D,Asia
+Belarus,BLR,2021,0.450979782,C,Europe
+Belgium,BEL,2021,0.612237122,A,Europe
+Belize,BLZ,2021,0.468015488,C,North America
+Bolivia,BOL,2021,0.419173368,D,South America
+Bosnia and Herzegovina,BIH,2021,0.443537741,C,Europe
+Botswana,BWA,2021,0.522108329,B,Africa
+Brazil,BRA,2021,0.456201,C,South America
+Bulgaria,BGR,2021,0.511581031,B,Europe
+Burkina Faso,BFA,2021,0.244592546,D,Africa
+Burundi,BDI,2021,0.185647513,D,Africa
+Cabo Verde,CPV,2021,0.517031891,B,Africa
+Cambodia,KHM,2021,0.402203162,D,Asia
+Cameroon,CMR,2021,0.305699884,D,Africa
+Canada,CAN,2021,0.606671141,A,North America
+Chile,CHL,2021,0.535985438,B,South America
+China,CHN,2021,0.500694721,B,Asia
+Colombia,COL,2021,0.441927233,C,South America
+"Congo, Rep.",COG,2021,0.311080103,D,Africa
+Costa Rica,CRI,2021,0.524910207,B,North America
+Cote d'Ivoire,CIV,2021,0.356325345,D,Africa
+Croatia,HRV,2021,0.555575837,B,Europe
+Cyprus,CYP,2021,0.562666643,B,Europe
+Czechia,CZE,2021,0.599617074,A,Europe
+Denmark,DNK,2021,0.670602298,A+,Europe
+Dominican Republic,DOM,2021,0.483585644,C,North America
+Ecuador,ECU,2021,0.4406068,C,South America
+"Egypt, Arab Rep.",EGY,2021,0.399132371,D,Africa
+El Salvador,SLV,2021,0.436070863,C,North America
+Estonia,EST,2021,0.605101294,A,Europe
+Finland,FIN,2021,0.628924932,A,Europe
+France,FRA,2021,0.56755948,A,Europe
+"Gambia, The",GMB,2021,0.382413486,D,Africa
+Georgia,GEO,2021,0.497841664,B,Asia
+Germany,DEU,2021,0.605295511,A,Europe
+Ghana,GHA,2021,0.439161243,C,Africa
+Greece,GRC,2021,0.499842222,B,Europe
+Guatemala,GTM,2021,0.404421441,D,North America
+Guinea,GIN,2021,0.325531128,D,Africa
+Guyana,GUY,2021,0.468817088,C,South America
+Honduras,HND,2021,0.398181998,D,North America
+"Hong Kong SAR, China",HKG,2021,0.701483238,A+,Asia
+Hungary,HUN,2021,0.558714782,B,Europe
+Iceland,ISL,2021,0.651933219,A+,Europe
+India,IND,2021,0.438127965,C,Asia
+Indonesia,IDN,2021,0.443354718,C,Asia
+Iraq,IRQ,2021,0.365310317,D,Asia
+Ireland,IRL,2021,0.693588797,A+,Europe
+Israel,ISR,2021,0.562796274,A,Asia
+Italy,ITA,2021,0.530800121,B,Europe
+Jamaica,JAM,2021,0.503161092,B,North America
+Japan,JPN,2021,0.624970513,A,Asia
+Jordan,JOR,2021,0.488955379,B,Asia
+Kazakhstan,KAZ,2021,0.485225014,C,Asia
+Kenya,KEN,2021,0.34785415,D,Africa
+"Korea, Rep.",KOR,2021,0.597916196,A,Asia
+Kuwait,KWT,2021,0.560608359,B,Asia
+Kyrgyz Republic,KGZ,2021,0.418839331,D,Asia
+Latvia,LVA,2021,0.567362669,A,Europe
+Lebanon,LBN,2021,0.395469151,D,Asia
+Lithuania,LTU,2021,0.583593407,A,Europe
+Luxembourg,LUX,2021,0.75879068,A+,Europe
+"Macao SAR, China",MAC,2021,0.665829442,A+,Asia
+Madagascar,MDG,2021,0.281838487,D,Africa
+Malaysia,MYS,2021,0.551244133,B,Asia
+Malta,MLT,2021,0.633199714,A+,Europe
+Mauritania,MRT,2021,0.32066115,D,Africa
+Mauritius,MUS,2021,0.535625345,B,Africa
+Mexico,MEX,2021,0.430504903,C,North America
+Moldova,MDA,2021,0.455693724,C,Europe
+Mongolia,MNG,2021,0.477466911,C,Asia
+Montenegro,MNE,2021,0.498199205,B,Europe
+Morocco,MAR,2021,0.467921442,C,Africa
+Mozambique,MOZ,2021,0.262567368,D,Africa
+Namibia,NAM,2021,0.430020253,C,Africa
+Nepal,NPL,2021,0.382037905,D,Asia
+Netherlands,NLD,2021,0.651626358,A+,Europe
+New Zealand,NZL,2021,0.615681837,A,Oceania
+Nicaragua,NIC,2021,0.383525705,D,North America
+Nigeria,NGA,2021,0.280419154,D,Africa
+North Macedonia,MKD,2021,0.492253749,B,Europe
+Norway,NOR,2021,0.672440765,A+,Europe
+Oman,OMN,2021,0.518501481,B,Asia
+Pakistan,PAK,2021,0.319843472,D,Asia
+Panama,PAN,2021,0.49141746,B,North America
+Papua New Guinea,PNG,2021,0.287267834,D,Oceania
+Paraguay,PRY,2021,0.446352281,C,South America
+Peru,PER,2021,0.462624871,C,South America
+Philippines,PHL,2021,0.435986729,C,Asia
+Poland,POL,2021,0.543310242,B,Europe
+Portugal,PRT,2021,0.562453134,B,Europe
+Qatar,QAT,2021,0.642122122,A+,Asia
+Romania,ROU,2021,0.506677102,B,Europe
+Russian Federation,RUS,2021,0.488196041,B,Europe
+Rwanda,RWA,2021,0.388832039,D,Africa
+Samoa,WSM,2021,0.49523079,B,Oceania
+Saudi Arabia,SAU,2021,0.584520178,A,Asia
+Serbia,SRB,2021,0.486650346,C,Europe
+Seychelles,SYC,2021,0.588580775,A,Africa
+Singapore,SGP,2021,0.7938191,A+,Asia
+Slovak Republic,SVK,2021,0.550568384,B,Europe
+Slovenia,SVN,2021,0.587250349,A,Europe
+Solomon Islands,SLB,2021,0.426659516,D,Oceania
+South Africa,ZAF,2021,0.439563973,C,Africa
+Spain,ESP,2021,0.554764576,B,Europe
+Sri Lanka,LKA,2021,0.405184792,D,Asia
+Suriname,SUR,2021,0.469743031,C,South America
+Sweden,SWE,2021,0.637953336,A+,Europe
+Switzerland,CHE,2021,0.722406782,A+,Europe
+Thailand,THA,2021,0.487192054,C,Asia
+Timor-Leste,TLS,2021,0.462561689,C,Asia
+Trinidad and Tobago,TTO,2021,0.515031403,B,North America
+Tunisia,TUN,2021,0.437386415,C,Africa
+Turkiye,TUR,2021,0.447475653,C,Asia
+Uganda,UGA,2021,0.283178278,D,Africa
+Ukraine,UKR,2021,0.414858777,D,Europe
+United Arab Emirates,ARE,2021,0.645648939,A+,Asia
+United Kingdom,GBR,2021,0.585818446,A,Europe
+United States,USA,2021,0.55268079,B,North America
+Uruguay,URY,2021,0.588507442,A,South America
+Uzbekistan,UZB,2021,0.467422483,C,Asia
+Viet Nam,VNM,2021,0.492607603,B,Asia
+West Bank and Gaza,PSE,2021,0.368489477,D,Asia
+Zambia,ZMB,2021,0.350536177,D,Africa
+Zimbabwe,ZWE,2021,0.276447525,D,Africa
+Albania,ALB,2022,0.486081451,C,Europe
+Algeria,DZA,2022,0.46611092,C,Africa
+Angola,AGO,2022,0.335475951,D,Africa
+Antigua and Barbuda,ATG,2022,0.518755417,B,North America
+Argentina,ARG,2022,0.461131969,C,South America
+Armenia,ARM,2022,0.462347269,C,Asia
+Australia,AUS,2022,0.610927188,A,Oceania
+Austria,AUT,2022,0.607776277,A,Europe
+Azerbaijan,AZE,2022,0.464142796,C,Asia
+"Bahamas, The",BHS,2022,0.569402198,A,North America
+Bahrain,BHR,2022,0.556353023,B,Asia
+Bangladesh,BGD,2022,0.356038978,D,Asia
+Belarus,BLR,2022,0.4335524,C,Europe
+Belgium,BEL,2022,0.617997848,A,Europe
+Belize,BLZ,2022,0.477939267,C,North America
+Bolivia,BOL,2022,0.421958074,C,South America
+Bosnia and Herzegovina,BIH,2022,0.437571241,C,Europe
+Botswana,BWA,2022,0.520557557,B,Africa
+Brazil,BRA,2022,0.444318029,C,South America
+Bulgaria,BGR,2022,0.511131972,B,Europe
+Burkina Faso,BFA,2022,0.228003397,D,Africa
+Burundi,BDI,2022,0.182452784,D,Africa
+Cabo Verde,CPV,2022,0.536375135,B,Africa
+Cambodia,KHM,2022,0.422437048,C,Asia
+Cameroon,CMR,2022,0.31495275,D,Africa
+Canada,CAN,2022,0.604046461,A,North America
+Chile,CHL,2022,0.525462093,B,South America
+China,CHN,2022,0.491497666,B,Asia
+Colombia,COL,2022,0.446210808,C,South America
+"Congo, Rep.",COG,2022,0.317320028,D,Africa
+Costa Rica,CRI,2022,0.523613173,B,North America
+Cote d'Ivoire,CIV,2022,0.365822364,D,Africa
+Croatia,HRV,2022,0.555854852,B,Europe
+Cyprus,CYP,2022,0.57085107,A,Europe
+Czechia,CZE,2022,0.590515843,A,Europe
+Denmark,DNK,2022,0.675484456,A+,Europe
+Dominican Republic,DOM,2022,0.471393664,C,North America
+Ecuador,ECU,2022,0.432224399,C,South America
+"Egypt, Arab Rep.",EGY,2022,0.405179139,D,Africa
+El Salvador,SLV,2022,0.420806438,D,North America
+Estonia,EST,2022,0.60164996,A,Europe
+Finland,FIN,2022,0.62494881,A+,Europe
+France,FRA,2022,0.565322936,B,Europe
+"Gambia, The",GMB,2022,0.386519165,D,Africa
+Georgia,GEO,2022,0.506744451,B,Asia
+Germany,DEU,2022,0.603309852,A,Europe
+Ghana,GHA,2022,0.427366315,C,Africa
+Greece,GRC,2022,0.502611279,B,Europe
+Guatemala,GTM,2022,0.402305377,D,North America
+Guinea,GIN,2022,0.317552325,D,Africa
+Guyana,GUY,2022,0.552749861,B,South America
+Honduras,HND,2022,0.394555826,D,North America
+"Hong Kong SAR, China",HKG,2022,0.699017817,A+,Asia
+Hungary,HUN,2022,0.551623058,B,Europe
+Iceland,ISL,2022,0.648443282,A+,Europe
+India,IND,2022,0.440631874,C,Asia
+Indonesia,IDN,2022,0.448918247,C,Asia
+Iraq,IRQ,2022,0.398624361,D,Asia
+Ireland,IRL,2022,0.698327368,A+,Europe
+Israel,ISR,2022,0.550185205,B,Asia
+Italy,ITA,2022,0.537522898,B,Europe
+Jamaica,JAM,2022,0.507550282,B,North America
+Japan,JPN,2022,0.623251896,A,Asia
+Jordan,JOR,2022,0.493710331,B,Asia
+Kazakhstan,KAZ,2022,0.486221386,C,Asia
+Kenya,KEN,2022,0.346087568,D,Africa
+"Korea, Rep.",KOR,2022,0.592468043,A,Asia
+Kuwait,KWT,2022,0.582211829,A,Asia
+Kyrgyz Republic,KGZ,2022,0.39974998,D,Asia
+Latvia,LVA,2022,0.555027392,B,Europe
+Lebanon,LBN,2022,0.379567914,D,Asia
+Lithuania,LTU,2022,0.573977382,A,Europe
+Luxembourg,LUX,2022,0.72197265,A+,Europe
+"Macao SAR, China",MAC,2022,0.631310419,A+,Asia
+Madagascar,MDG,2022,0.286943095,D,Africa
+Malaysia,MYS,2022,0.565727288,B,Asia
+Malta,MLT,2022,0.607155075,A,Europe
+Mauritania,MRT,2022,0.334796463,D,Africa
+Mauritius,MUS,2022,0.543040653,B,Africa
+Mexico,MEX,2022,0.432170486,C,North America
+Moldova,MDA,2022,0.430186011,C,Europe
+Mongolia,MNG,2022,0.477898744,C,Asia
+Montenegro,MNE,2022,0.493895681,B,Europe
+Morocco,MAR,2022,0.467397025,C,Africa
+Mozambique,MOZ,2022,0.260220576,D,Africa
+Namibia,NAM,2022,0.437011803,C,Africa
+Nepal,NPL,2022,0.399141426,D,Asia
+Netherlands,NLD,2022,0.647897016,A+,Europe
+New Zealand,NZL,2022,0.612972646,A,Oceania
+Nicaragua,NIC,2022,0.379249665,D,North America
+Nigeria,NGA,2022,0.280120578,D,Africa
+North Macedonia,MKD,2022,0.500248725,B,Europe
+Norway,NOR,2022,0.693666203,A+,Europe
+Oman,OMN,2022,0.538486931,B,Asia
+Pakistan,PAK,2022,0.307316692,D,Asia
+Panama,PAN,2022,0.480467328,C,North America
+Papua New Guinea,PNG,2022,0.302089114,D,Oceania
+Paraguay,PRY,2022,0.436237811,C,South America
+Peru,PER,2022,0.438303824,C,South America
+Philippines,PHL,2022,0.446039272,C,Asia
+Poland,POL,2022,0.545633427,B,Europe
+Portugal,PRT,2022,0.566670738,B,Europe
+Qatar,QAT,2022,0.660839662,A+,Asia
+Romania,ROU,2022,0.509369585,B,Europe
+Russian Federation,RUS,2022,0.463982876,C,Europe
+Rwanda,RWA,2022,0.391013222,D,Africa
+Samoa,WSM,2022,0.496372709,B,Oceania
+Saudi Arabia,SAU,2022,0.596333067,A,Asia
+Serbia,SRB,2022,0.48501895,C,Europe
+Seychelles,SYC,2022,0.59885779,A,Africa
+Singapore,SGP,2022,0.781175801,A+,Asia
+Slovak Republic,SVK,2022,0.540617003,B,Europe
+Slovenia,SVN,2022,0.585140894,A,Europe
+Solomon Islands,SLB,2022,0.4130358,D,Oceania
+South Africa,ZAF,2022,0.427301949,C,Africa
+Spain,ESP,2022,0.55362377,B,Europe
+Sri Lanka,LKA,2022,0.374065958,D,Asia
+Suriname,SUR,2022,0.473159229,C,South America
+Sweden,SWE,2022,0.632858657,A+,Europe
+Switzerland,CHE,2022,0.720190084,A+,Europe
+Thailand,THA,2022,0.491590465,B,Asia
+Timor-Leste,TLS,2022,0.41087959,D,Asia
+Trinidad and Tobago,TTO,2022,0.51600049,B,North America
+Tunisia,TUN,2022,0.439264605,C,Africa
+Turkiye,TUR,2022,0.441671165,C,Asia
+Uganda,UGA,2022,0.286446026,D,Africa
+Ukraine,UKR,2022,0.367568762,D,Europe
+United Arab Emirates,ARE,2022,0.658504877,A+,Asia
+United Kingdom,GBR,2022,0.586684025,A,Europe
+United States,USA,2022,0.554204684,B,North America
+Uruguay,URY,2022,0.586709469,A,South America
+Uzbekistan,UZB,2022,0.467900206,C,Asia
+Viet Nam,VNM,2022,0.500715112,B,Asia
+West Bank and Gaza,PSE,2022,0.375474717,D,Asia
+Zambia,ZMB,2022,0.353614226,D,Africa
+Zimbabwe,ZWE,2022,0.280900711,D,Africa
+Albania,ALB,2023,0.499393526,B,Europe
+Algeria,DZA,2023,0.464456259,C,Africa
+Angola,AGO,2023,0.345943298,D,Africa
+Antigua and Barbuda,ATG,2023,0.531100864,B,North America
+Argentina,ARG,2023,0.438937857,C,South America
+Armenia,ARM,2023,0.461805053,C,Asia
+Australia,AUS,2023,0.613025848,A,Oceania
+Austria,AUT,2023,0.598781487,A,Europe
+Azerbaijan,AZE,2023,0.454767381,C,Asia
+"Bahamas, The",BHS,2023,0.562902742,A,North America
+Bahrain,BHR,2023,0.548673471,B,Asia
+Bangladesh,BGD,2023,0.36090155,D,Asia
+Belarus,BLR,2023,0.441987444,C,Europe
+Belgium,BEL,2023,0.596764971,A,Europe
+Belize,BLZ,2023,0.476561841,C,North America
+Bolivia,BOL,2023,0.408497176,D,South America
+Bosnia and Herzegovina,BIH,2023,0.44902238,C,Europe
+Botswana,BWA,2023,0.521617336,B,Africa
+Brazil,BRA,2023,0.453004734,C,South America
+Bulgaria,BGR,2023,0.523077872,B,Europe
+Burkina Faso,BFA,2023,0.232817827,D,Africa
+Burundi,BDI,2023,0.180615101,D,Africa
+Cabo Verde,CPV,2023,0.52981944,B,Africa
+Cambodia,KHM,2023,0.44811172,C,Asia
+Cameroon,CMR,2023,0.310604316,D,Africa
+Canada,CAN,2023,0.602527559,A,North America
+Chile,CHL,2023,0.533779079,B,South America
+China,CHN,2023,0.500185523,B,Asia
+Colombia,COL,2023,0.442850109,C,South America
+"Congo, Rep.",COG,2023,0.318846119,D,Africa
+Costa Rica,CRI,2023,0.541007092,B,North America
+Cote d'Ivoire,CIV,2023,0.364428243,D,Africa
+Croatia,HRV,2023,0.535564556,B,Europe
+Cyprus,CYP,2023,0.557025975,B,Europe
+Czechia,CZE,2023,0.598906884,A,Europe
+Denmark,DNK,2023,0.674095036,A+,Europe
+Dominican Republic,DOM,2023,0.480279002,C,North America
+Ecuador,ECU,2023,0.421522138,C,South America
+"Egypt, Arab Rep.",EGY,2023,0.411334307,D,Africa
+El Salvador,SLV,2023,0.447448458,C,North America
+Estonia,EST,2023,0.593110105,A,Europe
+Finland,FIN,2023,0.615287991,A,Europe
+France,FRA,2023,0.560651192,B,Europe
+"Gambia, The",GMB,2023,0.375321567,D,Africa
+Georgia,GEO,2023,0.511481638,B,Asia
+Germany,DEU,2023,0.595952913,A,Europe
+Ghana,GHA,2023,0.4372343,C,Africa
+Greece,GRC,2023,0.499710717,B,Europe
+Guatemala,GTM,2023,0.407211151,D,North America
+Guinea,GIN,2023,0.314398349,D,Africa
+Guyana,GUY,2023,0.529080838,B,South America
+Honduras,HND,2023,0.396686298,D,North America
+"Hong Kong SAR, China",HKG,2023,0.700115825,A+,Asia
+Hungary,HUN,2023,0.545707464,B,Europe
+Iceland,ISL,2023,0.64538937,A+,Europe
+India,IND,2023,0.446430898,C,Asia
+Indonesia,IDN,2023,0.458288955,C,Asia
+Iraq,IRQ,2023,0.379023641,D,Asia
+Ireland,IRL,2023,0.676485785,A+,Europe
+Israel,ISR,2023,0.538532545,B,Asia
+Italy,ITA,2023,0.544967383,B,Europe
+Jamaica,JAM,2023,0.506627239,B,North America
+Japan,JPN,2023,0.626842033,A+,Asia
+Jordan,JOR,2023,0.505230518,B,Asia
+Kazakhstan,KAZ,2023,0.487379277,C,Asia
+Kenya,KEN,2023,0.343270358,D,Africa
+"Korea, Rep.",KOR,2023,0.596430162,A,Asia
+Kuwait,KWT,2023,0.570136416,A,Asia
+Kyrgyz Republic,KGZ,2023,0.41243019,D,Asia
+Latvia,LVA,2023,0.557180349,B,Europe
+Lebanon,LBN,2023,0.37189741,D,Asia
+Lithuania,LTU,2023,0.57763609,A,Europe
+Luxembourg,LUX,2023,0.75314233,A+,Europe
+"Macao SAR, China",MAC,2023,0.742973845,A+,Asia
+Madagascar,MDG,2023,0.276313024,D,Africa
+Malaysia,MYS,2023,0.556835793,B,Asia
+Malta,MLT,2023,0.597877673,A,Europe
+Mauritania,MRT,2023,0.341770537,D,Africa
+Mauritius,MUS,2023,0.550731576,B,Africa
+Mexico,MEX,2023,0.435580505,C,North America
+Moldova,MDA,2023,0.448878225,C,Europe
+Mongolia,MNG,2023,0.497761235,C,Asia
+Montenegro,MNE,2023,0.50580529,B,Europe
+Morocco,MAR,2023,0.470720624,C,Africa
+Mozambique,MOZ,2023,0.277843868,D,Africa
+Namibia,NAM,2023,0.436585149,C,Africa
+Nepal,NPL,2023,0.418225873,D,Asia
+Netherlands,NLD,2023,0.640208669,A+,Europe
+New Zealand,NZL,2023,0.616925507,A,Oceania
+Nicaragua,NIC,2023,0.401810676,D,North America
+Nigeria,NGA,2023,0.290989403,D,Africa
+North Macedonia,MKD,2023,0.504516419,B,Europe
+Norway,NOR,2023,0.670303629,A+,Europe
+Oman,OMN,2023,0.542487969,B,Asia
+Pakistan,PAK,2023,0.304078574,D,Asia
+Panama,PAN,2023,0.47258068,C,North America
+Papua New Guinea,PNG,2023,0.303556257,D,Oceania
+Paraguay,PRY,2023,0.455452789,C,South America
+Peru,PER,2023,0.441713099,C,South America
+Philippines,PHL,2023,0.461842603,C,Asia
+Poland,POL,2023,0.549286513,B,Europe
+Portugal,PRT,2023,0.561806311,A,Europe
+Qatar,QAT,2023,0.656122303,A+,Asia
+Romania,ROU,2023,0.511916782,B,Europe
+Russian Federation,RUS,2023,0.461361775,C,Europe
+Rwanda,RWA,2023,0.412604169,D,Africa
+Samoa,WSM,2023,0.542251467,B,Oceania
+Saudi Arabia,SAU,2023,0.583262488,A,Asia
+Serbia,SRB,2023,0.494934171,C,Europe
+Seychelles,SYC,2023,0.585930133,A,Africa
+Singapore,SGP,2023,0.776478611,A+,Asia
+Slovak Republic,SVK,2023,0.543197108,B,Europe
+Slovenia,SVN,2023,0.58763014,A,Europe
+Solomon Islands,SLB,2023,0.418614163,D,Oceania
+South Africa,ZAF,2023,0.426001239,C,Africa
+Spain,ESP,2023,0.546524013,B,Europe
+Sri Lanka,LKA,2023,0.402858923,D,Asia
+Suriname,SUR,2023,0.478040247,C,South America
+Sweden,SWE,2023,0.628215793,A+,Europe
+Switzerland,CHE,2023,0.708713739,A+,Europe
+Thailand,THA,2023,0.501397423,B,Asia
+Timor-Leste,TLS,2023,0.405011854,D,Asia
+Trinidad and Tobago,TTO,2023,0.514066202,B,North America
+Tunisia,TUN,2023,0.440557052,C,Africa
+Turkiye,TUR,2023,0.443643982,C,Asia
+Uganda,UGA,2023,0.295131442,D,Africa
+Ukraine,UKR,2023,0.415313178,D,Europe
+United Arab Emirates,ARE,2023,0.655263505,A+,Asia
+United Kingdom,GBR,2023,0.575210484,A,Europe
+United States,USA,2023,0.558640906,B,North America
+Uruguay,URY,2023,0.578214577,A,South America
+Uzbekistan,UZB,2023,0.464899397,C,Asia
+Viet Nam,VNM,2023,0.494727579,C,Asia
+West Bank and Gaza,PSE,2023,0.350302826,D,Asia
+Zambia,ZMB,2023,0.357906177,D,Africa
+Zimbabwe,ZWE,2023,0.245567293,D,Africa
