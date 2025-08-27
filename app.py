@@ -129,22 +129,6 @@ def _melt_capex_wide(df: pd.DataFrame) -> pd.DataFrame:
         melted["grade"] = pd.Categorical(melted["grade"], categories=order, ordered=True)
     return melted
 
-@st.cache_data(show_spinner=True)
-def load_capex_long() -> pd.DataFrame:
-    for key in ("cap_csv", "cap_csv_alt"):
-        try:
-            url = gh_raw_url(FILES[key])
-            df = pd.read_csv(url)
-            return _melt_capex_wide(df)
-        except Exception:
-            continue
-    try:
-        url = gh_raw_url(FILES["cap_xlsx"])
-        df_x = pd.read_excel(url, sheet_name=0)
-        return _melt_capex_wide(df_x)
-    except Exception as e:
-        raise RuntimeError(f"Could not load CAPEX from CSV or Excel: {e}")
-
 def _guess(df_cols, patterns):
     """Case/underscore-insensitive guesser."""
     for c in df_cols:
@@ -152,6 +136,25 @@ def _guess(df_cols, patterns):
         if any(p in s for p in patterns):
             return c
     return None
+
+# Canonicalization for sectors so All-mode bar charts never miss due to case/spacing
+_CANON_MAP = {
+    "software & it services": "Software & IT services",
+    "software and it services": "Software & IT services",
+    "communications": "Communications",
+    "telecommunications": "Communications",
+    "chemicals": "Chemicals",
+    "pharmaceuticals": "Pharmaceuticals",
+    "aerospace": "Aerospace",
+    "metals": "Metals",
+    "automotive oem": "Automotive OEM",
+    "automotive components": "Automotive Components",
+}
+def to_canon(sector: str) -> str:
+    if sector is None:
+        return ""
+    s = str(sector).strip().lower()
+    return _CANON_MAP.get(s, str(sector).strip())
 
 @st.cache_data(show_spinner=True)
 def load_sectors():
@@ -165,7 +168,6 @@ def load_sectors():
     capx    = _guess(df.columns, ["capex"])
     proj    = _guess(df.columns, ["project"])
 
-    # rename robustly
     rename_map = {}
     if country: rename_map[country] = "country"
     if sector:  rename_map[sector]  = "sector"
@@ -188,19 +190,22 @@ def load_sectors():
 
     df["country"] = df["country"].astype(str).str.strip()
     df["sector"]  = df["sector"].astype(str).str.strip()
+    # Canonical column for consistent matching
+    df["sector_canon"] = df["sector"].apply(to_canon)
+
+    # Normalize some country names (as before)
+    df["country_norm"] = (
+        df["country"]
+        .str.replace("Uae", "UAE", case=False, regex=False)
+        .str.replace("South korea", "South Korea", case=False, regex=False)
+    )
 
     # 10 countries used in the notebook
     top10 = [
         "United States", "United Kingdom", "France", "Germany", "UAE",
         "Canada", "Japan", "China", "South Korea", "Netherlands",
     ]
-    # enforce capitalization/variants
-    df["country_norm"] = (
-        df["country"]
-        .str.replace("Uae", "UAE", case=False, regex=False)
-        .str.replace("South korea", "South Korea", case=False, regex=False)
-    )
-    # selected sectors from the notebook
+    # selected sectors (canonical)
     selected_sectors = [
         "Software & IT services", "Communications", "Chemicals",
         "Pharmaceuticals", "Aerospace", "Metals",
@@ -428,7 +433,6 @@ with tab_eda:
 
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
-        # KPI when single year & single country
         if isinstance(sel_year_any, int) and sel_country != "All":
             v = capx_eda["capex"].sum()
             st.markdown(f"<div class='kpi-title'><b>{sel_country} CAPEX — {sel_year_any}</b></div>", unsafe_allow_html=True)
@@ -543,7 +547,7 @@ with tab_eda:
                 st.plotly_chart(fig, use_container_width=True)
 
 # =============================================================================
-# SECTORS TAB (unique keys, selected_sectors enforced)
+# SECTORS TAB (fixed: canonical sector names)
 # =============================================================================
 with tab_sectors:
     st.caption("Sectors Analysis")
@@ -557,11 +561,9 @@ with tab_sectors:
         country_opts = sectors_top10
         sel_country_s = st.selectbox("Country (Sectors)", country_opts, index=country_opts.index("United States") if "United States" in country_opts else 0, key="sectors_country")
 
-    # Metric radio
     metric = st.radio("Metric", ["Companies", "Jobs Created", "Capex", "Projects"],
                       horizontal=True, key="sectors_metric")
 
-    # Column mapping
     metric_map = {
         "Companies": "companies",
         "Jobs Created": "jobs",
@@ -570,30 +572,32 @@ with tab_sectors:
     }
     mcol = metric_map[metric]
 
-    # Country slice (use normalized names for Uae/South korea variants)
+    # Country slice using normalized country, keep canonical sector
     df_c = sectors_df[sectors_df["country_norm"].str.casefold() == sel_country_s.casefold()].copy()
 
-    # When both selected: KPI
+    # Specific sector → KPI (use canonical for summation, keep user label)
     if sel_sector != "All":
-        val = float(df_c.loc[df_c["sector"] == sel_sector, mcol].sum())
+        canon = to_canon(sel_sector)
+        val = float(df_c.loc[df_c["sector_canon"] == canon, mcol].sum())
         unit = " ($B)" if metric == "Capex" else ""
         st.markdown(f"**{sel_country_s} — {sel_sector} • {metric}**")
         st.markdown(f"<div class='kpi-big'>{val:,.0f}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='kpi-sub'>{unit.strip()}</div>", unsafe_allow_html=True)
-
     else:
-        # Bar by sector for the 8 selected_sectors (fill missing with 0)
-        agg = df_c.groupby("sector", as_index=False)[mcol].sum()
-        ordered = pd.DataFrame({"sector": SELECTED_SECTORS}).merge(agg, on="sector", how="left").fillna({mcol: 0})
+        # Aggregate by canonical sector, enforce SELECTED_SECTORS order so nothing disappears
+        agg = df_c.groupby("sector_canon", as_index=False)[mcol].sum()
+        ordered = pd.DataFrame({"sector_canon": SELECTED_SECTORS}).merge(
+            agg, on="sector_canon", how="left"
+        ).fillna({mcol: 0})
+
         title = f"{metric} by Sector — {sel_country_s}"
-        # format axis label for capex
         xlab = "CAPEX ($B)" if metric == "Capex" else ""
         fig = px.bar(
             ordered,
-            x=mcol, y="sector",
+            x=mcol, y="sector_canon",
             orientation="h",
             color=mcol, color_continuous_scale="Blues",
-            labels={mcol: xlab, "sector": ""},
+            labels={mcol: xlab, "sector_canon": ""},
             title=title
         )
         fig.update_coloraxes(showscale=False)
