@@ -45,7 +45,9 @@ def gh_raw_url(fname: str) -> str:
 
 # robust column finder
 def find_col(cols, *cands):
-    low = {c.lower().strip(): c for c in cols}
+    """Return the first actual column in cols that matches any candidate
+    (exact lower or substring lower)."""
+    low = {str(c).lower().strip(): c for c in cols}
     # exact
     for c in cands:
         key = c.lower().strip()
@@ -68,7 +70,7 @@ SELECTED_SECTORS = [
     "Coal, oil & gas", "Space & defence", "Leisure & entertainment"
 ]
 
-# optional normalization map (safe even if keys not present)
+# optional normalization map
 SECTOR_NAME_MAP = {
     "Software & IT Services": "Software & IT services",
     "IT & Software": "Software & IT services",
@@ -83,8 +85,8 @@ SECTOR_NAME_MAP = {
     "Space & Defense": "Space & defence",
 }
 
-# If you limit the Sectors/Destinations country list, put them here.
-SECTORS_COUNTRIES = None  # set to list like ["United States","Germany",...] if you want to restrict
+# If you want to limit the Sectors/Destinations country list, put them here.
+SECTORS_COUNTRIES = None  # or e.g. ["United States","United Kingdom",...]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -176,59 +178,72 @@ years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
 years_all = ["All"] + sorted(set(years_wb).union(years_cap))
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Aggregated (Sectors/Destinations) loader & helpers
+# Aggregated (Sectors/Destinations) loader & helpers — FIXED
 # ──────────────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=True)
 def load_agg_raw(file_key: str) -> pd.DataFrame:
     """
-    Reads merged_sectors_data.csv or merged_destinations_data.csv (from GitHub),
-    falls back to local /mnt/data if needed. It is tolerant to column variants
-    and standardizes to: country, sector, companies, projects, capex, jobs.
+    Reads merged_sectors_data.csv or merged_destinations_data.csv.
+    Accepts many aliases, then **builds a fresh normalized DataFrame**
+    with exact columns: country, sector, companies, projects, capex, jobs.
     """
     fname = FILES[file_key]
     # try GitHub first
-    df = None
     try:
-        df = pd.read_csv(gh_raw_url(fname))
+        df_raw = pd.read_csv(gh_raw_url(fname))
     except Exception:
-        try:
-            df = pd.read_csv(f"/mnt/data/{fname}")
-        except Exception as e:
-            raise RuntimeError(f"Could not read {fname}: {e}")
+        df_raw = pd.read_csv(f"/mnt/data/{fname}")
 
-    cols = list(df.columns)
+    cols = list(df_raw.columns)
 
-    country = find_col(cols, "source country", "country", "home country", "origin country")
-    sector  = find_col(cols, "sector", "destination", "category", "segment", "function")
-    companies = find_col(cols, "companies", "number of companies", "num companies", "company count")
-    projects  = find_col(cols, "projects", "number of projects", "num projects", "project count")
-    capex     = find_col(cols, "capex", "capital expenditure", "capex (in million usd)", "capex_usd", "capex (usd)")
-    jobs      = find_col(cols, "jobs created", "jobs", "jobs_created", "new jobs", "job creation")
+    # candidates for each field
+    country_col = find_col(
+        cols,
+        "source country", "country", "home country", "origin country",
+        "destination country", "host country", "target country"
+    )
+    sector_col = find_col(
+        cols,
+        "sector", "destination", "destination sector", "sector name",
+        "industry", "target sector", "category", "segment", "function"
+    )
+    companies_col = find_col(
+        cols, "companies", "number of companies", "num companies",
+        "company count", "no. of companies"
+    )
+    projects_col = find_col(
+        cols, "projects", "number of projects", "num projects",
+        "project count", "no. of projects"
+    )
+    capex_col = find_col(
+        cols, "capex", "capital expenditure", "capex (in million usd)",
+        "capex_usd", "capex (usd)", "capex ($m)", "capex (m usd)"
+    )
+    jobs_col = find_col(
+        cols, "jobs created", "jobs", "jobs_created", "new jobs",
+        "job creation", "jobs (estimated)"
+    )
 
-    # Validate
     needs = {
-        "country": country, "sector/destination": sector,
-        "companies": companies, "projects": projects,
-        "capex": capex, "jobs": jobs,
+        "country": country_col, "sector/destination": sector_col,
+        "companies": companies_col, "projects": projects_col,
+        "capex": capex_col, "jobs": jobs_col
     }
     missing = [k for k, v in needs.items() if v is None]
     if missing:
-        raise ValueError(f"{file_key} CSV missing column for {missing}. Found: {list(df.columns)}")
+        raise ValueError(f"{file_key} CSV missing column for {missing}. Found: {list(df_raw.columns)}")
 
-    df = df.rename(columns={
-        country: "country", sector: "sector", companies: "companies",
-        projects: "projects", capex: "capex", jobs: "jobs",
-    })
-    # nomalize text
-    df["country"] = df["country"].astype(str).str.strip()
-    df["sector"]  = (df["sector"].astype(str).str.strip()
-                     .map(lambda x: SECTOR_NAME_MAP.get(x, x)))
-    # numeric
-    for c in ["companies", "projects", "capex", "jobs"]:
-        df[c] = (pd.to_numeric(df[c], errors="coerce")
-                 .fillna(0))
+    # Build normalized DataFrame (no rename dependency)
+    out = pd.DataFrame({
+        "country": df_raw[country_col].astype(str).str.strip(),
+        "sector":  df_raw[sector_col].astype(str).str.strip().map(lambda x: SECTOR_NAME_MAP.get(x, x)),
+        "companies": pd.to_numeric(df_raw[companies_col], errors="coerce"),
+        "projects":  pd.to_numeric(df_raw[projects_col], errors="coerce"),
+        "capex":     pd.to_numeric(df_raw[capex_col], errors="coerce"),
+        "jobs":      pd.to_numeric(df_raw[jobs_col], errors="coerce"),
+    }).fillna(0)
 
-    return df
+    return out
 
 sectors_df       = load_agg_raw("sectors")
 destinations_df  = load_agg_raw("destinations")
@@ -268,7 +283,6 @@ def kpi_centered(value, title, unit=""):
         value = "-"
         unit = ""
     else:
-        # nice formatting; capex could be large and already in $M
         if isinstance(value, (int,float,np.integer,np.floating)):
             value = f"{value:,.0f}"
     st.markdown(f"<div style='text-align:center' class='kpi-big'>{value}{unit}</div>", unsafe_allow_html=True)
@@ -556,12 +570,11 @@ with tab_eda:
             st.info("No CAPEX data for growth ranking.")
 
 # =============================================================================
-# SECTORS TAB  (unchanged from your last working version)
+# SECTORS TAB  (same UX as before)
 # =============================================================================
 with tab_sectors:
     st.caption("Sectors Analysis")
 
-    # Filters (independent from global)
     s1, s2 = st.columns([1, 3], gap="large")
     with s1:
         sector_opt = ["All"] + sorted(sectors_df["sector"].dropna().unique().tolist())
@@ -599,7 +612,7 @@ with tab_sectors:
                        f"{title_suffix} by Selected Sectors — {sel_country_sec if sel_country_sec else 'Global'}")
 
 # =============================================================================
-# DESTINATIONS TAB  (NEW — mirrors Sectors tab)
+# DESTINATIONS TAB  (mirrors Sectors; loader fixed)
 # =============================================================================
 with tab_dest:
     st.caption("Destinations Analysis")
@@ -624,7 +637,7 @@ with tab_dest:
                                 filename=f"{sel_country_dest.lower().replace(' ','_')}_destinations_data.csv",
                                 label=f"Download CSV for {sel_country_dest}")
 
-    # KPI if both a specific "destination sector" and a specific country are chosen
+    # KPI if both a specific destination sector and a specific country are chosen
     if sel_dest != "All" and sel_country_dest:
         v = (destinations_df[(destinations_df["country"] == sel_country_dest) &
                              (destinations_df["sector"] == sel_dest)][metric_col_d]
@@ -641,7 +654,7 @@ with tab_dest:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Indicator weights table (Scoring tab only — unchanged; not shown elsewhere)
+# Indicator weights table (Scoring tab only — unchanged)
 # ──────────────────────────────────────────────────────────────────────────────
 with tab_scoring:
     st.markdown("### Indicator Weights (%)")
