@@ -5,6 +5,7 @@ import streamlit as st
 import plotly.express as px
 from urllib.parse import quote
 from urllib.error import URLError, HTTPError
+import io
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Basic page styling
@@ -347,7 +348,6 @@ with tab_scoring:
 with tab_eda:
     st.caption("Exploratory Data Analysis • (CAPEX)")
 
-    # EDA-only Grade selector (auto-change if specific year & country selected)
     grade_options = ["All", "A+", "A", "B", "C", "D"]
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
@@ -360,7 +360,6 @@ with tab_eda:
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
 
-    # Filter CAPEX with continent/country/grade; keep all years if Year == All
     capx_eda = capx_enriched.copy()
     if sel_cont != "All":    capx_eda = capx_eda[capx_eda["continent"] == sel_cont]
     if sel_country != "All": capx_eda = capx_eda[capx_eda["country"] == sel_country]
@@ -369,13 +368,11 @@ with tab_eda:
     if isinstance(sel_year_any, int):
         capx_eda = capx_eda[capx_eda["year"] == sel_year_any]
 
-    # ── TOP ROW: CAPEX Trend • CAPEX Map
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
         trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
         if trend.empty: st.info("No CAPEX data for the selected filters.")
         else:
-            # if a single year & specific country → KPI instead of a 1-point line
             if (sel_country != "All") and isinstance(sel_year_any, int) and len(trend) == 1:
                 v = float(trend["capex"].iloc[0])
                 title = f"<div class='kpi-sub'><b>{sel_country} CAPEX — {int(sel_year_any)}</b></div>"
@@ -414,7 +411,6 @@ with tab_eda:
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
             st.plotly_chart(fig, use_container_width=True)
 
-    # Bottom row (Top10 countries • Grade trend (only when Grade=All) • Growth)
     show_grade_trend = (sel_grade_eda == "All")
     if show_grade_trend:
         b1, b2, b3 = st.columns([1.2, 1.2, 1.6], gap="large")
@@ -489,9 +485,8 @@ with tab_eda:
                 st.plotly_chart(fig, use_container_width=True)
 
 # =============================================================================
-# SECTORS TAB  (new)
+# SECTORS TAB  (updated mapping + download CSV)
 # =============================================================================
-# Notebook's selected sectors (order preserved)
 SELECTED_SECTORS = [
     "Software & IT services", "Business services", "Communications",
     "Financial services", "Transportation & Warehousing", "Real estate",
@@ -500,37 +495,62 @@ SELECTED_SECTORS = [
     "Metals", "Coal, oil & gas", "Leisure & entertainment", "Space & defence",
 ]
 
+# Canonicalizer that mirrors typical notebook cleaning:
+def canon(s: str) -> str:
+    s = str(s if s is not None else "").lower()
+    s = s.replace("&", "and")
+    s = s.replace("/", " ")
+    s = s.replace("-", " ")
+    s = s.replace(",", "")
+    s = s.replace("’", "'")
+    s = " ".join(s.split())
+    return s
+
+# Map selected sectors to their canonical keys
+SELECTED_CANON_MAP = {canon(x): x for x in SELECTED_SECTORS}
+
+# Add common synonyms seen in raw data → canonical selected sector
+SECTOR_SYNONYMS = {
+    "software and it services": "Software & IT services",
+    "transportation and warehousing": "Transportation & Warehousing",
+    "leisure and entertainment": "Leisure & entertainment",
+    "space and defence": "Space & defence",
+    "food and beverages": "Food and Beverages",
+    "automotive components": "Automotive components",
+    "automotive oem": "Automotive OEM",
+    "coal oil and gas": "Coal, oil & gas",
+}
+
+def normalize_sector_to_selected(name: str) -> str:
+    c = canon(name)
+    # exact canonical match
+    if c in SELECTED_CANON_MAP:
+        return SELECTED_CANON_MAP[c]
+    # synonyms
+    if c in SECTOR_SYNONYMS:
+        return SECTOR_SYNONYMS[c]
+    # fallback: try fuzzy-ish contains for known tokens (conservative)
+    tokens = {
+        "software it": "Software & IT services",
+        "transportation warehousing": "Transportation & Warehousing",
+        "leisure entertainment": "Leisure & entertainment",
+        "space defence": "Space & defence",
+        "food beverages": "Food and Beverages",
+        "automotive component": "Automotive components",
+        "automotive oem": "Automotive OEM",
+        "coal oil gas": "Coal, oil & gas",
+    }
+    for k, v in tokens.items():
+        if all(t in c for t in k.split()):
+            return v
+    # otherwise keep original (still can be filtered out when we reindex selected sectors)
+    return str(name).strip()
+
 # Top-10 countries used in the sectors notebook
 SECTOR_COUNTRIES = [
     "United States", "United Kingdom", "Germany", "France", "Netherlands",
     "Canada", "Japan", "China", "South Korea", "UAE"
 ]
-
-def _norm_sector(s: str) -> str:
-    """Normalize sector names to match SELECTED_SECTORS exactly."""
-    if s is None: return ""
-    s = str(s).strip()
-    # Unify common variants
-    m = {
-        "Food and beverages": "Food and Beverages",
-        "Automotive Components": "Automotive components",
-        "Automotive components": "Automotive components",
-        "Software and IT services": "Software & IT services",
-        "Software & IT Services": "Software & IT services",
-        "Transportation and Warehousing": "Transportation & Warehousing",
-        "Leisure and entertainment": "Leisure & entertainment",
-        "Space and defence": "Space & defence",
-        "Coal, oil and gas": "Coal, oil & gas",
-    }
-    # Case-insensitive map
-    for k, v in m.items():
-        if s.lower() == k.lower():
-            s = v
-    # Final pass: exact match if existing (case-insensitive)
-    for t in SELECTED_SECTORS:
-        if s.lower() == t.lower():
-            return t
-    return s
 
 @st.cache_data(show_spinner=True)
 def load_sectors() -> pd.DataFrame:
@@ -563,8 +583,8 @@ def load_sectors() -> pd.DataFrame:
     for c in ["projects", "capex", "jobs", "companies"]:
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
 
-    # Normalize sector names to selected-sectors set
-    df["sector"] = df["sector"].map(_norm_sector)
+    # Robust sector normalization like in notebook
+    df["sector"] = df["sector"].map(normalize_sector_to_selected)
 
     return df
 
@@ -579,7 +599,6 @@ with tab_sectors:
         sector_all_opts = ["All"] + sorted(sectors["sector"].dropna().unique().tolist())
         sel_sector = st.selectbox("Sector", sector_all_opts, index=sector_all_opts.index("All"), key="sec_sector")
     with r1c2:
-        # Only the 10 countries from notebook + "All"
         countries_opts = ["All"] + SECTOR_COUNTRIES
         sel_country_sec = st.selectbox("Country (Sectors)", countries_opts, index=0, key="sec_country")
 
@@ -598,9 +617,30 @@ with tab_sectors:
     }
     metric_col, metric_label = metric_map[metric]
 
-    # Filter to notebook's 10 countries for charts
+    # Base restricted to notebook's 10 countries for visual alignment
     base = sectors.copy()
     base = base[base["country"].isin(SECTOR_COUNTRIES)]
+
+    # ── Download CSV for selected country (like the notebook)
+    if sel_country_sec != "All":
+        country_df = (
+            base[base["country"] == sel_country_sec]
+            .groupby("sector", as_index=False)[["companies", "jobs", "capex", "projects"]]
+            .sum()
+            .set_index("sector")
+            .reindex(SELECTED_SECTORS, fill_value=0)
+            .reset_index()
+        )
+        # Save to buffer to let user download
+        buf = io.StringIO()
+        country_df.to_csv(buf, index=False)
+        st.download_button(
+            label=f"Download {sel_country_sec} sectors CSV",
+            data=buf.getvalue(),
+            file_name=f"{sel_country_sec.replace(' ', '_').lower()}_sectors_data.csv",
+            mime="text/csv",
+            key="download_country_sectors_csv"
+        )
 
     # KPI or Chart logic
     if sel_sector != "All" and sel_country_sec != "All":
@@ -614,14 +654,12 @@ with tab_sectors:
             st.markdown(f"<div class='kpi-big'>{int(round(v)):,}</div>", unsafe_allow_html=True)
 
     else:
-        # Chart mode
-        # When Sector=All → bar by SELECTED_SECTORS, ordered & complete (fill zeros)
+        # Chart mode (Sector=All → sectors bar; Sector=specific → country breakdown)
         blues = px.colors.sequential.Blues
         bar_color = blues[-2]
 
         if sel_sector == "All":
             if sel_country_sec == "All":
-                # Aggregate globally across notebook's countries
                 df_plot = (base.groupby("sector", as_index=False)[metric_col]
                               .sum()
                               .set_index("sector")
