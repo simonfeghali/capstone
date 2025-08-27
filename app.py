@@ -17,9 +17,12 @@ st.markdown(
     <style>
       .block-container { padding-top: 1rem; }
       .metric-value { font-weight: 700 !important; }
-      .kpi-big {font-size: 72px; font-weight: 800; line-height: 1; text-align:center;}
-      .kpi-title {font-size: 18px; font-weight: 700;}
-      .kpi-sub {font-size: 14px; opacity:.7; text-align:center;}
+
+      /* KPI styling used in EDA & Sectors */
+      .kpi-wrap {width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px 8px;}
+      .kpi-big  {font-size: 72px; font-weight: 800; line-height: 1; text-align:center;}
+      .kpi-title{font-size: 18px; font-weight: 700; text-align:left; width:100%;}
+      .kpi-sub  {font-size: 14px; opacity:.75; text-align:center;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -41,7 +44,7 @@ def gh_raw_url(fname: str) -> str:
     return f"{RAW_BASE}/{quote(fname)}"
 
 def find_col(cols, *cands):
-    """Try exact then fuzzy match."""
+    """Try exact match first, then substring match."""
     low = {c.lower(): c for c in cols}
     for c in cands:
         if c.lower() in low:
@@ -53,7 +56,7 @@ def find_col(cols, *cands):
     return None
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Loaders
+# Loaders for SCORING & EDA  (unchanged behaviour)
 # ──────────────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=True)
 def load_world_bank() -> pd.DataFrame:
@@ -109,7 +112,7 @@ def _melt_capex_wide(df: pd.DataFrame) -> pd.DataFrame:
         id_vars=id_vars,
         value_vars=year_cols,
         var_name="year",
-        value_name="capex",
+        value_name="capex"
     ).rename(columns={src: "country", grade_col if grade_col else "": "grade"})
     melted["year"] = pd.to_numeric(melted["year"], errors="coerce").astype("Int64")
 
@@ -129,15 +132,33 @@ def _melt_capex_wide(df: pd.DataFrame) -> pd.DataFrame:
         melted["grade"] = pd.Categorical(melted["grade"], categories=order, ordered=True)
     return melted
 
+@st.cache_data(show_spinner=True)
+def load_capex_long() -> pd.DataFrame:
+    for key in ("cap_csv", "cap_csv_alt"):
+        try:
+            url = gh_raw_url(FILES[key])
+            df = pd.read_csv(url)
+            return _melt_capex_wide(df)
+        except Exception:
+            continue
+    try:
+        url = gh_raw_url(FILES["cap_xlsx"])
+        df_x = pd.read_excel(url, sheet_name=0)
+        return _melt_capex_wide(df_x)
+    except Exception as e:
+        raise RuntimeError(f"Could not load CAPEX from CSV or Excel: {e}")
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Loaders for SECTORS
+# ──────────────────────────────────────────────────────────────────────────────
 def _guess(df_cols, patterns):
-    """Case/underscore-insensitive guesser."""
     for c in df_cols:
         s = c.lower().replace("_", " ")
         if any(p in s for p in patterns):
             return c
     return None
 
-# Canonicalization for sectors so All-mode bar charts never miss due to case/spacing
+# canonical sector mapping to prevent missing bars due to spelling/case variants
 _CANON_MAP = {
     "software & it services": "Software & IT services",
     "software and it services": "Software & IT services",
@@ -190,28 +211,25 @@ def load_sectors():
 
     df["country"] = df["country"].astype(str).str.strip()
     df["sector"]  = df["sector"].astype(str).str.strip()
-    # Canonical column for consistent matching
     df["sector_canon"] = df["sector"].apply(to_canon)
 
-    # Normalize some country names (as before)
+    # normalize a couple of country labels
     df["country_norm"] = (
         df["country"]
         .str.replace("Uae", "UAE", case=False, regex=False)
         .str.replace("South korea", "South Korea", case=False, regex=False)
     )
 
-    # 10 countries used in the notebook
+    # countries and sectors used in the notebook
     top10 = [
         "United States", "United Kingdom", "France", "Germany", "UAE",
         "Canada", "Japan", "China", "South Korea", "Netherlands",
     ]
-    # selected sectors (canonical)
     selected_sectors = [
         "Software & IT services", "Communications", "Chemicals",
         "Pharmaceuticals", "Aerospace", "Metals",
         "Automotive OEM", "Automotive Components"
     ]
-
     return df, top10, selected_sectors
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -224,7 +242,7 @@ capx_enriched = capx.merge(wb_year_cc, on=["year", "country"], how="left")
 sectors_df, sectors_top10, SELECTED_SECTORS = load_sectors()
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Global filters (unique keys!)
+# Global filters (keys unchanged to avoid duplicate-key issues)
 # ──────────────────────────────────────────────────────────────────────────────
 years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
 years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
@@ -232,10 +250,10 @@ years_all = ["All"] + sorted(set(years_wb).union(years_cap))
 
 c1, c2, c3 = st.columns([1, 1, 2], gap="small")
 with c1:
-    sel_year_any = st.selectbox("Year", years_all, index=0, key="year_any_global")
+    sel_year_any = st.selectbox("Year", years_all, index=0, key="year_any")
 
 # Auto-continent suggestion if a country is already selected
-prev_country = st.session_state.get("country_global", "All")
+prev_country = st.session_state.get("country", "All")
 suggested_cont = None
 if prev_country != "All":
     if isinstance(sel_year_any, int):
@@ -248,19 +266,19 @@ if prev_country != "All":
 valid_year_for_wb = sel_year_any if (isinstance(sel_year_any, int) and sel_year_any in years_wb) else max(years_wb)
 cont_options = ["All"] + sorted(wb.loc[wb["year"] == valid_year_for_wb, "continent"].dropna().unique().tolist())
 
-saved_cont = st.session_state.get("continent_global", "All")
+saved_cont = st.session_state.get("continent", "All")
 default_cont = suggested_cont if (suggested_cont in cont_options) else (saved_cont if saved_cont in cont_options else "All")
 with c2:
-    sel_cont = st.selectbox("Continent", cont_options, index=cont_options.index(default_cont), key="continent_global")
+    sel_cont = st.selectbox("Continent", cont_options, index=cont_options.index(default_cont), key="continent")
 
 wb_scope = wb[wb["year"] == valid_year_for_wb].copy()
 if sel_cont != "All":
     wb_scope = wb_scope[wb_scope["continent"] == sel_cont]
 country_options = ["All"] + sorted(wb_scope["country"].unique().tolist())
-saved_country = st.session_state.get("country_global", "All")
+saved_country = st.session_state.get("country", "All")
 default_country = saved_country if saved_country in country_options else "All"
 with c3:
-    sel_country = st.selectbox("Country", country_options, index=country_options.index(default_country), key="country_global")
+    sel_country = st.selectbox("Country", country_options, index=country_options.index(default_country), key="country")
 
 def filt_wb_single_year(df: pd.DataFrame, year_any) -> tuple[pd.DataFrame, int]:
     yy = int(year_any) if (isinstance(year_any, int) and year_any in years_wb) else max(years_wb)
@@ -277,7 +295,7 @@ def filt_wb_single_year(df: pd.DataFrame, year_any) -> tuple[pd.DataFrame, int]:
 tab_scoring, tab_eda, tab_sectors = st.tabs(["Scoring", "EDA", "Sectors"])
 
 # =============================================================================
-# SCORING TAB  (unchanged)
+# SCORING TAB (same as your working version; weights table only here)
 # =============================================================================
 with tab_scoring:
     st.caption("Scoring • (World Bank–based)")
@@ -344,7 +362,8 @@ with tab_scoring:
         b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
         with b1:
             top10 = wb_year_df[["country", "score"]].dropna().sort_values("score", ascending=False).head(10)
-            if top10.empty: st.info("No countries available for Top 10 with this filter.")
+            if top10.empty:
+                st.info("No countries available for Top 10 with this filter.")
             else:
                 fig_top = px.bar(top10.sort_values("score"), x="score", y="country", orientation="h",
                                  color="score", color_continuous_scale="Blues",
@@ -355,7 +374,8 @@ with tab_scoring:
                 st.plotly_chart(fig_top, use_container_width=True)
         with b2:
             donut_base = wb_year_df.copy()
-            if donut_base.empty or donut_base["grade"].isna().all(): st.info("No grade data for this selection.")
+            if donut_base.empty or donut_base["grade"].isna().all():
+                st.info("No grade data for this selection.")
             else:
                 grades = ["A+", "A", "B", "C", "D"]
                 donut = (donut_base.assign(grade=donut_base["grade"].astype(str))
@@ -372,9 +392,11 @@ with tab_scoring:
                 st.plotly_chart(fig_donut, use_container_width=True)
         with b3:
             cont_base = wb[wb["year"] == scoring_year].copy()
-            if sel_cont != "All": cont_base = cont_base[cont_base["continent"] == sel_cont]
+            if sel_cont != "All":
+                cont_base = cont_base[cont_base["continent"] == sel_cont]
             cont_bar = cont_base.groupby("continent", as_index=False)["score"].mean().sort_values("score", ascending=True)
-            if cont_bar.empty: st.info("No continent data for this selection.")
+            if cont_bar.empty:
+                st.info("No continent data for this selection.")
             else:
                 fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
                                   color="score", color_continuous_scale="Blues",
@@ -384,33 +406,35 @@ with tab_scoring:
                 fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig_cont, use_container_width=True)
 
+    # Indicator Weights table — SCORING TAB ONLY
     st.markdown("### Indicator Weights (%)")
     weights = pd.DataFrame({
         "Indicator": [
             "GDP growth (annual %)",
             "GDP per capita, PPP (current international $)",
             "Current account balance (% of GDP)",
-            "Political Stability and Absence of Violence/Terrorism: Estimate",
             "Foreign direct investment, net outflows (% of GDP)",
-            "Government Effectiveness: Estimate",
-            "Control of Corruption: Estimate",
             "Inflation, consumer prices (annual %)",
-            "Access to electricity (% of population)",
             "Exports of goods and services (% of GDP)",
             "Imports of goods and services (% of GDP)",
+            "Political Stability and Absence of Violence/Terrorism: Estimate",
+            "Government Effectiveness: Estimate",
+            "Control of Corruption: Estimate",
+            "Access to electricity (% of population)",
             "Individuals using the Internet (% of population)",
             "Total reserves in months of imports",
         ],
-        "Weight (%)": [12, 10, 10, 9, 8, 8, 8, 6, 6, 5, 5, 5, 5],
+        "Weight (%)": [12, 10, 10, 8, 6, 5, 5, 9, 8, 8, 6, 5, 5],
     }).sort_values("Weight (%)", ascending=False, kind="mergesort")
     st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# EDA TAB (unchanged)
+# EDA TAB (CAPEX) — unchanged logic and behaviour
 # =============================================================================
 with tab_eda:
     st.caption("Exploratory Data Analysis • (CAPEX)")
 
+    # EDA-only Grade selector (auto-set if user picked country+year)
     grade_options = ["All", "A+", "A", "B", "C", "D"]
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
@@ -423,29 +447,51 @@ with tab_eda:
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
 
+    # Filter CAPEX with continent/country/grade; keep all years if Year == All
     capx_eda = capx_enriched.copy()
-    if sel_cont != "All":    capx_eda = capx_eda[capx_eda["continent"] == sel_cont]
-    if sel_country != "All": capx_eda = capx_eda[capx_eda["country"] == sel_country]
+    if sel_cont != "All":
+        capx_eda = capx_eda[capx_eda["continent"] == sel_cont]
+    if sel_country != "All":
+        capx_eda = capx_eda[capx_eda["country"] == sel_country]
     if sel_grade_eda != "All" and "grade" in capx_eda.columns:
         capx_eda = capx_eda[capx_eda["grade"] == sel_grade_eda]
     if isinstance(sel_year_any, int):
         capx_eda = capx_eda[capx_eda["year"] == sel_year_any]
 
-    e1, e2 = st.columns([1.6, 2], gap="large")
+    # TOP ROW: KPI (country+year) OR Trend; plus Map
+    e1, e2 = st.columns([1.4, 2], gap="large")
     with e1:
-        if isinstance(sel_year_any, int) and sel_country != "All":
-            v = capx_eda["capex"].sum()
-            st.markdown(f"<div class='kpi-title'><b>{sel_country} CAPEX — {sel_year_any}</b></div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='kpi-big'>{v:,.1f}</div>", unsafe_allow_html=True)
-            st.markdown("<div class='kpi-sub'>$B</div>", unsafe_allow_html=True)
+        if sel_country != "All" and isinstance(sel_year_any, int):
+            # KPI card for single country & single year
+            val = capx_eda["capex"].sum()
+            title = f"{sel_country} CAPEX — {sel_year_any}"
+            st.markdown(f"""
+                <div class="kpi-wrap">
+                  <div class="kpi-title">{title}</div>
+                  <div class="kpi-big">{val:,.1f}</div>
+                  <div class="kpi-sub">$B</div>
+                </div>
+            """, unsafe_allow_html=True)
         else:
-            trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
-            if trend.empty: st.info("No CAPEX data for the selected filters.")
+            # Trend
+            if sel_country != "All":
+                base = capx_enriched[capx_enriched["country"] == sel_country]
+                title = f"{sel_country} CAPEX Trend"
+            elif sel_cont != "All":
+                base = capx_enriched[capx_enriched["continent"] == sel_cont]
+                title = f"{sel_cont} CAPEX Trend"
+            else:
+                base = capx_enriched.copy()
+                title = "Global CAPEX Trend"
+
+            trend = base.groupby("year", as_index=False)["capex"].sum().sort_values("year")
+            if trend.empty:
+                st.info("No CAPEX data for the selected filters.")
             else:
                 trend["year_str"] = trend["year"].astype(int).astype(str)
                 fig = px.line(trend, x="year_str", y="capex", markers=True,
                               labels={"year_str": "", "capex": "Global CAPEX ($B)"},
-                              title=(f"{sel_country} CAPEX Trend" if sel_country!="All" else "Global CAPEX Trend"))
+                              title=title)
                 fig.update_xaxes(type="category", categoryorder="array",
                                  categoryarray=trend["year_str"].tolist(), showgrid=False)
                 fig.update_yaxes(showgrid=False)
@@ -454,11 +500,13 @@ with tab_eda:
 
     with e2:
         if isinstance(sel_year_any, int):
-            map_df = capx_eda.copy(); map_title = f"CAPEX Map — {sel_year_any}"
+            map_df = capx_eda.copy()
+            map_title = f"CAPEX Map — {sel_year_any}"
         else:
             map_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
             map_title = "CAPEX Map — All Years (aggregated)"
-        if map_df.empty: st.info("No CAPEX data for this selection.")
+        if map_df.empty:
+            st.info("No CAPEX data for this selection.")
         else:
             fig = px.choropleth(map_df, locations="country", locationmode="country names",
                                 color="capex", color_continuous_scale="Blues", title=map_title)
@@ -469,10 +517,12 @@ with tab_eda:
             current_scope = scope_map.get(sel_cont, "world")
             fig.update_geos(scope=current_scope, projection_type="natural earth",
                             showcountries=True, showcoastlines=True)
-            if sel_cont != "All" or sel_country != "All": fig.update_geos(fitbounds="locations")
+            if sel_cont != "All" or sel_country != "All":
+                fig.update_geos(fitbounds="locations")
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
             st.plotly_chart(fig, use_container_width=True)
 
+    # BOTTOM ROW:
     show_grade_trend = (sel_grade_eda == "All")
     if show_grade_trend:
         b1, b2, b3 = st.columns([1.2, 1.2, 1.6], gap="large")
@@ -481,12 +531,14 @@ with tab_eda:
 
     with b1:
         if isinstance(sel_year_any, int):
-            level_df = capx_eda.copy(); title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
+            level_df = capx_eda.copy()
+            title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
         else:
             level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
             title_top10 = "Top 10 Countries by CAPEX — All Years (aggregated)"
         top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
-        if top10.empty: st.info("No CAPEX data for Top 10 with this filter.")
+        if top10.empty:
+            st.info("No CAPEX data for Top 10 with this filter.")
         else:
             fig = px.bar(top10.sort_values("capex"), x="capex", y="country", orientation="h",
                          color="capex", color_continuous_scale="Blues",
@@ -502,7 +554,8 @@ with tab_eda:
                                .groupby(["year", "grade"], as_index=False, observed=True)["capex"]
                                .sum()
                                .sort_values("year"))
-                if tg.empty: st.info("No CAPEX data for grade trend.")
+                if tg.empty:
+                    st.info("No CAPEX data for grade trend.")
                 else:
                     tg["year_str"] = tg["year"].astype(int).astype(str)
                     blues = px.colors.sequential.Blues
@@ -547,59 +600,78 @@ with tab_eda:
                 st.plotly_chart(fig, use_container_width=True)
 
 # =============================================================================
-# SECTORS TAB (fixed: canonical sector names)
+# SECTORS TAB — new; Scoring/EDA left untouched
 # =============================================================================
 with tab_sectors:
     st.caption("Sectors Analysis")
 
-    # Filters (unique keys)
-    s1, s2 = st.columns([1, 2], gap="small")
-    with s1:
-        sector_options = ["All"] + sorted(sectors_df["sector"].dropna().unique().tolist())
-        sel_sector = st.selectbox("Sector", sector_options, index=0, key="sectors_sector")
-    with s2:
-        country_opts = sectors_top10
-        sel_country_s = st.selectbox("Country (Sectors)", country_opts, index=country_opts.index("United States") if "United States" in country_opts else 0, key="sectors_country")
+    # Selectors
+    all_sectors = ["All"] + sorted(sectors_df["sector_canon"].unique().tolist())
+    cS1, cS2 = st.columns([1, 2], gap="large")
+    with cS1:
+        sel_sector = st.selectbox("Sector", all_sectors, index=0, key="sectors_sector")
+    with cS2:
+        # limit countries to the 10 in the notebook
+        sel_sector_country = st.selectbox("Country (Sectors)", sectors_top10, index=0, key="sectors_country")
 
-    metric = st.radio("Metric", ["Companies", "Jobs Created", "Capex", "Projects"],
-                      horizontal=True, key="sectors_metric")
+    metric = st.radio(
+        "Metric",
+        ["Companies", "Jobs Created", "Capex", "Projects"],
+        horizontal=True,
+        key="sectors_metric"
+    )
 
-    metric_map = {
+    col_map = {
         "Companies": "companies",
         "Jobs Created": "jobs",
         "Capex": "capex",
         "Projects": "projects",
     }
-    mcol = metric_map[metric]
+    metric_col = col_map[metric]
 
-    # Country slice using normalized country, keep canonical sector
-    df_c = sectors_df[sectors_df["country_norm"].str.casefold() == sel_country_s.casefold()].copy()
+    # aggregate to canonical sector & normalized country
+    base = sectors_df.copy()
+    base = (base.groupby(["country_norm", "sector_canon"], as_index=False)[["companies", "jobs", "capex", "projects"]]
+                 .sum())
 
-    # Specific sector → KPI (use canonical for summation, keep user label)
-    if sel_sector != "All":
-        canon = to_canon(sel_sector)
-        val = float(df_c.loc[df_c["sector_canon"] == canon, mcol].sum())
-        unit = " ($B)" if metric == "Capex" else ""
-        st.markdown(f"**{sel_country_s} — {sel_sector} • {metric}**")
-        st.markdown(f"<div class='kpi-big'>{val:,.0f}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='kpi-sub'>{unit.strip()}</div>", unsafe_allow_html=True)
+    # KPI case: sector != All AND country chosen
+    if sel_sector != "All" and sel_sector_country in sectors_top10:
+        kdf = base[(base["country_norm"] == sel_sector_country) & (base["sector_canon"] == sel_sector)]
+        value = float(kdf[metric_col].sum()) if not kdf.empty else 0.0
+        unit = "$B" if metric == "Capex" else ""
+        title = f"{sel_sector_country} — {sel_sector} • {metric}"
+        st.markdown(f"""
+            <div class="kpi-wrap">
+              <div class="kpi-title">{title}</div>
+              <div class="kpi-big">{value:,.0f}</div>
+              <div class="kpi-sub">{unit}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
     else:
-        # Aggregate by canonical sector, enforce SELECTED_SECTORS order so nothing disappears
-        agg = df_c.groupby("sector_canon", as_index=False)[mcol].sum()
-        ordered = pd.DataFrame({"sector_canon": SELECTED_SECTORS}).merge(
-            agg, on="sector_canon", how="left"
-        ).fillna({mcol: 0})
+        # Show bar for SELECTED_SECTORS only; single-country view
+        bdf = base[base["country_norm"] == sel_sector_country].copy()
+        # Keep only sectors the notebook uses, preserve order
+        bdf = bdf.set_index("sector_canon").reindex(SELECTED_SECTORS).fillna(0.0).reset_index()
+        bdf = bdf.rename(columns={"sector_canon": "sector"})
 
-        title = f"{metric} by Sector — {sel_country_s}"
-        xlab = "CAPEX ($B)" if metric == "Capex" else ""
-        fig = px.bar(
-            ordered,
-            x=mcol, y="sector_canon",
-            orientation="h",
-            color=mcol, color_continuous_scale="Blues",
-            labels={mcol: xlab, "sector_canon": ""},
-            title=title
-        )
-        fig.update_coloraxes(showscale=False)
-        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=460)
-        st.plotly_chart(fig, use_container_width=True)
+        if sel_sector != "All":
+            bdf = bdf[bdf["sector"] == sel_sector]  # if user narrows to one; usually KPI branch handles this
+
+        title = f"{metric} by Sector — {sel_sector_country}"
+        if bdf.empty:
+            st.info("No sector data for this selection.")
+        else:
+            fig = px.bar(
+                bdf,
+                x=metric_col,
+                y="sector",
+                orientation="h",
+                color=metric_col,
+                color_continuous_scale="Blues",
+                labels={metric_col: "", "sector": ""},
+                title=title
+            )
+            fig.update_coloraxes(showscale=False)
+            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
+            st.plotly_chart(fig, use_container_width=True)
