@@ -242,7 +242,7 @@ def filt_wb_single_year(df: pd.DataFrame, year_any) -> tuple[pd.DataFrame, int]:
 tab_scoring, tab_eda, tab_sectors = st.tabs(["Scoring", "EDA", "Sectors"])
 
 # =============================================================================
-# SCORING TAB (UNCHANGED)
+# SCORING TAB (unchanged)
 # =============================================================================
 with tab_scoring:
     st.caption("Scoring • (World Bank–based)")
@@ -386,7 +386,7 @@ with tab_scoring:
     st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# EDA TAB (UNCHANGED)
+# EDA TAB (unchanged)
 # =============================================================================
 with tab_eda:
     st.caption("Exploratory Data Analysis • (CAPEX)")
@@ -585,17 +585,48 @@ with tab_eda:
                     st.plotly_chart(fig, use_container_width=True)
 
 # =============================================================================
-# SECTORS TAB (UPDATED WITH KPI MODE)
+# SECTORS TAB (updated: filter bar plots to selected_sectors + KPI centered)
 # =============================================================================
 with tab_sectors:
     st.caption("Sectors Analysis")
 
-    # Restrict to the 10 countries present in the sectors dataset
-    sector_countries = sorted(sectors_df["country"].dropna().unique().tolist())
-    if len(sector_countries) > 10:
-        sector_countries = sector_countries[:10]
+    # Canonical 10 countries used in notebook (case-insensitive matching to dataset)
+    NOTEBOOK_COUNTRIES = [
+        "United States", "United Kingdom", "France", "Germany", "Netherlands",
+        "Canada", "Japan", "China", "South Korea", "UAE"
+    ]
+    canon = {c.lower(): c for c in sectors_df["country"].unique()}
+    sector_countries = [canon.get(n.lower()) for n in NOTEBOOK_COUNTRIES if n.lower() in canon]
+    # Fallback: if names don't match, use the top-10 by companies globally
+    if len(sector_countries) < 10:
+        sector_countries = (
+            sectors_df.groupby("country")["companies"]
+            .sum().sort_values(ascending=False).head(10).index.tolist()
+        )
 
-    sectors_list = ["All"] + sorted(sectors_df["sector"].dropna().unique().tolist())
+    # ALL sectors for the filter
+    all_sectors = sorted(sectors_df["sector"].dropna().unique().tolist())
+
+    # EXACT list from your notebook (edit to match your 'selected_sectors' if needed)
+    DEFAULT_SELECTED_SECTORS = [
+        # Put your exact notebook list here. These are common examples:
+        "Aerospace", "Automotive OEM", "Automotive Components",
+        "Business Services", "Communications", "Software & IT services",
+        "Financial Services", "Electronics", "Industrial Equipment",
+        "Food & Beverages", "Chemicals", "Pharmaceuticals",
+        "Renewable Energy", "Metals", "Real Estate"
+    ]
+    # Keep only those that exist in the CSV
+    selected_sectors = [s for s in DEFAULT_SELECTED_SECTORS if s in all_sectors]
+    # If the manual list ends up empty, pick top sectors by 'companies' across the 10 countries
+    if not selected_sectors:
+        selected_sectors = (
+            sectors_df[sectors_df["country"].isin(sector_countries)]
+            .groupby("sector")["companies"].sum()
+            .sort_values(ascending=False).head(15).index.tolist()
+        )
+
+    sectors_list = ["All"] + all_sectors
 
     sc1, sc2 = st.columns([1, 1.2], gap="small")
     with sc1:
@@ -638,6 +669,7 @@ with tab_sectors:
                 val_str = f"{int(round(val)):,}"
                 unit = ""
 
+            # Title left-aligned, value centered (like your screenshot)
             st.markdown(
                 f"""
                 <div style="padding:22px 8px;">
@@ -660,9 +692,11 @@ with tab_sectors:
                 unsafe_allow_html=True,
             )
     else:
-        # ── Bar chart modes (unchanged behaviour)
+        # ── Bar chart modes; restrict sectors to the 'selected_sectors' list
         if sel_sector == "All":
             filtered = sectors_df[sectors_df["country"] == sel_sector_country]
+            # keep only selected sectors here
+            filtered = filtered[filtered["sector"].isin(selected_sectors)]
             grp_dim = "sector"
             title = f"{metric_label} by Sector — {sel_sector_country}"
         else:
