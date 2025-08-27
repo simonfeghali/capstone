@@ -28,7 +28,7 @@ FILES = {
     "cap_csv":      "capex_EDA_cleaned_filled.csv",
     "cap_csv_alt":  "capex_EDA_cleaned_filled.csv",
     "cap_xlsx":     "capex_EDA.xlsx",
-    # NEW: sectors dataset
+    # Sectors dataset
     "sectors_csv":  "merged_sectors_data.csv",
 }
 
@@ -143,7 +143,6 @@ def load_capex_long() -> pd.DataFrame:
     except Exception as e:
         raise RuntimeError(f"Could not load CAPEX from CSV or Excel: {e}")
 
-# NEW: Sectors loader
 @st.cache_data(show_spinner=True)
 def load_sectors() -> pd.DataFrame:
     url = gh_raw_url(FILES["sectors_csv"])
@@ -152,7 +151,6 @@ def load_sectors() -> pd.DataFrame:
     except Exception as e:
         raise RuntimeError(f"Could not fetch {FILES['sectors_csv']}: {e}")
 
-    # Canonicalize column names
     cols = list(df.columns)
     c_country  = find_col(cols, "country", "Country")
     c_sector   = find_col(cols, "sector", "industry", "Sector")
@@ -174,7 +172,6 @@ def load_sectors() -> pd.DataFrame:
         if need not in df.columns:
             raise ValueError(f"Sectors CSV missing column: {need}. Found: {list(df.columns)}")
 
-    # Clean types
     for col in ["companies", "jobs", "capex", "projects"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -184,9 +181,9 @@ def load_sectors() -> pd.DataFrame:
 
 wb   = load_world_bank()
 capx = load_capex_long()
-sectors_df = load_sectors()  # new
+sectors_df = load_sectors()
 
-# enrich CAPEX with continent
+# Enrich CAPEX with continent
 wb_year_cc = wb[["year", "country", "continent"]].dropna()
 capx_enriched = capx.merge(wb_year_cc, on=["year", "country"], how="left")
 
@@ -202,7 +199,6 @@ c1, c2, c3 = st.columns([1, 1, 2], gap="small")
 with c1:
     sel_year_any = st.selectbox("Year", years_all, index=0, key="year_any")
 
-# Auto-continent suggestion if a country is already selected (use case 2)
 prev_country = st.session_state.get("country", "All")
 suggested_cont = None
 if prev_country != "All":
@@ -213,18 +209,15 @@ if prev_country != "All":
     if not rows.empty and rows["continent"].notna().any():
         suggested_cont = rows["continent"].dropna().iloc[0]
 
-# Build continent options from a valid WB year so Scoring never breaks
 valid_year_for_wb = sel_year_any if (isinstance(sel_year_any, int) and sel_year_any in years_wb) else max(years_wb)
 cont_options = ["All"] + sorted(wb.loc[wb["year"] == valid_year_for_wb, "continent"].dropna().unique().tolist())
 
-# default continent: suggested (if available and in options) else last selection
 saved_cont = st.session_state.get("continent", "All")
 default_cont = suggested_cont if (suggested_cont in cont_options) else (saved_cont if saved_cont in cont_options else "All")
 
 with c2:
     sel_cont = st.selectbox("Continent", cont_options, index=cont_options.index(default_cont), key="continent")
 
-# country options depend on continent (for a valid WB year)
 wb_scope = wb[wb["year"] == valid_year_for_wb].copy()
 if sel_cont != "All":
     wb_scope = wb_scope[wb_scope["continent"] == sel_cont]
@@ -234,7 +227,6 @@ default_country = saved_country if saved_country in country_options else "All"
 with c3:
     sel_country = st.selectbox("Country", country_options, index=country_options.index(default_country), key="country")
 
-# helper for Scoring tab
 def filt_wb_single_year(df: pd.DataFrame, year_any) -> tuple[pd.DataFrame, int]:
     yy = int(year_any) if (isinstance(year_any, int) and year_any in years_wb) else max(years_wb)
     out = df[df["year"] == yy].copy()
@@ -593,14 +585,13 @@ with tab_eda:
                     st.plotly_chart(fig, use_container_width=True)
 
 # =============================================================================
-# SECTORS TAB (NEW)
+# SECTORS TAB (UPDATED WITH KPI MODE)
 # =============================================================================
 with tab_sectors:
     st.caption("Sectors Analysis")
 
-    # Only allow the 10 countries included in the sectors file
+    # Restrict to the 10 countries present in the sectors dataset
     sector_countries = sorted(sectors_df["country"].dropna().unique().tolist())
-    # If the list is longer, keep first 10 unique as a guard (but normally it's exactly the 10)
     if len(sector_countries) > 10:
         sector_countries = sector_countries[:10]
 
@@ -610,8 +601,6 @@ with tab_sectors:
     with sc1:
         sel_sector = st.selectbox("Sector", sectors_list, index=0, key="sectors_sector")
     with sc2:
-        # No "All" here per requirement: restrict to the 10 countries in the sectors analysis
-        # (If you'd like an "All Countries" option later, we can add it)
         default_sector_country = sector_countries[0] if sector_countries else None
         sel_sector_country = st.selectbox(
             "Country (Sectors)", sector_countries,
@@ -619,7 +608,6 @@ with tab_sectors:
             key="sectors_country"
         )
 
-    # Horizontal selector for metric (acts like 4 buttons)
     metric_choice = st.radio(
         "Metric",
         ["Companies", "Jobs Created", "Capex", "Projects"],
@@ -635,32 +623,67 @@ with tab_sectors:
     }
     metric_col, metric_label = metric_map[metric_choice]
 
-    # Build data for chart:
-    # If sector == All -> show metric by sector for selected country
-    # Else -> show metric by country (restricted 10) for the selected sector
-    if sel_sector == "All":
-        filtered = sectors_df[sectors_df["country"] == sel_sector_country]
-        grp_dim = "sector"
-        title = f"{metric_label} by Sector — {sel_sector_country}"
-    else:
-        filtered = sectors_df[sectors_df["sector"] == sel_sector]
-        filtered = filtered[filtered["country"].isin(sector_countries)]
-        grp_dim = "country"
-        title = f"{metric_label} in {sel_sector} Sector — 10 Countries"
+    # ── KPI mode: specific sector AND specific country
+    if sel_sector != "All" and sel_sector_country:
+        kdf = sectors_df[(sectors_df["country"] == sel_sector_country) & (sectors_df["sector"] == sel_sector)]
+        if kdf.empty:
+            st.info("No sector data for this selection.")
+        else:
+            val = float(kdf[metric_col].sum())
+            # Format & unit
+            if metric_col == "capex":
+                val_str = f"{val:,.1f}"
+                unit = "$B"
+            else:
+                val_str = f"{int(round(val)):,}"
+                unit = ""
 
-    if filtered.empty:
-        st.info("No sector data for this selection.")
+            st.markdown(
+                f"""
+                <div style="padding:22px 8px;">
+                  <div style="font-weight:800; font-size:22px; text-align:left;">
+                    {sel_sector_country} — {sel_sector} • {metric_label}
+                  </div>
+                  <div style="
+                      display:flex;
+                      flex-direction:column;
+                      align-items:center;
+                      justify-content:center;
+                      margin-top:8px;">
+                    <div style="font-weight:900; font-size:76px; line-height:1;">
+                      {val_str}
+                    </div>
+                    <div style="opacity:0.7; font-size:14px;">{unit}</div>
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
     else:
-        plot_df = filtered.groupby(grp_dim, as_index=False)[metric_col].sum()
-        plot_df = plot_df.sort_values(metric_col, ascending=True)
+        # ── Bar chart modes (unchanged behaviour)
+        if sel_sector == "All":
+            filtered = sectors_df[sectors_df["country"] == sel_sector_country]
+            grp_dim = "sector"
+            title = f"{metric_label} by Sector — {sel_sector_country}"
+        else:
+            filtered = sectors_df[sectors_df["sector"] == sel_sector]
+            filtered = filtered[filtered["country"].isin(sector_countries)]
+            grp_dim = "country"
+            title = f"{metric_label} in {sel_sector} Sector — 10 Countries"
 
-        fig = px.bar(
-            plot_df,
-            x=metric_col, y=grp_dim, orientation="h",
-            color=metric_col, color_continuous_scale="Blues",
-            labels={metric_col: "", grp_dim: ""},
-            title=title
-        )
-        fig.update_coloraxes(showscale=False)
-        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
-        st.plotly_chart(fig, use_container_width=True)
+        if filtered.empty:
+            st.info("No sector data for this selection.")
+        else:
+            plot_df = filtered.groupby(grp_dim, as_index=False)[metric_col].sum()
+            plot_df = plot_df.sort_values(metric_col, ascending=True)
+
+            fig = px.bar(
+                plot_df,
+                x=metric_col, y=grp_dim, orientation="h",
+                color=metric_col, color_continuous_scale="Blues",
+                labels={metric_col: "", grp_dim: ""},
+                title=title
+            )
+            fig.update_coloraxes(showscale=False)
+            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
+            st.plotly_chart(fig, use_container_width=True)
