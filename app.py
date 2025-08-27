@@ -36,7 +36,7 @@ RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
     "wb": "world_bank_data_with_scores_and_continent.csv",
     "cap_csv": "capex_EDA_cleaned_filled.csv",
-    "cap_csv_alt": "capex_EDA_cleaned_filled.csv",   # keeps your current filename
+    "cap_csv_alt": "capex_EDA_cleaned_filled.csv",   # same path you provided
     "cap_xlsx": "capex_EDA.xlsx",
     "sectors": "merged_sectors_data.csv",
 }
@@ -56,7 +56,7 @@ def find_col(cols, *cands):
     return None
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Loaders (WB + CAPEX) — unchanged from your working version
+# Loaders (WB + CAPEX)
 # ──────────────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=True)
 def load_world_bank() -> pd.DataFrame:
@@ -86,8 +86,10 @@ def load_world_bank() -> pd.DataFrame:
     df["year"] = pd.to_numeric(df["year"], errors="coerce").astype("Int64")
     if "score" not in df.columns: df["score"] = np.nan
     if "grade" not in df.columns: df["grade"] = np.nan
-    df["country"]   = df["country"].astype(str).strip()
-    df["continent"] = df["continent"].astype(str).strip()
+
+    # ✅ FIX: use .str.strip() on Series
+    df["country"]   = df["country"].astype(str).str.strip()
+    df["continent"] = df["continent"].astype(str).str.strip()
 
     order = ["A+", "A", "B", "C", "D"]
     df["grade"] = df["grade"].astype(str).str.strip()
@@ -167,7 +169,6 @@ c1, c2, c3 = st.columns([1, 1, 2], gap="small")
 with c1:
     sel_year_any = st.selectbox("Year", years_all, index=0, key="year_any")
 
-# Suggest continent from country (when possible)
 prev_country = st.session_state.get("country", "All")
 suggested_cont = None
 if prev_country != "All":
@@ -210,7 +211,7 @@ def filt_wb_single_year(df: pd.DataFrame, year_any) -> tuple[pd.DataFrame, int]:
 tab_scoring, tab_eda, tab_sectors = st.tabs(["Scoring", "EDA", "Sectors"])
 
 # =============================================================================
-# SCORING TAB  (as in your last working version)
+# SCORING TAB  (same as before)
 # =============================================================================
 with tab_scoring:
     st.caption("Scoring • (World Bank–based)")
@@ -337,7 +338,7 @@ weights = pd.DataFrame({
 st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# EDA TAB (CAPEX) — unchanged from your latest working version with KPI styling
+# EDA TAB (CAPEX) — unchanged from your last working version (with KPI styling)
 # =============================================================================
 with tab_eda:
     st.caption("Exploratory Data Analysis • (CAPEX)")
@@ -361,7 +362,6 @@ with tab_eda:
     if isinstance(sel_year_any, int):
         capx_eda = capx_eda[capx_eda["year"] == sel_year_any]
 
-    # Country+Year (specific) -> KPI card instead of single-point trend
     if sel_country != "All" and isinstance(sel_year_any, int):
         val = float(capx_eda["capex"].sum()) if not capx_eda.empty else np.nan
         st.markdown(f"<div class='kpiTitle'><b>{sel_country} CAPEX — {sel_year_any}</b></div>", unsafe_allow_html=True)
@@ -371,7 +371,6 @@ with tab_eda:
             f"<div class='kpiUnit'>$B</div></div></div>",
             unsafe_allow_html=True
         )
-        # Map on the right
         e2 = st.container()
         map_df = capx_eda.copy()
         if map_df.empty:
@@ -385,7 +384,6 @@ with tab_eda:
             e2.plotly_chart(fig, use_container_width=True)
 
     else:
-        # Two top panels: trend + map
         e1, e2 = st.columns([1.6, 2], gap="large")
         with e1:
             trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
@@ -424,7 +422,6 @@ with tab_eda:
                 fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig, use_container_width=True)
 
-        # Bottom row (grade trend only if Grade==All)
         show_grade_trend = (st.session_state.get("grade_eda", "All") == "All")
         if show_grade_trend:
             b1, b2, b3 = st.columns([1.2, 1.2, 1.6], gap="large")
@@ -499,10 +496,8 @@ with tab_eda:
                         st.plotly_chart(fig, use_container_width=True)
 
 # =============================================================================
-# SECTORS TAB — fixed
+# SECTORS TAB — with normalization, selected sectors and KPI behavior
 # =============================================================================
-
-# Selected sectors list (same set used in your notebook visuals)
 SELECTED_SECTORS = [
     "Software & IT services",
     "Communications",
@@ -512,8 +507,6 @@ SELECTED_SECTORS = [
     "Metals",
     "Automotive OEM",
 ]
-
-# 10 allowed countries for Sectors tab picker
 SECTORS_COUNTRIES = [
     "United States", "United Kingdom", "France", "Germany", "Canada",
     "Japan", "China", "South Korea", "UAE", "Netherlands"
@@ -522,10 +515,8 @@ SECTORS_COUNTRIES = [
 def canon_country(name: str) -> str:
     n = str(name).strip()
     n = n.title()
-    # fix acronyms / common cases
     n = n.replace("Usa", "United States").replace("U.s.a", "United States")
     n = n.replace("Uk", "United Kingdom")
-    n = n.replace("South Korea", "South Korea")
     n = n.replace("Uae", "UAE")
     return n
 
@@ -557,7 +548,6 @@ def load_sectors() -> pd.DataFrame:
     url = gh_raw_url(FILES["sectors"])
     df = pd.read_csv(url)
 
-    # columns
     s_col = find_col(df.columns, "sector")
     c_col = find_col(df.columns, "country")
     comp_col = find_col(df.columns, "companies", "company_count", "num_companies")
@@ -574,19 +564,15 @@ def load_sectors() -> pd.DataFrame:
     if proj_col: rename[proj_col] = "projects"
     df = df.rename(columns=rename)
 
-    needed = ["sector", "country", "companies", "jobs", "capex", "projects"]
-    for n in needed:
-        if n not in df.columns:
-            df[n] = np.nan
+    for n in ["sector", "country", "companies", "jobs", "capex", "projects"]:
+        if n not in df.columns: df[n] = np.nan
 
-    # clean
     df["sector"] = df["sector"].map(canon_sector)
     df["country"] = df["country"].map(canon_country)
 
     for col in ["companies", "jobs", "capex", "projects"]:
         df[col] = df[col].map(to_number)
 
-    # keep only countries present in file (we limit picker later)
     return df
 
 sectors_df = load_sectors()
@@ -594,19 +580,16 @@ sectors_df = load_sectors()
 with tab_sectors:
     st.caption("Sectors Analysis")
 
-    # Filters
     all_sectors_options = ["All"] + sorted(sectors_df["sector"].dropna().unique().tolist())
     col_s, col_c = st.columns([1, 2], gap="large")
     with col_s:
         sel_sector = st.selectbox("Sector", all_sectors_options, index=0, key="sector_pick")
     with col_c:
-        # restrict picker to the 10 requested (intersection with data)
         allowed = [c for c in SECTORS_COUNTRIES if c in sectors_df["country"].unique()]
         sel_country_sec = st.selectbox("Country (Sectors)", allowed, index=0, key="sector_country")
 
     metric = st.radio("Metric", ["Companies", "Jobs Created", "Capex", "Projects"],
                       horizontal=True, index=0, key="sector_metric")
-
     metric_map = {
         "Companies": ("companies", "", 0),
         "Jobs Created": ("jobs", "", 0),
@@ -615,7 +598,6 @@ with tab_sectors:
     }
     m_col, m_unit, m_round = metric_map[metric]
 
-    # KPI when a specific sector + country is selected
     if sel_sector != "All" and sel_country_sec:
         base = sectors_df[(sectors_df["country"] == sel_country_sec) & (sectors_df["sector"] == sel_sector)]
         val = float(base[m_col].sum()) if not base.empty else np.nan
@@ -628,11 +610,9 @@ with tab_sectors:
             unsafe_allow_html=True
         )
     else:
-        # Bar plot limited to SELECTED_SECTORS (as in the notebook)
         plot_base = sectors_df[sectors_df["country"] == sel_country_sec].copy()
         plot_base = plot_base[plot_base["sector"].isin(SELECTED_SECTORS)]
 
-        # Aggregate by sector (so it shows even if raw is per-company/project)
         agg = (plot_base.groupby("sector", as_index=False)[m_col].sum()
                          .set_index("sector")
                          .reindex(SELECTED_SECTORS, fill_value=0)
