@@ -24,10 +24,12 @@ st.markdown(
 # ──────────────────────────────────────────────────────────────────────────────
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
-    "wb":  "world_bank_data_with_scores_and_continent.csv",
-    "cap_csv": "capex_EDA_cleaned_filled.csv",
-    "cap_csv_alt": "capex_EDA_cleaned_filled.csv",
-    "cap_xlsx": "capex_EDA.xlsx",
+    "wb":           "world_bank_data_with_scores_and_continent.csv",
+    "cap_csv":      "capex_EDA_cleaned_filled.csv",
+    "cap_csv_alt":  "capex_EDA_cleaned_filled.csv",
+    "cap_xlsx":     "capex_EDA.xlsx",
+    # NEW: sectors dataset
+    "sectors_csv":  "merged_sectors_data.csv",
 }
 
 def gh_raw_url(fname: str) -> str:
@@ -141,8 +143,48 @@ def load_capex_long() -> pd.DataFrame:
     except Exception as e:
         raise RuntimeError(f"Could not load CAPEX from CSV or Excel: {e}")
 
+# NEW: Sectors loader
+@st.cache_data(show_spinner=True)
+def load_sectors() -> pd.DataFrame:
+    url = gh_raw_url(FILES["sectors_csv"])
+    try:
+        df = pd.read_csv(url)
+    except Exception as e:
+        raise RuntimeError(f"Could not fetch {FILES['sectors_csv']}: {e}")
+
+    # Canonicalize column names
+    cols = list(df.columns)
+    c_country  = find_col(cols, "country", "Country")
+    c_sector   = find_col(cols, "sector", "industry", "Sector")
+    c_comp     = find_col(cols, "companies", "company_count", "num_companies")
+    c_jobs     = find_col(cols, "jobs_created", "jobs created", "jobs", "jobs_created_total")
+    c_capex    = find_col(cols, "capex", "capex_usd_b", "capex (b)")
+    c_projects = find_col(cols, "projects", "num_projects", "project_count")
+
+    rename_map = {}
+    if c_country:  rename_map[c_country]  = "country"
+    if c_sector:   rename_map[c_sector]   = "sector"
+    if c_comp:     rename_map[c_comp]     = "companies"
+    if c_jobs:     rename_map[c_jobs]     = "jobs"
+    if c_capex:    rename_map[c_capex]    = "capex"
+    if c_projects: rename_map[c_projects] = "projects"
+
+    df = df.rename(columns=rename_map)
+    for need in ["country", "sector", "companies", "jobs", "capex", "projects"]:
+        if need not in df.columns:
+            raise ValueError(f"Sectors CSV missing column: {need}. Found: {list(df.columns)}")
+
+    # Clean types
+    for col in ["companies", "jobs", "capex", "projects"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df["country"] = df["country"].astype(str).str.strip()
+    df["sector"]  = df["sector"].astype(str).str.strip()
+    return df
+
 wb   = load_world_bank()
 capx = load_capex_long()
+sectors_df = load_sectors()  # new
 
 # enrich CAPEX with continent
 wb_year_cc = wb[["year", "country", "continent"]].dropna()
@@ -205,10 +247,10 @@ def filt_wb_single_year(df: pd.DataFrame, year_any) -> tuple[pd.DataFrame, int]:
 # ──────────────────────────────────────────────────────────────────────────────
 # Tabs
 # ──────────────────────────────────────────────────────────────────────────────
-tab_scoring, tab_eda = st.tabs(["Scoring", "EDA"])
+tab_scoring, tab_eda, tab_sectors = st.tabs(["Scoring", "EDA", "Sectors"])
 
 # =============================================================================
-# SCORING TAB
+# SCORING TAB (UNCHANGED)
 # =============================================================================
 with tab_scoring:
     st.caption("Scoring • (World Bank–based)")
@@ -330,7 +372,6 @@ with tab_scoring:
                 fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig_cont, use_container_width=True)
 
-    # Indicator Weights ONLY in Scoring tab
     st.markdown("### Indicator Weights (%)")
     weights = pd.DataFrame({
         "Indicator": [
@@ -353,12 +394,11 @@ with tab_scoring:
     st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# EDA TAB (CAPEX)
+# EDA TAB (UNCHANGED)
 # =============================================================================
 with tab_eda:
     st.caption("Exploratory Data Analysis • (CAPEX)")
 
-    # EDA-only Grade selector (auto when specific year + country)
     grade_options = ["All", "A+", "A", "B", "C", "D"]
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
@@ -373,7 +413,6 @@ with tab_eda:
         key="grade_eda"
     )
 
-    # Filter CAPEX with continent/country/grade; keep all years if Year == All
     capx_eda = capx_enriched.copy()
     if sel_cont != "All":
         capx_eda = capx_eda[capx_eda["continent"] == sel_cont]
@@ -387,11 +426,9 @@ with tab_eda:
     country_selected = sel_country != "All"
     specific_year_selected = isinstance(sel_year_any, int)
 
-    # ── TOP ROW: KPI or Trend • CAPEX Map
     e1, e2 = st.columns([1.2, 2], gap="large")
 
     with e1:
-        # >>> KPI CARD: title LEFT-aligned, number+unit CENTERED
         if country_selected and specific_year_selected:
             cap_val = float(capx_eda["capex"].sum()) if not capx_eda.empty else np.nan
             value = "-" if np.isnan(cap_val) else f"{cap_val:,.1f}"
@@ -399,12 +436,9 @@ with tab_eda:
             st.markdown(
                 f"""
                 <div style="padding:22px 8px;">
-                  <!-- Title: left aligned -->
                   <div style="font-weight:800; font-size:22px; text-align:left;">
                     {sel_country} CAPEX — {sel_year_any}
                   </div>
-
-                  <!-- Number + unit: centered -->
                   <div style="
                       display:flex;
                       flex-direction:column;
@@ -470,7 +504,6 @@ with tab_eda:
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
             st.plotly_chart(fig, use_container_width=True)
 
-    # ── BOTTOM ROW (hidden when a single country is selected)
     if not country_selected:
         show_grade_trend = (sel_grade_eda == "All")
 
@@ -479,7 +512,6 @@ with tab_eda:
         else:
             b1, b3 = st.columns([1.2, 1.6], gap="large")
 
-        # Top 10 Countries by CAPEX (level)
         with b1:
             if isinstance(sel_year_any, int):
                 level_df = capx_eda.copy()
@@ -502,7 +534,6 @@ with tab_eda:
                 fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig, use_container_width=True)
 
-        # CAPEX Trend by Grade (ONLY when Grade == All)
         if show_grade_trend:
             with b2:
                 if "grade" in capx_eda.columns and not capx_eda.empty:
@@ -534,7 +565,6 @@ with tab_eda:
                 else:
                     st.info("No CAPEX data for grade trend.")
 
-        # Top 10 Countries by CAPEX Growth
         with b3:
             growth_base = capx_eda.copy()
             if growth_base.empty:
@@ -561,3 +591,76 @@ with tab_eda:
                     fig.update_coloraxes(showscale=False)
                     fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                     st.plotly_chart(fig, use_container_width=True)
+
+# =============================================================================
+# SECTORS TAB (NEW)
+# =============================================================================
+with tab_sectors:
+    st.caption("Sectors Analysis")
+
+    # Only allow the 10 countries included in the sectors file
+    sector_countries = sorted(sectors_df["country"].dropna().unique().tolist())
+    # If the list is longer, keep first 10 unique as a guard (but normally it's exactly the 10)
+    if len(sector_countries) > 10:
+        sector_countries = sector_countries[:10]
+
+    sectors_list = ["All"] + sorted(sectors_df["sector"].dropna().unique().tolist())
+
+    sc1, sc2 = st.columns([1, 1.2], gap="small")
+    with sc1:
+        sel_sector = st.selectbox("Sector", sectors_list, index=0, key="sectors_sector")
+    with sc2:
+        # No "All" here per requirement: restrict to the 10 countries in the sectors analysis
+        # (If you'd like an "All Countries" option later, we can add it)
+        default_sector_country = sector_countries[0] if sector_countries else None
+        sel_sector_country = st.selectbox(
+            "Country (Sectors)", sector_countries,
+            index=sector_countries.index(default_sector_country) if default_sector_country in sector_countries else 0,
+            key="sectors_country"
+        )
+
+    # Horizontal selector for metric (acts like 4 buttons)
+    metric_choice = st.radio(
+        "Metric",
+        ["Companies", "Jobs Created", "Capex", "Projects"],
+        horizontal=True,
+        index=0,
+        key="sectors_metric"
+    )
+    metric_map = {
+        "Companies":   ("companies", "Companies"),
+        "Jobs Created":("jobs", "Jobs Created"),
+        "Capex":       ("capex", "CAPEX ($B)"),
+        "Projects":    ("projects", "Projects"),
+    }
+    metric_col, metric_label = metric_map[metric_choice]
+
+    # Build data for chart:
+    # If sector == All -> show metric by sector for selected country
+    # Else -> show metric by country (restricted 10) for the selected sector
+    if sel_sector == "All":
+        filtered = sectors_df[sectors_df["country"] == sel_sector_country]
+        grp_dim = "sector"
+        title = f"{metric_label} by Sector — {sel_sector_country}"
+    else:
+        filtered = sectors_df[sectors_df["sector"] == sel_sector]
+        filtered = filtered[filtered["country"].isin(sector_countries)]
+        grp_dim = "country"
+        title = f"{metric_label} in {sel_sector} Sector — 10 Countries"
+
+    if filtered.empty:
+        st.info("No sector data for this selection.")
+    else:
+        plot_df = filtered.groupby(grp_dim, as_index=False)[metric_col].sum()
+        plot_df = plot_df.sort_values(metric_col, ascending=True)
+
+        fig = px.bar(
+            plot_df,
+            x=metric_col, y=grp_dim, orientation="h",
+            color=metric_col, color_continuous_scale="Blues",
+            labels={metric_col: "", grp_dim: ""},
+            title=title
+        )
+        fig.update_coloraxes(showscale=False)
+        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
+        st.plotly_chart(fig, use_container_width=True)
