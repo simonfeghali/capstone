@@ -9,21 +9,23 @@ from urllib.error import URLError, HTTPError
 st.set_page_config(page_title="FDI Analytics", layout="wide")
 st.title("FDI Analytics Dashboard")
 
+# --- light styling -----------------------------------------------------------
 st.markdown(
     """
     <style>
       .block-container { padding-top: 1rem; }
       .metric-value { font-weight: 700 !important; }
-      .kpi-center {display:flex; align-items:center; justify-content:center; height:200px;}
-      .kpi-title {font-weight:700; margin-bottom:4px;}
-      .kpi-number {font-size:64px; font-weight:800;}
+      .kpi-wrap {display:flex;align-items:center;justify-content:center;height:260px;}
+      .kpi-num  {font-size:72px; font-weight:800; letter-spacing:1px;}
+      .kpi-unit {font-size:18px; font-weight:600; margin-left:6px; opacity:.8;}
+      .title-left {font-weight:700; font-size:18px; margin:12px 0 4px;}
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Data sources (GitHub raw)
+# Remote data sources used by SCORING/EDA (unchanged)
 # ──────────────────────────────────────────────────────────────────────────────
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
@@ -31,9 +33,6 @@ FILES = {
     "cap_csv": "capex_EDA_cleaned_filled.csv",
     "cap_csv_alt": "capex_EDA_cleaned_filled.csv",
     "cap_xlsx": "capex_EDA.xlsx",
-    # NEW: aggregated datasets
-    "sectors": "merged_sectors_data.csv",
-    "destinations": "merged_destinations_data.csv",
 }
 
 def gh_raw_url(fname: str) -> str:
@@ -42,17 +41,12 @@ def gh_raw_url(fname: str) -> str:
 def find_col(cols, *cands):
     low = {c.lower(): c for c in cols}
     for c in cands:
-        if c.lower() in low:
-            return low[c.lower()]
+        if c.lower() in low: return low[c.lower()]
     for c in cands:
         for col in cols:
-            if c.lower() in col.lower():
-                return col
+            if c.lower() in col.lower(): return col
     return None
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Loaders for Scoring/EDA (unchanged)
-# ──────────────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=True)
 def load_world_bank() -> pd.DataFrame:
     url = gh_raw_url(FILES["wb"])
@@ -145,11 +139,13 @@ def load_capex_long() -> pd.DataFrame:
 
 wb   = load_world_bank()
 capx = load_capex_long()
+
+# enrich CAPEX with continent
 wb_year_cc = wb[["year", "country", "continent"]].dropna()
 capx_enriched = capx.merge(wb_year_cc, on=["year", "country"], how="left")
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Global filters used by Scoring/EDA (unchanged)
+# Global filter row (Year, Continent, Country) - used by Scoring & EDA
 # ──────────────────────────────────────────────────────────────────────────────
 years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
 years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
@@ -159,6 +155,7 @@ c1, c2, c3 = st.columns([1, 1, 2], gap="small")
 with c1:
     sel_year_any = st.selectbox("Year", years_all, index=0, key="year_any")
 
+# Auto-continent suggestion if a country is already selected (use case 2)
 prev_country = st.session_state.get("country", "All")
 suggested_cont = None
 if prev_country != "All":
@@ -169,14 +166,18 @@ if prev_country != "All":
     if not rows.empty and rows["continent"].notna().any():
         suggested_cont = rows["continent"].dropna().iloc[0]
 
+# Build continent options from a valid WB year so Scoring never breaks
 valid_year_for_wb = sel_year_any if (isinstance(sel_year_any, int) and sel_year_any in years_wb) else max(years_wb)
 cont_options = ["All"] + sorted(wb.loc[wb["year"] == valid_year_for_wb, "continent"].dropna().unique().tolist())
+
+# default continent
 saved_cont = st.session_state.get("continent", "All")
 default_cont = suggested_cont if (suggested_cont in cont_options) else (saved_cont if saved_cont in cont_options else "All")
 
 with c2:
     sel_cont = st.selectbox("Continent", cont_options, index=cont_options.index(default_cont), key="continent")
 
+# country options depend on continent (for a valid WB year)
 wb_scope = wb[wb["year"] == valid_year_for_wb].copy()
 if sel_cont != "All":
     wb_scope = wb_scope[wb_scope["continent"] == sel_cont]
@@ -201,7 +202,7 @@ def filt_wb_single_year(df: pd.DataFrame, year_any) -> tuple[pd.DataFrame, int]:
 tab_scoring, tab_eda, tab_sectors, tab_dest = st.tabs(["Scoring", "EDA", "Sectors", "Destinations"])
 
 # =============================================================================
-# SCORING TAB (unchanged)
+# SCORING TAB  (unchanged)
 # =============================================================================
 with tab_scoring:
     st.caption("Scoring • (World Bank–based)")
@@ -308,35 +309,11 @@ with tab_scoring:
                 fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig_cont, use_container_width=True)
 
-# Indicator weights table (shown once, outside EDA)
-st.markdown("### Indicator Weights (%)")
-weights = pd.DataFrame({
-    "Indicator": [
-        "GDP growth (annual %)",
-        "GDP per capita, PPP (current international $)",
-        "Current account balance (% of GDP)",
-        "Foreign direct investment, net outflows (% of GDP)",
-        "Inflation, consumer prices (annual %)",
-        "Exports of goods and services (% of GDP)",
-        "Imports of goods and services (% of GDP)",
-        "Political Stability and Absence of Violence/Terrorism: Estimate",
-        "Government Effectiveness: Estimate",
-        "Control of Corruption: Estimate",
-        "Access to electricity (% of population)",
-        "Individuals using the Internet (% of population)",
-        "Total reserves in months of imports",
-    ],
-    "Weight (%)": [12, 10, 10, 8, 6, 5, 5, 9, 8, 8, 6, 5, 5],
-}).sort_values("Weight (%)", ascending=False, kind="mergesort")
-st.dataframe(weights, hide_index=True, use_container_width=True)
-
 # =============================================================================
-# EDA TAB (unchanged behaviour from your last working version)
+# EDA TAB (unchanged)
 # =============================================================================
 with tab_eda:
     st.caption("Exploratory Data Analysis • (CAPEX)")
-
-    # EDA-only Grade selector (same auto behavior)
     grade_options = ["All", "A+", "A", "B", "C", "D"]
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
@@ -363,22 +340,14 @@ with tab_eda:
         if trend.empty: st.info("No CAPEX data for the selected filters.")
         else:
             trend["year_str"] = trend["year"].astype(int).astype(str)
-            title = "Global CAPEX Trend"
-            if sel_country != "All" and isinstance(sel_year_any, int):
-                title = f"{sel_country} CAPEX — {sel_year_any}"
-                # KPI style single-year, single-country
-                val = float(trend.loc[trend["year"] == sel_year_any, "capex"].sum())
-                st.markdown(f"<div class='kpi-title'>{title}</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='kpi-center'><div class='kpi-number'>{val:,.1f}</div></div>", unsafe_allow_html=True)
-            else:
-                fig = px.line(trend, x="year_str", y="capex", markers=True,
-                              labels={"year_str": "", "capex": "Global CAPEX ($B)"},
-                              title=title)
-                fig.update_xaxes(type="category", categoryorder="array",
-                                 categoryarray=trend["year_str"].tolist(), showgrid=False)
-                fig.update_yaxes(showgrid=False)
-                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=360)
-                st.plotly_chart(fig, use_container_width=True)
+            fig = px.line(trend, x="year_str", y="capex", markers=True,
+                          labels={"year_str": "", "capex": "Global CAPEX ($B)"},
+                          title="Global CAPEX Trend")
+            fig.update_xaxes(type="category", categoryorder="array",
+                             categoryarray=trend["year_str"].tolist(), showgrid=False)
+            fig.update_yaxes(showgrid=False)
+            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=360)
+            st.plotly_chart(fig, use_container_width=True)
 
     with e2:
         if isinstance(sel_year_any, int):
@@ -401,7 +370,6 @@ with tab_eda:
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
             st.plotly_chart(fig, use_container_width=True)
 
-    # Bottom row (same logic as your last working app)
     show_grade_trend = (sel_grade_eda == "All")
     if show_grade_trend:
         b1, b2, b3 = st.columns([1.2, 1.2, 1.6], gap="large")
@@ -475,172 +443,169 @@ with tab_eda:
                 fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig, use_container_width=True)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Common loader/harmonizer for Sectors & Destinations
-# ──────────────────────────────────────────────────────────────────────────────
-# canonical sector list from your notebook
-SELECTED_SECTORS = [
+# =============================================================================
+# Shared helpers for SECTORS & DESTINATIONS
+# =============================================================================
+
+# sector name unification (same as notebook)
+SELECTED_SECTORS_ORDER = [
     "Software & IT services","Business services","Communications","Financial services",
-    "Transportation & Warehousing","Real estate","Consumer products","Food and Beverages",
-    "Chemicals","Pharmaceuticals","Automotive OEM","Automotive components",
-    "Metals","Coal, oil & gas","Space & defence","Leisure & entertainment"
+    "Food and Beverages","Transportation & Warehousing","Real estate","Consumer products",
+    "Automotive OEM","Automotive components","Chemicals","Pharmaceuticals","Metals",
+    "Coal, oil & gas","Space & defence","Leisure & entertainment"
 ]
 
-# Harmonization mapping (extend as needed)
-SECTOR_MAP = {
-    "Software and IT services":"Software & IT services",
-    "Software & IT services":"Software & IT services",
-    "Business Services":"Business services",
-    "Business services":"Business services",
-    "Communications":"Communications",
-    "Financial services":"Financial services",
-    "Transportation & Warehousing":"Transportation & Warehousing",
-    "Transport & Warehousing":"Transportation & Warehousing",
-    "Real estate":"Real estate",
-    "Consumer products":"Consumer products",
-    "Food and Beverages":"Food and Beverages",
-    "Chemicals":"Chemicals",
-    "Pharmaceuticals":"Pharmaceuticals",
-    "Automotive OEM":"Automotive OEM",
-    "Automotive components":"Automotive components",
-    "Metals":"Metals",
-    "Coal, oil & gas":"Coal, oil & gas",
-    "Space & defence":"Space & defence",
-    "Leisure & entertainment":"Leisure & entertainment",
-}
-
-def _to_float(x):
-    if pd.isna(x): return np.nan
-    if isinstance(x, (int,float,np.integer,np.floating)): return float(x)
-    s = str(x).replace(",","").strip()
-    try:
-        return float(s)
-    except Exception:
-        return np.nan
+def normalize_sector_name(s: str) -> str:
+    if pd.isna(s): return np.nan
+    t = str(s).strip()
+    # Very light normalization (extend if you added more in the notebook)
+    repl = {
+        "Software and IT services": "Software & IT services",
+        "IT & Software services": "Software & IT services",
+        "Business Services": "Business services",
+        "Food & Beverages": "Food and Beverages",
+        "Transport & Warehousing": "Transportation & Warehousing",
+        "Automotive Components": "Automotive components",
+        "Automotive O.E.M.": "Automotive OEM",
+        "Coal, Oil & Gas": "Coal, oil & gas",
+        "Space and defence": "Space & defence",
+        "Leisure and entertainment": "Leisure & entertainment",
+    }
+    return repl.get(t, t)
 
 @st.cache_data(show_spinner=True)
-def load_agg_raw(kind: str) -> pd.DataFrame:
-    """kind in {"sectors","destinations"}; normalize to columns:
-       country, sector, companies, jobs, capex, projects
+def load_vertical_csv(path: str) -> pd.DataFrame:
     """
-    fn = FILES[kind]
-    url = gh_raw_url(fn)
-    df = pd.read_csv(url)
-
+    Read a sectors-like CSV and standardize the columns.
+    Expected columns (case-insensitive):
+      country, sector, companies, jobs_created, capex, projects
+    """
+    df = pd.read_csv(path)
     cols = list(df.columns)
-    c_country = find_col(cols, "Source Country", "Country", "source_country")
-    c_sector  = find_col(cols, "Sector")
-    c_comp    = find_col(cols, "Companies", "Number of Companies")
-    c_jobs    = find_col(cols, "Jobs Created", "Jobs")
-    c_capex   = find_col(cols, "Capex", "Capital Expenditure")
-    c_proj    = find_col(cols, "Projects", "Number of Projects")
+    m = {c.lower(): c for c in cols}
 
-    needs = [("country", c_country), ("sector", c_sector),
-             ("companies", c_comp), ("jobs", c_jobs), ("capex", c_capex), ("projects", c_proj)]
-    for need, col in needs:
-        if col is None:
-            raise ValueError(f"{kind} CSV missing column for {need}. Found: {list(df.columns)}")
+    def need(name, *alts):
+        for key in (name, *alts):
+            if key in m: return m[key]
+        # try fuzzy contains
+        for c in cols:
+            if name in c.lower(): return c
+        raise ValueError(f"CSV missing column for {name}. Found: {list(df.columns)}")
+
+    country = need("country")
+    sector  = need("sector")
+    comp    = need("companies", "company")
+    jobs    = need("jobs_created", "jobs", "jobs created")
+    capex   = need("capex")
+    projs   = need("projects", "project_count", "nb_projects")
 
     out = df.rename(columns={
-        c_country:"country", c_sector:"sector", c_comp:"companies",
-        c_jobs:"jobs", c_capex:"capex", c_proj:"projects"
+        country: "country",
+        sector:  "sector",
+        comp:    "companies",
+        jobs:    "jobs_created",
+        capex:   "capex",
+        projs:   "projects",
     }).copy()
 
     out["country"] = out["country"].astype(str).str.strip()
-    out["sector"]  = out["sector"].astype(str).str.strip().map(lambda s: SECTOR_MAP.get(s, s))
+    out["sector"]  = out["sector"].astype(str).map(normalize_sector_name)
 
-    for c in ["companies","jobs","capex","projects"]:
-        out[c] = out[c].map(_to_float)
+    # numeric
+    for c in ["companies","jobs_created","capex","projects"]:
+        out[c] = pd.to_numeric(out[c], errors="coerce").fillna(0)
 
-    # keep only the selected sectors for the bar charts (same as notebook)
-    out = out[out["sector"].isin(SELECTED_SECTORS)]
-
+    # keep only sectors we display (order list)
+    out = out[out["sector"].isin(SELECTED_SECTORS_ORDER)].copy()
+    out["sector"] = pd.Categorical(out["sector"], categories=SELECTED_SECTORS_ORDER, ordered=True)
     return out
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Reusable renderer for Sectors-like tab
-# ──────────────────────────────────────────────────────────────────────────────
-def render_sector_like_tab(df: pd.DataFrame, tab_label: str, country_key: str, sector_key: str, csv_prefix: str):
-    st.caption(f"{tab_label} Analysis")
+def sectors_bar_for_country(df: pd.DataFrame, country: str, metric: str, title_prefix: str):
+    metric_labels = {
+        "companies": "Number of Companies",
+        "jobs_created": "Jobs Created",
+        "capex": "CAPEX (in million USD)",
+        "projects": "Number of Projects",
+    }
+    nice = metric_labels.get(metric, metric)
+    base = df[df["country"] == country].groupby("sector", as_index=False)[metric].sum()
+    base = base.set_index("sector").reindex(SELECTED_SECTORS_ORDER, fill_value=0).reset_index()
+    fig = px.bar(
+        base.sort_values(metric, ascending=True),
+        x=metric, y="sector", orientation="h",
+        labels={metric: "", "sector": ""},
+        color=metric, color_continuous_scale="Blues",
+        title=f"{nice} by Sector — {title_prefix}"
+    )
+    fig.update_coloraxes(showscale=False)
+    fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=480)
+    return fig
 
-    # Filters: Sector(All) + Country(only those in df, no 'All')
-    cA, cB = st.columns([1, 3], gap="large")
-    with cA:
-        sector_opts = ["All"] + [s for s in SELECTED_SECTORS if s in df["sector"].unique()]
-        sel_sector = st.selectbox("Sector", sector_opts, key=sector_key)
+def kpi_card(value: float, unit: str):
+    st.markdown(f'<div class="kpi-wrap"><div class="kpi-num">{value:,.0f}</div><div class="kpi-unit">{unit}</div></div>', unsafe_allow_html=True)
 
-    with cB:
-        # Only countries that exist in this df (and typically 10). No "All" here.
-        country_opts = sorted(df["country"].dropna().unique().tolist())
-        # Safe default
-        default = country_opts[0] if country_opts else ""
-        sel_ctry = st.selectbox("Country ({})".format(tab_label), country_opts, index=country_opts.index(default) if default else 0, key=country_key)
-
-    metric = st.radio("Metric", ["Companies","Jobs Created","Capex","Projects"], horizontal=True, key=f"{tab_label}_metric")
-
-    # Download CSV for selected country
-    ctry_slice = df[df["country"] == sel_ctry].copy()
-    csv_data = ctry_slice.rename(columns={
-        "country":"Source Country", "sector":"Sector",
-        "companies":"Companies", "jobs":"Jobs Created",
-        "capex":"Capex", "projects":"Projects"
-    }).sort_values("Sector")
+def download_country_csv_button(df: pd.DataFrame, country: str, label_prefix: str):
+    export = (df[df["country"] == country]
+              .groupby("sector", as_index=False)
+              .agg({"companies":"sum","jobs_created":"sum","capex":"sum","projects":"sum"})
+              .set_index("sector").reindex(SELECTED_SECTORS_ORDER, fill_value=0).reset_index())
+    csv = export.to_csv(index=False).encode("utf-8")
     st.download_button(
-        label=f"Download CSV for {sel_ctry}",
-        data=csv_data.to_csv(index=False).encode("utf-8"),
-        file_name=f"{csv_prefix}_{sel_ctry.replace(' ','_').lower()}.csv",
+        label=f"Download CSV for {country}",
+        data=csv,
+        file_name=f"{label_prefix}_{country.lower().replace(' ','_')}.csv",
         mime="text/csv",
-        key=f"dl_{tab_label}_{sel_ctry}"
+        key=f"dl_{label_prefix}_{country}"
     )
 
-    # Which column to plot/KPI
-    col_map = {"Companies":"companies","Jobs Created":"jobs","Capex":"capex","Projects":"projects"}
-    val_col = col_map[metric]
+def sector_dest_tab_ui(data_path: str, who: str, key_prefix: str):
+    """
+    Draw a Sectors-like tab. 'who' appears in labels ("Country (Sectors)" vs "Country (Destinations)")
+    """
+    df = load_vertical_csv(data_path)
 
+    # Country options should be ONLY those present in the file (no "All")
+    countries = sorted(df["country"].unique().tolist())
+    left, right = st.columns([1, 3], gap="small")
+
+    with left:
+        sect_opt = ["All"] + SELECTED_SECTORS_ORDER
+        sel_sector = st.selectbox("Sector", sect_opt, index=0, key=f"{key_prefix}_sector")
+    with right:
+        sel_country = st.selectbox(f"Country ({who})", countries, index=0, key=f"{key_prefix}_country")
+
+    # metric radio
+    metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
+    pretty2raw = {k:v for k,v in metric_map.items()}
+    pretty = st.radio("Metric", list(pretty2raw.keys()), horizontal=True, key=f"{key_prefix}_metric")
+    metric = pretty2raw[pretty]
+
+    # CSV export button (country-level sectors breakdown)
+    download_country_csv_button(df, sel_country, f"{who.lower()}_sectors_data")
+
+    # logic:
     if sel_sector == "All":
-        # bar across selected sectors for the chosen country
-        plot_df = (ctry_slice.groupby("sector", as_index=False)[val_col].sum()
-                              .sort_values(val_col, ascending=True))
-        title = f"Number of {metric} by Selected Sectors — {sel_ctry}" if metric=="Companies" else \
-                f"{metric} by Selected Sectors — {sel_ctry}"
-        if plot_df.empty:
-            st.info("No data for this selection.")
-        else:
-            fig = px.bar(plot_df, x=val_col, y="sector", orientation="h",
-                         color=val_col, color_continuous_scale="Blues",
-                         labels={val_col:"", "sector":""}, title=title)
-            fig.update_coloraxes(showscale=False)
-            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=460)
-            st.plotly_chart(fig, use_container_width=True)
+        # show sector breakdown bar
+        fig = sectors_bar_for_country(df, sel_country, metric, sel_country)
+        st.plotly_chart(fig, use_container_width=True)
     else:
-        # KPI for specific country+sector
-        v = float(ctry_slice.loc[ctry_slice["sector"] == sel_sector, val_col].sum())
-        st.markdown(f"**{sel_ctry} — {sel_sector} • {metric}**")
-        st.markdown(f"<div class='kpi-center'><div class='kpi-number'>{v:,.0f}</div></div>", unsafe_allow_html=True)
+        # KPI for the specific (country, sector) and metric
+        row = df[(df["country"] == sel_country) & (df["sector"] == sel_sector)].agg({metric:"sum"})
+        val = float(row.iloc[0]) if not row.empty else 0.0
+        st.markdown(f'<div class="title-left">{sel_country} — {sel_sector} • {pretty}</div>', unsafe_allow_html=True)
+        unit = {"companies":"", "jobs_created":"", "capex":"$M", "projects":""}[metric]
+        kpi_card(val, unit)
 
 # =============================================================================
-# SECTORS TAB (unchanged — this is your working one)
+# SECTORS TAB  (as you validated earlier)
 # =============================================================================
 with tab_sectors:
-    sectors_df = load_agg_raw("sectors")
-    # Country selector here is inside the renderer and shows only data countries
-    render_sector_like_tab(
-        df=sectors_df,
-        tab_label="Sectors",
-        country_key="sector_country",
-        sector_key="sector_sector",
-        csv_prefix="country_sectors_data"
-    )
+    st.caption("Sectors Analysis")
+    sector_dest_tab_ui("/mnt/data/merged_sectors_data.csv", "Sectors", "sec")
 
 # =============================================================================
-# DESTINATIONS TAB (new – exact twin of Sectors)
+# DESTINATIONS TAB  (exact mirror of Sectors, different dataset)
 # =============================================================================
 with tab_dest:
-    destinations_df = load_agg_raw("destinations")
-    render_sector_like_tab(
-        df=destinations_df,
-        tab_label="Destinations",
-        country_key="dest_country",
-        sector_key="dest_sector",
-        csv_prefix="country_destinations_data"
-    )
+    st.caption("Destinations Analysis")
+    sector_dest_tab_ui("/mnt/data/merged_destinations_data.csv", "Destinations", "dest")
