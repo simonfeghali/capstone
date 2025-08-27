@@ -3,15 +3,13 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from pathlib import Path
 from urllib.parse import quote
-from urllib.error import URLError, HTTPError
 
 st.set_page_config(page_title="FDI Analytics", layout="wide")
 st.title("FDI Analytics Dashboard")
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Small style helpers
+# Styling
 # ──────────────────────────────────────────────────────────────────────────────
 st.markdown(
     """
@@ -27,7 +25,7 @@ st.markdown(
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Remote data (Scoring/EDA) — unchanged
+# Data locations (GitHub)
 # ──────────────────────────────────────────────────────────────────────────────
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
@@ -35,6 +33,9 @@ FILES = {
     "cap_csv": "capex_EDA_cleaned_filled.csv",
     "cap_csv_alt": "capex_EDA_cleaned_filled.csv",
     "cap_xlsx": "capex_EDA.xlsx",
+    # NEW: aggregated datasets
+    "sectors": "merged_sectors_data.csv",
+    "destinations": "merged_destinations_data.csv",
 }
 def gh_raw_url(fname: str) -> str:
     return f"{RAW_BASE}/{quote(fname)}"
@@ -48,6 +49,9 @@ def _find_col(cols, *cands):
             if c.lower() in col.lower(): return col
     return None
 
+# ──────────────────────────────────────────────────────────────────────────────
+# World Bank + CAPEX (unchanged)
+# ──────────────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=True)
 def load_world_bank() -> pd.DataFrame:
     url = gh_raw_url(FILES["wb"])
@@ -118,6 +122,7 @@ def _melt_capex_wide(df: pd.DataFrame) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=True)
 def load_capex_long() -> pd.DataFrame:
+    # Try CSV first, then XLSX as a fallback (same as before)
     for key in ("cap_csv", "cap_csv_alt"):
         try:
             df = pd.read_csv(gh_raw_url(FILES[key]))
@@ -133,7 +138,7 @@ wb_for_merge = wb[["year", "country", "continent"]].dropna()
 capx_enriched = capx.merge(wb_for_merge, on=["year", "country"], how="left")
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Global filters (used by Scoring/EDA) — unchanged
+# Top row (global filters) — unchanged
 # ──────────────────────────────────────────────────────────────────────────────
 years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
 years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
@@ -417,7 +422,7 @@ with tab_eda:
                 st.plotly_chart(fig, use_container_width=True)
 
 # =============================================================================
-# Helpers for Sectors & Destinations (fail-safe file loading)
+# Shared helpers for Sectors/Destinations (now loading from GitHub)
 # =============================================================================
 SELECTED_SECTORS_ORDER = [
     "Software & IT services","Business services","Communications","Financial services",
@@ -443,19 +448,15 @@ def normalize_sector_name(s: str) -> str:
     }
     return repl.get(t, t)
 
-@st.cache_data(show_spinner=False)
-def try_load_vertical_csv(path: str):
+@st.cache_data(show_spinner=True)
+def load_agg_raw(kind: str) -> pd.DataFrame:
     """
-    Return (df, error_message). If file is missing or invalid, df=None with msg.
+    kind: "sectors" or "destinations"
+    Loads from GitHub, normalizes column names and sector labels, and filters to
+    the 15 selected sectors (order preserved).
     """
-    p = Path(path)
-    if not p.exists():
-        return None, f"Dataset not found: {path}"
-
-    try:
-        raw = pd.read_csv(p)
-    except Exception as e:
-        return None, f"Failed to read {path}: {e}"
+    url = gh_raw_url(FILES[kind])
+    raw = pd.read_csv(url)
 
     cols = list(raw.columns)
     low = {c.lower(): c for c in cols}
@@ -474,7 +475,7 @@ def try_load_vertical_csv(path: str):
     projs   = need("projects","project_count","nb_projects")
 
     if not all([country, sector, comp, jobs, capex, projs]):
-        return None, f"{path} is missing required columns. Found: {cols}"
+        raise ValueError(f"{kind} CSV missing required columns. Found: {cols}")
 
     df = raw.rename(columns={
         country:"country", sector:"sector", comp:"companies",
@@ -483,12 +484,14 @@ def try_load_vertical_csv(path: str):
 
     df["country"] = df["country"].astype(str).str.strip()
     df["sector"]  = df["sector"].astype(str).map(normalize_sector_name)
+
     for c in ["companies","jobs_created","capex","projects"]:
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
+    # Limit to selected sectors only and set plotting order
     df = df[df["sector"].isin(SELECTED_SECTORS_ORDER)].copy()
     df["sector"] = pd.Categorical(df["sector"], categories=SELECTED_SECTORS_ORDER, ordered=True)
-    return df, None
+    return df
 
 def sectors_bar_for_country(df: pd.DataFrame, country: str, metric: str, title_prefix: str):
     metric_labels = {
@@ -528,12 +531,14 @@ def download_country_csv_button(df: pd.DataFrame, country: str, label_prefix: st
         key=f"dl_{label_prefix}_{country}"
     )
 
-def sector_dest_tab_ui(csv_path: str, who: str, key_prefix: str):
-    df, err = try_load_vertical_csv(csv_path)
-    if df is None:
-        st.warning(err)
-        return
+def sector_dest_tab_ui(kind: str, who: str, key_prefix: str):
+    """
+    kind: "sectors" or "destinations"
+    who:  Label used in CSV filename ("sectors" / "destinations")
+    """
+    df = load_agg_raw(kind)
 
+    # Country filter: ONLY the countries present in the dataset (no "All")
     countries = sorted(df["country"].unique().tolist())
     left, right = st.columns([1, 3], gap="small")
     with left:
@@ -546,7 +551,8 @@ def sector_dest_tab_ui(csv_path: str, who: str, key_prefix: str):
     pretty = st.radio("Metric", list(metric_map.keys()), horizontal=True, key=f"{key_prefix}_metric")
     metric = metric_map[pretty]
 
-    download_country_csv_button(df, sel_country_local, f"{who.lower()}_sectors_data")
+    # Download CSV for that country
+    download_country_csv_button(df, sel_country_local, f"{who.lower()}_{kind}_data")
 
     if sel_sector == "All":
         fig = sectors_bar_for_country(df, sel_country_local, metric, sel_country_local)
@@ -559,15 +565,15 @@ def sector_dest_tab_ui(csv_path: str, who: str, key_prefix: str):
         kpi_card(val, unit)
 
 # =============================================================================
-# SECTORS (UNCHANGED features; now fail-safe if file is missing)
+# SECTORS (unchanged UI/behavior; now loads from GitHub repo)
 # =============================================================================
 with tab_sectors:
     st.caption("Sectors Analysis")
-    sector_dest_tab_ui("/mnt/data/merged_sectors_data.csv", "Sectors", "sec")
+    sector_dest_tab_ui("sectors", "Sectors", "sec")
 
 # =============================================================================
-# DESTINATIONS (mirror of Sectors; separate dataset; now fail-safe)
+# DESTINATIONS (exact mirror of Sectors; loads from GitHub repo)
 # =============================================================================
 with tab_dest:
     st.caption("Destinations Analysis")
-    sector_dest_tab_ui("/mnt/data/merged_destinations_data.csv", "Destinations", "dest")
+    sector_dest_tab_ui("destinations", "Destinations", "dest")
