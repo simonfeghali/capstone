@@ -632,7 +632,7 @@ with tab_sectors:
         countries = SECTOR_COUNTRIES_10
         default_c = st.session_state.get("sector_country", countries[0])
         if default_c not in countries: default_c = countries[0]
-        sel_sector_country = st.selectbox("Country (Sectors)", countries,
+        sel_sector_country = st.selectbox("Source Country", countries,
                                           index=countries.index(default_c), key="sector_country")
 
     # Metric
