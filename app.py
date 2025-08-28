@@ -148,6 +148,7 @@ def _melt_capex_wide(df: pd.DataFrame) -> pd.DataFrame:
     year_cols = [c for c in cols if str(c).isdigit() and len(str(c)) == 4]
     if not year_cols:
         raise ValueError("CAPEX: no 4-digit year columns detected.")
+
     id_vars = [src]
     grade_col = find_col(cols, "Grade")
     if grade_col: id_vars.append(grade_col)
@@ -469,6 +470,7 @@ with tab_eda:
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
 
+    # Main filtered frame (includes the selected country)
     capx_eda = capx_enriched.copy()
     if sel_cont != "All":    capx_eda = capx_eda[capx_eda["continent"] == sel_cont]
     if sel_country != "All": capx_eda = capx_eda[capx_eda["country"] == sel_country]
@@ -476,6 +478,14 @@ with tab_eda:
         capx_eda = capx_eda[capx_eda["grade"] == sel_grade_eda]
     if isinstance(sel_year_any, int):
         capx_eda = capx_eda[capx_eda["year"] == sel_year_any]
+
+    # Scope without country filter — used to ALWAYS compute Top 10 across countries
+    capx_scope_no_country = capx_enriched.copy()
+    if sel_cont != "All": capx_scope_no_country = capx_scope_no_country[capx_scope_no_country["continent"] == sel_cont]
+    if sel_grade_eda != "All" and "grade" in capx_scope_no_country.columns:
+        capx_scope_no_country = capx_scope_no_country[capx_scope_no_country["grade"] == sel_grade_eda]
+    if isinstance(sel_year_any, int):
+        capx_scope_no_country = capx_scope_no_country[capx_scope_no_country["year"] == sel_year_any]
 
     # Helper for KPI tiles
     def kpi_tile(title: str, number: str, sub: str):
@@ -492,7 +502,7 @@ with tab_eda:
 
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
-        # KPI for specific year
+        # KPI for specific year or trend
         if isinstance(sel_year_any, int):
             total_capex = float(capx_eda["capex"].sum()) if not capx_eda.empty else 0.0
             where_bits = []
@@ -547,7 +557,7 @@ with tab_eda:
     else:
         b1, b3 = st.columns([1.2, 1.6], gap="large")
 
-    # SPECIAL KPI MODE as requested:
+    # SPECIAL KPI MODE as requested earlier:
     special_kpi_mode = (
         sel_year_any == "All" and
         sel_cont != "All" and
@@ -555,51 +565,50 @@ with tab_eda:
         sel_grade_eda == "All"
     )
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # TOP 10 BAR — NOW ALWAYS SHOWN EVEN IF A COUNTRY IS SELECTED
+    # Uses capx_scope_no_country (ignores country filter) so the ranking is meaningful.
+    # ──────────────────────────────────────────────────────────────────────────
     with b1:
         if isinstance(sel_year_any, int):
-            level_df = capx_eda.copy(); title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
-            # normal chart in single-year mode
+            title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
+            level_df = capx_scope_no_country.copy()
             top10 = (level_df.dropna(subset=["capex"])
                               .groupby("country", as_index=False)["capex"].sum()
                               .sort_values("capex", ascending=False)
                               .head(10))
-            if top10.empty: st.info("No CAPEX data for Top 10 with this filter.")
-            else:
-                fig = px.bar(top10.sort_values("capex"), x="capex", y="country", orientation="h",
-                             color="capex", color_continuous_scale="Blues",
-                             labels={"capex": "", "country": ""}, title=title_top10)
-                fig.update_coloraxes(showscale=False)
-                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                st.plotly_chart(fig, use_container_width=True)
         else:
-            # Year = All
-            if special_kpi_mode:
-                # KPI: selected country's aggregated CAPEX + rank within continent
-                scope = capx_enriched[capx_enriched["continent"] == sel_cont].copy()
-                agg = scope.groupby("country", as_index=False)["capex"].sum().sort_values("capex", ascending=False)
-                if agg.empty or sel_country not in agg["country"].values:
-                    st.info("No CAPEX data for this selection.")
-                else:
-                    agg["rank"] = np.arange(1, len(agg) + 1)
-                    row = agg[agg["country"] == sel_country].iloc[0]
-                    rank_txt = f"Rank #{int(row['rank'])}" + (" (Top 10)" if int(row["rank"]) <= 10 else " (Outside Top 10)")
-                    kpi_tile(
-                        f"{sel_country} — CAPEX (All Years, Aggregated) • {sel_cont}",
-                        f"{row['capex']:,.1f}",
-                        f"$B • {rank_txt}"
-                    )
-            else:
-                level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
-                title_top10 = "Top 10 Countries by CAPEX — All Years (aggregated)"
-                top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
-                if top10.empty: st.info("No CAPEX data for Top 10 with this filter.")
-                else:
-                    fig = px.bar(top10.sort_values("capex"), x="capex", y="country", orientation="h",
-                                 color="capex", color_continuous_scale="Blues",
-                                 labels={"capex": "", "country": ""}, title=title_top10)
-                    fig.update_coloraxes(showscale=False)
-                    fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                    st.plotly_chart(fig, use_container_width=True)
+            title_top10 = "Top 10 Countries by CAPEX — All Years (aggregated)"
+            level_df = capx_scope_no_country.groupby("country", as_index=False)["capex"].sum()
+            top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
+
+        if top10.empty:
+            st.info("No CAPEX data for Top 10 with this filter.")
+        else:
+            fig = px.bar(
+                top10.sort_values("capex"),
+                x="capex", y="country", orientation="h",
+                color="capex", color_continuous_scale="Blues",
+                labels={"capex": "", "country": ""},
+                title=title_top10
+            )
+            fig.update_coloraxes(showscale=False)
+            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+            st.plotly_chart(fig, use_container_width=True)
+
+        # If we're in the special KPI mode, ALSO show the selected country's aggregate KPI above.
+        if special_kpi_mode:
+            scope = capx_enriched[capx_enriched["continent"] == sel_cont].copy()
+            agg = scope.groupby("country", as_index=False)["capex"].sum().sort_values("capex", ascending=False)
+            if not agg.empty and sel_country in agg["country"].values:
+                agg["rank"] = np.arange(1, len(agg) + 1)
+                row = agg[agg["country"] == sel_country].iloc[0]
+                rank_txt = f"Rank #{int(row['rank'])}" + (" (Top 10)" if int(row["rank"]) <= 10 else " (Outside Top 10)")
+                kpi_tile(
+                    f"{sel_country} — CAPEX (All Years, Aggregated) • {sel_cont}",
+                    f"{row['capex']:,.1f}",
+                    f"$B • {rank_txt}"
+                )
 
     if show_grade_trend:
         with b2:
