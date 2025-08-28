@@ -195,7 +195,7 @@ def load_capex_long() -> pd.DataFrame:
 wb   = load_world_bank()
 capx = load_capex_long()
 
-# FIX #1: allow 2024 CAPEX to retain continent by merging on country (not on year)
+# Allow 2024 CAPEX to retain continent by merging on country (not on year)
 wb_cc = wb.drop_duplicates(subset=["country", "continent"])[["country", "continent"]]
 capx_enriched = capx.merge(wb_cc, on="country", how="left")
 
@@ -452,7 +452,7 @@ with tab_scoring:
     st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB — (unchanged structure, two fixes applied)
+# CAPEX TAB — includes Top-10 fix and % growth logic
 # =============================================================================
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
@@ -570,12 +570,26 @@ with tab_eda:
     else:
         b1, b3 = st.columns([1.2, 1.6], gap="large")
 
+    # ───────────── FIXED: Build Top-10 without country filter ─────────────
     with b1:
+        # Build Top-10 scope that IGNORES the selected country
+        level_scope = capx_enriched.copy()
         if isinstance(sel_year_any, int):
-            level_df = capx_eda.copy(); title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
+            level_scope = level_scope[level_scope["year"] == sel_year_any]
+        if sel_cont != "All":
+            level_scope = level_scope[level_scope["continent"] == sel_cont]
+        if sel_grade_eda != "All":
+            level_scope = level_scope[level_scope["grade"] == sel_grade_eda]
+
+        level_df = level_scope.groupby("country", as_index=False)["capex"].sum()
+
+        if isinstance(sel_year_any, int):
+            title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
         else:
-            level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
             title_top10 = "Top 10 Countries by CAPEX — All Years (aggregated)"
+        if sel_cont != "All":
+            title_top10 += f" — {sel_cont}"
+
         top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
         if top10.empty:
             st.info("No CAPEX data for Top 10 with this filter.")
@@ -589,6 +603,7 @@ with tab_eda:
                 height=420,
                 ascending_for_hbar=True
             )
+    # ──────────────────────────────────────────────────────────────────────
 
     if show_grade_trend:
         with b2:
@@ -656,7 +671,7 @@ with tab_eda:
                 end   = agg[agg["year"] == last_year][["country", "capex"]].rename(columns={"capex": "capex_end"})
                 joined = start.merge(end, on="country", how="inner")
 
-                # FIX #2: percentage growth instead of absolute $B change
+                # percentage growth instead of absolute $B change
                 joined = joined[joined["capex_start"].notna()]
                 joined = joined.assign(
                     growth_pct=lambda d: np.where(
@@ -671,7 +686,6 @@ with tab_eda:
                 if top_growth.empty or top_growth["growth_pct"].notna().sum() == 0:
                     st.info("No CAPEX data for growth ranking.")
                 else:
-                    # Use the helper to ensure single-bar case becomes KPI, with % unit
                     _bars_or_kpi(
                         df=top_growth.sort_values("growth_pct"),
                         value_col="growth_pct",
