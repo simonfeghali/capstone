@@ -1,32 +1,35 @@
 # app.py
 import numpy as np
 import pandas as pd
-import plotly.express as px
 import streamlit as st
-from urllib.parse import quote
+import plotly.express as px
 import re
+from urllib.parse import quote
+from urllib.error import URLError, HTTPError
 
+# ──────────────────────────────────────────────────────────────────────────────
+# App chrome / theme
+# ──────────────────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="FDI Analytics", layout="wide")
 st.title("FDI Analytics Dashboard")
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Styling
-# ──────────────────────────────────────────────────────────────────────────────
 st.markdown(
     """
     <style>
       .block-container { padding-top: 1rem; }
-      .kpi-wrap {display:flex;align-items:center;justify-content:center;height:260px;}
-      .kpi-num  {font-size:72px; font-weight:800; letter-spacing:1px;}
-      .kpi-unit {font-size:18px; font-weight:600; margin-left:6px; opacity:.8;}
-      .title-left {font-weight:700; font-size:18px; margin:12px 0 4px;}
+      .metric-value { font-weight: 700 !important; }
+      .kpi-box {text-align:center; padding:18px 0;}
+      .kpi-title {font-weight:700;}
+      .kpi-number {font-size:64px; line-height:1; font-weight:800; margin:10px 0 2px 0;}
+      .kpi-sub {opacity:.75; margin-top:0}
+      .section-top-gap { margin-top: .5rem; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Data locations (GitHub)
+# Data sources (GitHub raw)
 # ──────────────────────────────────────────────────────────────────────────────
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
@@ -34,35 +37,40 @@ FILES = {
     "cap_csv": "capex_EDA_cleaned_filled.csv",
     "cap_csv_alt": "capex_EDA_cleaned_filled.csv",
     "cap_xlsx": "capex_EDA.xlsx",
-    # Aggregated datasets
-    "sectors": "merged_sectors_data.csv",
-    "destinations": "merged_destinations_data.csv",
+    "sectors": "merged_sectors_data.csv",   # sectors data from your notebook
 }
+
 def gh_raw_url(fname: str) -> str:
     return f"{RAW_BASE}/{quote(fname)}"
 
-def _find_col(cols, *cands):
+def find_col(cols, *cands):
+    """Find a column by exact (case-insensitive) name or substring."""
     low = {c.lower(): c for c in cols}
     for c in cands:
-        if c.lower() in low: return low[c.lower()]
-    for c in cands:
+        if c.lower() in low:
+            return low[c.lower()]
+    for cand in cands:
         for col in cols:
-            if c.lower() in col.lower(): return col
+            if cand.lower() in col.lower():
+                return col
     return None
 
 # ──────────────────────────────────────────────────────────────────────────────
-# World Bank + CAPEX (same as your working version)
+# Load World Bank (Scoring)  + CAPEX (EDA)
 # ──────────────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=True)
 def load_world_bank() -> pd.DataFrame:
     url = gh_raw_url(FILES["wb"])
-    df = pd.read_csv(url)
+    try:
+        df = pd.read_csv(url)
+    except (URLError, HTTPError, FileNotFoundError) as e:
+        raise RuntimeError(f"Could not fetch {FILES['wb']}: {e}")
 
-    country = _find_col(df.columns, "country", "country_name", "Country Name")
-    year    = _find_col(df.columns, "year")
-    cont    = _find_col(df.columns, "continent", "region")
-    score   = _find_col(df.columns, "score", "viability_score", "composite_score")
-    grade   = _find_col(df.columns, "grade", "letter_grade")
+    country = find_col(df.columns, "country", "country_name", "Country Name")
+    year    = find_col(df.columns, "year")
+    cont    = find_col(df.columns, "continent", "region")
+    score   = find_col(df.columns, "score", "viability_score", "composite_score")
+    grade   = find_col(df.columns, "grade", "letter_grade")
 
     for need, col in [("country", country), ("year", year), ("continent", cont)]:
         if col is None:
@@ -76,10 +84,10 @@ def load_world_bank() -> pd.DataFrame:
         **({grade: "grade"} if grade else {}),
     })
     df["year"] = pd.to_numeric(df["year"], errors="coerce").astype("Int64")
-    df["country"]   = df["country"].astype(str).str.strip()
-    df["continent"] = df["continent"].astype(str).str.strip()
     if "score" not in df.columns: df["score"] = np.nan
     if "grade" not in df.columns: df["grade"] = np.nan
+    df["country"]   = df["country"].astype(str).str.strip()
+    df["continent"] = df["continent"].astype(str).str.strip()
 
     order = ["A+", "A", "B", "C", "D"]
     df["grade"] = df["grade"].astype(str).str.strip()
@@ -88,13 +96,16 @@ def load_world_bank() -> pd.DataFrame:
     return df
 
 def _melt_capex_wide(df: pd.DataFrame) -> pd.DataFrame:
-    df.columns = [str(c).strip() for c in df.columns]
-    src = _find_col(df.columns, "Source Country", "Source Co", "Country")
+    cols = [str(c).strip() for c in df.columns]
+    df.columns = cols
+    src = find_col(cols, "Source Country", "Source Co", "Country")
     if not src:
         raise ValueError("CAPEX: 'Source Country' column not found.")
-    year_cols = [c for c in df.columns if str(c).isdigit() and len(str(c)) == 4]
+    year_cols = [c for c in cols if str(c).isdigit() and len(str(c)) == 4]
+    if not year_cols:
+        raise ValueError("CAPEX: no 4-digit year columns detected.")
     id_vars = [src]
-    grade_col = _find_col(df.columns, "Grade")
+    grade_col = find_col(cols, "Grade")
     if grade_col: id_vars.append(grade_col)
 
     melted = df.melt(
@@ -111,9 +122,9 @@ def _melt_capex_wide(df: pd.DataFrame) -> pd.DataFrame:
         s = str(x).replace(",", "").strip()
         try: return float(s)
         except Exception: return np.nan
+
     melted["capex"]   = melted["capex"].map(numify)
     melted["country"] = melted["country"].astype(str).str.strip()
-
     if "grade" in melted.columns:
         order = ["A+", "A", "B", "C", "D"]
         melted["grade"] = melted["grade"].astype(str).str.strip()
@@ -125,43 +136,60 @@ def _melt_capex_wide(df: pd.DataFrame) -> pd.DataFrame:
 def load_capex_long() -> pd.DataFrame:
     for key in ("cap_csv", "cap_csv_alt"):
         try:
-            df = pd.read_csv(gh_raw_url(FILES[key]))
+            url = gh_raw_url(FILES[key])
+            df = pd.read_csv(url)
             return _melt_capex_wide(df)
         except Exception:
             continue
-    df_x = pd.read_excel(gh_raw_url(FILES["cap_xlsx"]), sheet_name=0)
-    return _melt_capex_wide(df_x)
+    try:
+        url = gh_raw_url(FILES["cap_xlsx"])
+        df_x = pd.read_excel(url, sheet_name=0)
+        return _melt_capex_wide(df_x)
+    except Exception as e:
+        raise RuntimeError(f"Could not load CAPEX from CSV or Excel: {e}")
 
 wb   = load_world_bank()
 capx = load_capex_long()
-wb_for_merge = wb[["year", "country", "continent"]].dropna()
-capx_enriched = capx.merge(wb_for_merge, on=["year", "country"], how="left")
+
+# enrich CAPEX with continent
+wb_year_cc = wb[["year", "country", "continent"]].dropna()
+capx_enriched = capx.merge(wb_year_cc, on=["year", "country"], how="left")
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Top row (global filters) — unchanged
+# Global filter row (Year, Continent, Country)  — used for Scoring & EDA
 # ──────────────────────────────────────────────────────────────────────────────
 years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
 years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
 years_all = ["All"] + sorted(set(years_wb).union(years_cap))
 
 c1, c2, c3 = st.columns([1, 1, 2], gap="small")
+
 with c1:
     sel_year_any = st.selectbox("Year", years_all, index=0, key="year_any")
 
+# Auto-continent suggestion if a country is already selected (use case 2)
 prev_country = st.session_state.get("country", "All")
 suggested_cont = None
 if prev_country != "All":
-    rows = wb[(wb["country"] == prev_country)] if sel_year_any == "All" else wb[(wb["year"] == sel_year_any) & (wb["country"] == prev_country)]
+    if isinstance(sel_year_any, int):
+        rows = wb[(wb["year"] == sel_year_any) & (wb["country"] == prev_country)]
+    else:
+        rows = wb[wb["country"] == prev_country]
     if not rows.empty and rows["continent"].notna().any():
         suggested_cont = rows["continent"].dropna().iloc[0]
 
+# Build continent options from a valid WB year so Scoring never breaks
 valid_year_for_wb = sel_year_any if (isinstance(sel_year_any, int) and sel_year_any in years_wb) else max(years_wb)
 cont_options = ["All"] + sorted(wb.loc[wb["year"] == valid_year_for_wb, "continent"].dropna().unique().tolist())
+
+# default continent: suggested (if available and in options) else last selection
 saved_cont = st.session_state.get("continent", "All")
 default_cont = suggested_cont if (suggested_cont in cont_options) else (saved_cont if saved_cont in cont_options else "All")
+
 with c2:
     sel_cont = st.selectbox("Continent", cont_options, index=cont_options.index(default_cont), key="continent")
 
+# country options depend on continent (for a valid WB year)
 wb_scope = wb[wb["year"] == valid_year_for_wb].copy()
 if sel_cont != "All":
     wb_scope = wb_scope[wb_scope["continent"] == sel_cont]
@@ -171,27 +199,30 @@ default_country = saved_country if saved_country in country_options else "All"
 with c3:
     sel_country = st.selectbox("Country", country_options, index=country_options.index(default_country), key="country")
 
-def filt_wb_year(df, year_any):
+# helper for Scoring tab
+def filt_wb_single_year(df: pd.DataFrame, year_any) -> tuple[pd.DataFrame, int]:
     yy = int(year_any) if (isinstance(year_any, int) and year_any in years_wb) else max(years_wb)
     out = df[df["year"] == yy].copy()
-    if sel_cont != "All": out = out[out["continent"] == sel_cont]
-    if sel_country != "All": out = out[out["country"] == sel_country]
+    if sel_cont != "All":
+        out = out[out["continent"] == sel_cont]
+    if sel_country != "All":
+        out = out[out["country"] == sel_country]
     return out, yy
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Tabs
 # ──────────────────────────────────────────────────────────────────────────────
-tab_scoring, tab_eda, tab_sectors, tab_dest = st.tabs(["Scoring", "EDA", "Sectors", "Destinations"])
+tab_scoring, tab_eda, tab_sectors = st.tabs(["Scoring", "EDA", "Sectors"])
 
 # =============================================================================
-# SCORING (keep your previous working section)
+# SCORING TAB  (unchanged)
 # =============================================================================
 with tab_scoring:
     st.caption("Scoring • (World Bank–based)")
     where_title = sel_country if sel_country != "All" else (sel_cont if sel_cont != "All" else "Worldwide")
     st.subheader(where_title)
 
-    wb_year_df, scoring_year = filt_wb_year(wb, sel_year_any)
+    wb_year_df, scoring_year = filt_wb_single_year(wb, sel_year_any)
 
     if sel_country != "All":
         rows = wb[(wb["year"] == scoring_year) & (wb["country"] == sel_country)]
@@ -200,99 +231,126 @@ with tab_scoring:
         ctry_cont = rows["continent"].dropna().iloc[0] if not rows.empty and rows["continent"].notna().any() else None
         cont_avg = float(wb[(wb["year"] == scoring_year) & (wb["continent"] == ctry_cont)]["score"].mean()) if ctry_cont else np.nan
 
-        c1_, c2_, c3_ = st.columns(3, gap="large")
-        c1_.metric("Country Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
-        c2_.metric("Grade", country_grade)
-        c3_.metric(f"{ctry_cont} Avg Score" if ctry_cont else "Continent Avg Score", "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
+        k1, k2, k3 = st.columns(3, gap="large")
+        with k1:
+            st.metric("Country Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
+        with k2:
+            st.metric("Grade", country_grade)
+        with k3:
+            label = f"{ctry_cont} Avg Score" if ctry_cont else "Continent Avg Score"
+            st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
 
     t1, t2 = st.columns([1, 2], gap="large")
     with t1:
-        base = wb.copy()
-        title = "Year-over-Year Viability Score — Global"
         if sel_country != "All":
-            base = base[base["country"] == sel_country]
-            title = f"Year-over-Year Viability Score — {sel_country}"
+            base = wb[wb["country"] == sel_country]; title = f"Year-over-Year Viability Score — {sel_country}"
         elif sel_cont != "All":
-            base = base[base["continent"] == sel_cont]
-            title = f"Year-over-Year Viability Score — {sel_cont}"
-
+            base = wb[wb["continent"] == sel_cont]; title = f"Year-over-Year Viability Score — {sel_cont}"
+        else:
+            base = wb.copy(); title = "Year-over-Year Viability Score — Global"
         yoy_df = base.groupby("year", as_index=False)["score"].mean().sort_values("year")
         yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)
-        fig = px.line(yoy_df, x="year_str", y="score", markers=True,
-                      labels={"year_str": "", "score": "Mean score"}, title=title)
-        fig.update_xaxes(type="category", categoryorder="array",
-                         categoryarray=yoy_df["year_str"].tolist(), showgrid=False)
-        fig.update_yaxes(showgrid=False)
-        fig.update_layout(margin=dict(l=10,r=10,t=60,b=10), height=340)
-        st.plotly_chart(fig, use_container_width=True)
+        fig_line = px.line(yoy_df, x="year_str", y="score", markers=True,
+                           labels={"year_str": "", "score": "Mean score"}, title=title)
+        fig_line.update_xaxes(type="category", categoryorder="array",
+                              categoryarray=yoy_df["year_str"].tolist(), showgrid=False)
+        fig_line.update_yaxes(showgrid=False)
+        fig_line.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=340)
+        st.plotly_chart(fig_line, use_container_width=True)
 
     with t2:
         map_df = wb_year_df[["country", "score"]].copy()
         if map_df.empty:
             st.info("No data for this selection.")
         else:
-            fig = px.choropleth(map_df, locations="country", locationmode="country names",
-                                color="score", color_continuous_scale="Blues",
-                                title=f"Global Performance Map — {scoring_year}")
-            fig.update_coloraxes(showscale=True)
+            fig_map = px.choropleth(map_df, locations="country", locationmode="country names",
+                                    color="score", color_continuous_scale="Blues",
+                                    title=f"Global Performance Map — {scoring_year}")
+            fig_map.update_coloraxes(showscale=True)
             scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
                          "North America":"north america","South America":"south america",
                          "Oceania":"world","All":"world"}
-            fig.update_geos(scope=scope_map.get(sel_cont, "world"), projection_type="natural earth",
-                            showcountries=True, showcoastlines=True)
-            if sel_cont != "All" or sel_country != "All": fig.update_geos(fitbounds="locations")
-            fig.update_layout(margin=dict(l=10,r=10,t=60,b=10), height=410)
-            st.plotly_chart(fig, use_container_width=True)
+            current_scope = scope_map.get(sel_cont, "world")
+            fig_map.update_geos(scope=current_scope, projection_type="natural earth",
+                                showcountries=True, showcoastlines=True)
+            if sel_cont != "All" or sel_country != "All":
+                fig_map.update_geos(fitbounds="locations")
+            fig_map.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=410)
+            st.plotly_chart(fig_map, use_container_width=True)
 
     if sel_country == "All":
-        b1,b2,b3 = st.columns([1.2,1,1.2], gap="large")
+        b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
         with b1:
-            top10 = wb_year_df[["country","score"]].dropna().sort_values("score", ascending=False).head(10)
+            top10 = wb_year_df[["country", "score"]].dropna().sort_values("score", ascending=False).head(10)
             if top10.empty: st.info("No countries available for Top 10 with this filter.")
             else:
-                fig = px.bar(top10.sort_values("score"), x="score", y="country", orientation="h",
-                             color="score", color_continuous_scale="Blues",
-                             labels={"score":"", "country":""},
-                             title=f"Top 10 Performing Countries — {scoring_year}")
-                fig.update_coloraxes(showscale=False)
-                fig.update_layout(margin=dict(l=10,r=10,t=60,b=10), height=420)
-                st.plotly_chart(fig, use_container_width=True)
+                fig_top = px.bar(top10.sort_values("score"), x="score", y="country", orientation="h",
+                                 color="score", color_continuous_scale="Blues",
+                                 labels={"score": "", "country": ""},
+                                 title=f"Top 10 Performing Countries — {scoring_year}")
+                fig_top.update_coloraxes(showscale=False)
+                fig_top.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+                st.plotly_chart(fig_top, use_container_width=True)
         with b2:
-            base = wb_year_df.copy()
-            if base.empty or base["grade"].isna().all(): st.info("No grade data for this selection.")
+            donut_base = wb_year_df.copy()
+            if donut_base.empty or donut_base["grade"].isna().all(): st.info("No grade data for this selection.")
             else:
-                grades = ["A+","A","B","C","D"]
-                donut = (base.assign(grade=base["grade"].astype(str))
-                              .loc[lambda d: d["grade"].isin(grades)]
-                              .groupby("grade", as_index=False)["country"].nunique()
-                              .rename(columns={"country":"count"})
+                grades = ["A+", "A", "B", "C", "D"]
+                donut = (donut_base.assign(grade=donut_base["grade"].astype(str))
+                                     .loc[lambda d: d["grade"].isin(grades)]
+                                     .groupby("grade", as_index=False)["country"].nunique()
+                                     .rename(columns={"country": "count"})
                         ).set_index("grade").reindex(grades, fill_value=0).reset_index()
                 shades = [px.colors.sequential.Blues[-1-i] for i in range(5)]
-                cmap = {g:c for g,c in zip(grades, shades)}
-                fig = px.pie(donut, names="grade", values="count", hole=0.55,
-                             title=f"Grade Distribution — {scoring_year}",
-                             color="grade", color_discrete_map=cmap)
-                fig.update_layout(margin=dict(l=10,r=10,t=60,b=10), height=420, showlegend=True)
-                st.plotly_chart(fig, use_container_width=True)
+                cmap = {g:c for g, c in zip(grades, shades)}
+                fig_donut = px.pie(donut, names="grade", values="count", hole=0.55,
+                                   title=f"Grade Distribution — {scoring_year}",
+                                   color="grade", color_discrete_map=cmap)
+                fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
+                st.plotly_chart(fig_donut, use_container_width=True)
         with b3:
-            base = wb[wb["year"] == scoring_year].copy()
-            if sel_cont != "All": base = base[base["continent"] == sel_cont]
-            cont_bar = base.groupby("continent", as_index=False)["score"].mean().sort_values("score", ascending=True)
+            cont_base = wb[wb["year"] == scoring_year].copy()
+            if sel_cont != "All": cont_base = cont_base[cont_base["continent"] == sel_cont]
+            cont_bar = cont_base.groupby("continent", as_index=False)["score"].mean().sort_values("score", ascending=True)
             if cont_bar.empty: st.info("No continent data for this selection.")
             else:
-                fig = px.bar(cont_bar, x="score", y="continent", orientation="h",
-                             color="score", color_continuous_scale="Blues",
-                             labels={"score":"","continent":""},
-                             title=f"Continent Viability Score — {scoring_year}")
-                fig.update_coloraxes(showscale=False)
-                fig.update_layout(margin=dict(l=10,r=10,t=60,b=10), height=420)
-                st.plotly_chart(fig, use_container_width=True)
+                fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
+                                  color="score", color_continuous_scale="Blues",
+                                  labels={"score": "", "continent": ""},
+                                  title=f"Continent Viability Score — {scoring_year}")
+                fig_cont.update_coloraxes(showscale=False)
+                fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+                st.plotly_chart(fig_cont, use_container_width=True)
+
+    # 👉 Indicator weights appear ONLY in Scoring
+    st.markdown("### Indicator Weights (%)")
+    weights = pd.DataFrame({
+        "Indicator": [
+            "GDP growth (annual %)",
+            "GDP per capita, PPP (current international $)",
+            "Current account balance (% of GDP)",
+            "Foreign direct investment, net outflows (% of GDP)",
+            "Inflation, consumer prices (annual %)",
+            "Exports of goods and services (% of GDP)",
+            "Imports of goods and services (% of GDP)",
+            "Political Stability and Absence of Violence/Terrorism: Estimate",
+            "Government Effectiveness: Estimate",
+            "Control of Corruption: Estimate",
+            "Access to electricity (% of population)",
+            "Individuals using the Internet (% of population)",
+            "Total reserves in months of imports",
+        ],
+        "Weight (%)": [12, 10, 10, 8, 6, 5, 5, 9, 8, 8, 6, 5, 5],
+    }).sort_values("Weight (%)", ascending=False, kind="mergesort")
+    st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# EDA (keep your previous working section)
+# EDA TAB (unchanged behavior)
 # =============================================================================
 with tab_eda:
     st.caption("Exploratory Data Analysis • (CAPEX)")
+
+    # EDA-only Grade selector (and auto-grade when year+country picked)
     grade_options = ["All", "A+", "A", "B", "C", "D"]
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
@@ -305,6 +363,7 @@ with tab_eda:
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
 
+    # Filter CAPEX with continent/country/grade; keep all years if Year == All
     capx_eda = capx_enriched.copy()
     if sel_cont != "All":    capx_eda = capx_eda[capx_eda["continent"] == sel_cont]
     if sel_country != "All": capx_eda = capx_eda[capx_eda["country"] == sel_country]
@@ -315,18 +374,34 @@ with tab_eda:
 
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
-        trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
-        if trend.empty: st.info("No CAPEX data for the selected filters.")
+        # If specific country + specific year => KPI; else trend
+        if sel_country != "All" and isinstance(sel_year_any, int):
+            cval = capx_eda["capex"].sum()
+            st.markdown(
+                f"""
+                <div class="kpi-box">
+                  <div class="kpi-title">{sel_country} CAPEX — {sel_year_any}</div>
+                  <div class="kpi-number">{cval:,.1f}</div>
+                  <div class="kpi-sub">$B</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
         else:
-            trend["year_str"] = trend["year"].astype(int).astype(str)
-            fig = px.line(trend, x="year_str", y="capex", markers=True,
-                          labels={"year_str": "", "capex": "Global CAPEX ($B)"},
-                          title="Global CAPEX Trend")
-            fig.update_xaxes(type="category", categoryorder="array",
-                             categoryarray=trend["year_str"].tolist(), showgrid=False)
-            fig.update_yaxes(showgrid=False)
-            fig.update_layout(margin=dict(l=10,r=10,t=60,b=10), height=360)
-            st.plotly_chart(fig, use_container_width=True)
+            trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
+            if trend.empty: st.info("No CAPEX data for the selected filters.")
+            else:
+                trend["year_str"] = trend["year"].astype(int).astype(str)
+                title = (f"{sel_country} CAPEX Trend" if sel_country != "All"
+                         else "Global CAPEX Trend")
+                fig = px.line(trend, x="year_str", y="capex", markers=True,
+                              labels={"year_str": "", "capex": "Global CAPEX ($B)"},
+                              title=title)
+                fig.update_xaxes(type="category", categoryorder="array",
+                                 categoryarray=trend["year_str"].tolist(), showgrid=False)
+                fig.update_yaxes(showgrid=False)
+                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=360)
+                st.plotly_chart(fig, use_container_width=True)
 
     with e2:
         if isinstance(sel_year_any, int):
@@ -342,10 +417,11 @@ with tab_eda:
             scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
                          "North America":"north america","South America":"south america",
                          "Oceania":"world","All":"world"}
-            fig.update_geos(scope=scope_map.get(sel_cont, "world"), projection_type="natural earth",
+            current_scope = scope_map.get(sel_cont, "world")
+            fig.update_geos(scope=current_scope, projection_type="natural earth",
                             showcountries=True, showcoastlines=True)
             if sel_cont != "All" or sel_country != "All": fig.update_geos(fitbounds="locations")
-            fig.update_layout(margin=dict(l=10,r=10,t=60,b=10), height=420)
+            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
             st.plotly_chart(fig, use_container_width=True)
 
     show_grade_trend = (sel_grade_eda == "All")
@@ -367,7 +443,7 @@ with tab_eda:
                          color="capex", color_continuous_scale="Blues",
                          labels={"capex": "", "country": ""}, title=title_top10)
             fig.update_coloraxes(showscale=False)
-            fig.update_layout(margin=dict(l=10,r=10,t=60,b=10), height=420)
+            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
             st.plotly_chart(fig, use_container_width=True)
 
     if show_grade_trend:
@@ -391,7 +467,7 @@ with tab_eda:
                     fig.update_xaxes(type="category", categoryorder="array",
                                      categoryarray=sorted(tg["year_str"].unique().tolist()), showgrid=False)
                     fig.update_yaxes(showgrid=False)
-                    fig.update_layout(margin=dict(l=10,r=10,t=60,b=10), height=420)
+                    fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                     st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("No CAPEX data for grade trend.")
@@ -418,319 +494,205 @@ with tab_eda:
                              labels={"growth_abs": "", "country": ""},
                              title=f"Top 10 Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]")
                 fig.update_coloraxes(showscale=False)
-                fig.update_layout(margin=dict(l=10,r=10,t=60,b=10), height=420)
+                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig, use_container_width=True)
 
 # =============================================================================
-# Shared helpers for Sectors/Destinations
+# SECTORS TAB
 # =============================================================================
-SELECTED_SECTORS_ORDER = [
+
+# Canonical sector list used in notebook
+SECTORS_CANON = [
     "Software & IT services","Business services","Communications","Financial services",
-    "Food and Beverages","Transportation & Warehousing","Real estate","Consumer products",
-    "Automotive OEM","Automotive components","Chemicals","Pharmaceuticals","Metals",
-    "Coal, oil & gas","Space & defence","Leisure & entertainment"
+    "Transportation & Warehousing","Real estate","Consumer products","Food and Beverages",
+    "Automotive OEM","Automotive components","Chemicals","Pharmaceuticals",
+    "Metals","Coal, oil & gas","Space & defence","Leisure & entertainment"
 ]
 
-def normalize_sector_name(s: str) -> str:
-    if pd.isna(s): return np.nan
-    t = str(s).strip()
-    repl = {
-        "Software and IT services": "Software & IT services",
-        "IT & Software services": "Software & IT services",
-        "Business Services": "Business services",
-        "Food & Beverages": "Food and Beverages",
-        "Transport & Warehousing": "Transportation & Warehousing",
-        "Automotive Components": "Automotive components",
-        "Automotive O.E.M.": "Automotive OEM",
-        "Coal, Oil & Gas": "Coal, oil & gas",
-        "Space and defence": "Space & defence",
-        "Leisure and entertainment": "Leisure & entertainment",
+# 10 allowed countries from the notebook
+SECTOR_COUNTRIES_10 = [
+    "United States","United Kingdom","Germany","France","China",
+    "Japan","South Korea","Canada","Netherlands","United Arab Emirates"
+]
+
+def _numify_generic(x):
+    if pd.isna(x): return np.nan
+    if isinstance(x, (int, float, np.integer, np.floating)): return float(x)
+    s = re.sub(r"[^\d\.\-]", "", str(x))
+    try: return float(s)
+    except Exception: return np.nan
+
+def _canon_country(name: str) -> str:
+    if not isinstance(name, str): return ""
+    s = name.strip()
+    swap = {
+        "usa":"United States","us":"United States","u.s.":"United States",
+        "uk":"United Kingdom","u.k.":"United Kingdom",
+        "south korea":"South Korea","republic of korea":"South Korea",
+        "uae":"United Arab Emirates",
     }
-    return repl.get(t, t)
+    low = s.lower()
+    if low in swap: return swap[low]
+    t = " ".join(w.capitalize() for w in low.split())
+    t = t.replace("Of", "of")
+    return t
 
-def _norm(s: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", str(s).lower()).strip()
+def _canon_sector(sector: str) -> str:
+    if not isinstance(sector, str): return ""
+    s = sector.strip().lower()
+    s = s.replace("&amp;", "&").replace(" and ", " & ")
+    s = s.replace("defense", "defence")
+    s = re.sub(r"\s+", " ", s)
 
-# ---------- Sectors loader ----------
+    mapping = [
+        (["software", "it"], "Software & IT services"),
+        (["business services"], "Business services"),
+        (["communication"], "Communications"),
+        (["financial"], "Financial services"),
+        (["transport", "warehouse"], "Transportation & Warehousing"),
+        (["real estate"], "Real estate"),
+        (["consumer product"], "Consumer products"),
+        (["food", "beverage"], "Food and Beverages"),
+        (["automotive oem"], "Automotive OEM"),
+        (["automotive component"], "Automotive components"),
+        (["chemical"], "Chemicals"),
+        (["pharma"], "Pharmaceuticals"),
+        (["metal"], "Metals"),
+        (["coal", "oil", "gas"], "Coal, oil & gas"),
+        (["space", "defence"], "Space & defence"),
+        (["leisure", "entertain"], "Leisure & entertainment"),
+    ]
+    for pats, label in mapping:
+        if all(p in s for p in pats):
+            return label
+    return " ".join(w.capitalize() if w != "&" else "&" for w in s.split())
+
 @st.cache_data(show_spinner=True)
 def load_sectors_raw() -> pd.DataFrame:
+    """Load and normalize merged sectors CSV similar to your notebook."""
     url = gh_raw_url(FILES["sectors"])
-    raw = pd.read_csv(url)
+    df = pd.read_csv(url)
 
-    cols = list(raw.columns)
-    low = {c.lower(): c for c in cols}
-    def need_or_none(name, *alts):
-        for k in (name, *alts):
-            if k in low: return low[k]
-        for col in cols:
-            if name in col.lower(): return col
-        return None
+    col_country = find_col(df.columns, "country")
+    col_sector  = find_col(df.columns, "sector")
+    col_comp    = find_col(df.columns, "companies", "# companies", "number of companies")
+    col_jobs    = find_col(df.columns, "jobs created", "jobs", "job")
+    col_capex   = find_col(df.columns, "capex", "capital expenditure", "capex (in million usd)")
+    col_proj    = find_col(df.columns, "projects")
 
-    country = need_or_none("country", "source_country", "home_country", "origin")
-    sector  = need_or_none("sector", "industry", "sector_name")
-    comp    = need_or_none("companies", "company")
-    jobs    = need_or_none("jobs_created", "jobs", "jobs created")
-    capex   = need_or_none("capex")
-    projs   = need_or_none("projects", "project_count", "nb_projects")
+    for need, col in [
+        ("country", col_country), ("sector", col_sector),
+        ("companies", col_comp), ("jobs", col_jobs),
+        ("capex", col_capex), ("projects", col_proj)
+    ]:
+        if col is None:
+            raise ValueError(f"Sectors CSV missing column for {need}. Found: {list(df.columns)}")
 
-    if country is None or sector is None:
-        raise ValueError(f"Sectors CSV missing required columns. Found: {cols}")
+    df = df.rename(columns={
+        col_country: "country_raw",
+        col_sector : "sector_raw",
+        col_comp   : "companies",
+        col_jobs   : "jobs_created",
+        col_capex  : "capex",
+        col_proj   : "projects",
+    })
 
-    df = raw.rename(columns={
-        country:"country", sector:"sector",
-        **({comp:"companies"} if comp else {}),
-        **({jobs:"jobs_created"} if jobs else {}),
-        **({capex:"capex"} if capex else {}),
-        **({projs:"projects"} if projs else {}),
-    }).copy()
+    # numeric cleanup (commas, spaces, etc.)
+    for c in ["companies", "jobs_created", "capex", "projects"]:
+        df[c] = df[c].map(_numify_generic)
 
-    for m in ["companies","jobs_created","capex","projects"]:
-        if m not in df.columns: df[m] = 0
+    # canonicalize
+    df["country"] = df["country_raw"].astype(str).map(_canon_country)
+    df["sector"]  = df["sector_raw"].astype(str).map(_canon_sector)
 
-    df["country"] = df["country"].astype(str).str.strip()
-    df["sector"]  = df["sector"].astype(str).map(normalize_sector_name)
-    for c in ["companies","jobs_created","capex","projects"]:
-        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+    # keep only selected sectors + the 10 allowed countries
+    df = df[df["sector"].isin(SECTORS_CANON)]
+    df = df[df["country"].isin(SECTOR_COUNTRIES_10)]
 
-    df = df[df["sector"].isin(SELECTED_SECTORS_ORDER)].copy()
-    df["sector"] = pd.Categorical(df["sector"], categories=SELECTED_SECTORS_ORDER, ordered=True)
-    return df
-
-# ---------- Destinations loader (very tolerant/fuzzy) ----------
-@st.cache_data(show_spinner=True)
-def load_destinations_raw() -> pd.DataFrame:
-    url = gh_raw_url(FILES["destinations"])
-    raw = pd.read_csv(url)
-
-    cols = list(raw.columns)
-
-    # Identify country-like columns
-    normalized = {_norm(c): c for c in cols}
-
-    def find_candidates(tokens, require_country=False):
-        out = []
-        for n, orig in normalized.items():
-            if all(tok in n for tok in tokens):
-                if not require_country or "country" in n:
-                    out.append(orig)
-        return out
-
-    # Try direct patterns
-    src_cands  = find_candidates(["source", "country"], require_country=False) \
-                 or find_candidates(["origin", "country"], False) \
-                 or find_candidates(["home", "country"], False)
-    dest_cands = find_candidates(["destination", "country"], False) \
-                 or find_candidates(["host", "country"], False) \
-                 or find_candidates(["target", "country"], False) \
-                 or find_candidates(["to", "country"], False)
-
-    # If not explicit, try using the two "country" fields
-    country_like = [orig for n, orig in normalized.items() if "country" in n]
-    if not src_cands or not dest_cands:
-        if len(country_like) >= 2:
-            # Prefer names with source/dest hints
-            if not src_cands:
-                src_cands = [c for c in country_like if any(k in _norm(c) for k in ["source","origin","home","from"])]
-            if not dest_cands:
-                dest_cands = [c for c in country_like if any(k in _norm(c) for k in ["dest","destination","host","target","to"])]
-
-            # If still ambiguous, pick first two distinct columns
-            if (not src_cands or not dest_cands) and len(country_like) >= 2:
-                first, second = country_like[0], country_like[1]
-                if not src_cands:  src_cands  = [first]
-                if not dest_cands: dest_cands = [second]
-
-    # Fallbacks for odd schemas
-    if not dest_cands:
-        # e.g., a plain "destination" column without "country"
-        for name in cols:
-            if "dest" in _norm(name) or _norm(name) == "destination":
-                dest_cands = [name]; break
-
-    src_col  = src_cands[0]  if src_cands  else None
-    dest_col = dest_cands[0] if dest_cands else None
-
-    if src_col is None or dest_col is None:
-        raise ValueError(f"Destinations CSV missing required columns. Found: {cols}")
-
-    # Metrics
-    def pick(*alts):
-        for a in alts:
-            for c in cols:
-                if a in _norm(c): return c
-        return None
-
-    comp = pick("companies", "company")
-    jobs = pick("jobs", "jobs created")
-    capx = pick("capex")
-    proj = pick("projects", "project count", "nb projects")
-
-    df = raw.rename(columns={
-        src_col:  "source_country",
-        dest_col: "destination_country",
-        **({comp:"companies"} if comp else {}),
-        **({jobs:"jobs_created"} if jobs else {}),
-        **({capx:"capex"} if capx else {}),
-        **({proj:"projects"} if proj else {}),
-    }).copy()
-
-    for m in ["companies","jobs_created","capex","projects"]:
-        if m not in df.columns: df[m] = 0
-
-    df["source_country"]      = df["source_country"].astype(str).str.strip()
-    df["destination_country"] = df["destination_country"].astype(str).str.strip()
-    for c in ["companies","jobs_created","capex","projects"]:
-        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+    # aggregate in case multiple raw rows map to the same (country, sector)
+    df = (df.groupby(["country", "sector"], as_index=False)[["companies","jobs_created","capex","projects"]]
+            .sum(min_count=1))
 
     return df
 
-# ---------- Shared viz helpers ----------
-def kpi_card(value: float, unit: str):
-    st.markdown(
-        f'<div class="kpi-wrap"><div class="kpi-num">{value:,.0f}</div>'
-        f'<div class="kpi-unit">{unit}</div></div>',
-        unsafe_allow_html=True
-    )
+sectors_df = load_sectors_raw()
 
-def sectors_bar_for_country(df: pd.DataFrame, country: str, metric: str, title_prefix: str):
-    metric_labels = {
-        "companies": "Number of Companies",
-        "jobs_created": "Jobs Created",
-        "capex": "CAPEX (in million USD)",
-        "projects": "Number of Projects",
-    }
-    nice = metric_labels.get(metric, metric)
-    base = df[df["country"] == country].groupby("sector", as_index=False)[metric].sum()
-    base = base.set_index("sector").reindex(SELECTED_SECTORS_ORDER, fill_value=0).reset_index()
-    fig = px.bar(
-        base.sort_values(metric, ascending=True),
-        x=metric, y="sector", orientation="h",
-        labels={metric: "", "sector": ""},
-        color=metric, color_continuous_scale="Blues",
-        title=f"{nice} by Sector — {title_prefix}"
-    )
-    fig.update_coloraxes(showscale=False)
-    fig.update_layout(margin=dict(l=10,r=10,t=60,b=10), height=480)
-    return fig
-
-def destinations_bar_for_source(df: pd.DataFrame, source: str, metric: str):
-    metric_labels = {
-        "companies": "Number of Companies",
-        "jobs_created": "Jobs Created",
-        "capex": "CAPEX (in million USD)",
-        "projects": "Number of Projects",
-    }
-    nice = metric_labels.get(metric, metric)
-    base = (df[df["source_country"] == source]
-            .groupby("destination_country", as_index=False)[metric].sum())
-    fig = px.bar(
-        base.sort_values(metric, ascending=True),
-        x=metric, y="destination_country", orientation="h",
-        labels={metric: "", "destination_country": ""},
-        color=metric, color_continuous_scale="Blues",
-        title=f"{nice} by Destination — {source}"
-    )
-    fig.update_coloraxes(showscale=False)
-    fig.update_layout(margin=dict(l=10,r=10,t=60,b=10), height=520)
-    return fig
-
-def download_sectors_csv(df: pd.DataFrame, country: str):
-    export = (df[df["country"] == country]
-              .groupby("sector", as_index=False)
-              .agg({"companies":"sum","jobs_created":"sum","capex":"sum","projects":"sum"})
-              .set_index("sector").reindex(SELECTED_SECTORS_ORDER, fill_value=0).reset_index())
-    csv = export.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label=f"Download CSV for {country}",
-        data=csv,
-        file_name=f"sectors_{country.lower().replace(' ','_')}.csv",
-        mime="text/csv",
-        key=f"dl_sectors_{country}"
-    )
-
-def download_destinations_csv(df: pd.DataFrame, source: str):
-    export = (df[df["source_country"] == source]
-              .groupby("destination_country", as_index=False)
-              .agg({"companies":"sum","jobs_created":"sum","capex":"sum","projects":"sum"}))
-    csv = export.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label=f"Download CSV for {source}",
-        data=csv,
-        file_name=f"destinations_{source.lower().replace(' ','_')}.csv",
-        mime="text/csv",
-        key=f"dl_dest_{source}"
-    )
-
-# ---------- Sectors tab UI ----------
-def sectors_tab_ui():
-    df = load_sectors_raw()
-
-    countries = sorted(df["country"].unique().tolist())  # 10 source countries
-    left, right = st.columns([1, 3], gap="small")
-    with left:
-        sect_opt = ["All"] + SELECTED_SECTORS_ORDER
-        sel_sector = st.selectbox("Sector", sect_opt, index=0, key="sec_sector")
-    with right:
-        sel_country_local = st.selectbox("Source Country (Sectors)", countries, index=0, key="sec_country")
-
-    metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
-    pretty = st.radio("Metric", list(metric_map.keys()), horizontal=True, key="sec_metric")
-    metric = metric_map[pretty]
-
-    download_sectors_csv(df, sel_country_local)
-
-    if sel_sector == "All":
-        fig = sectors_bar_for_country(df, sel_country_local, metric, sel_country_local)
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        row = df[(df["country"] == sel_country_local) & (df["sector"] == sel_sector)].agg({metric:"sum"})
-        val = float(row.iloc[0]) if not row.empty else 0.0
-        st.markdown(f'<div class="title-left">{sel_country_local} — {sel_sector} • {pretty}</div>', unsafe_allow_html=True)
-        unit = {"companies":"", "jobs_created":"", "capex":"$M", "projects":""}[metric]
-        kpi_card(val, unit)
-
-# ---------- Destinations tab UI ----------
-def destinations_tab_ui():
-    try:
-        df = load_destinations_raw()
-    except Exception as e:
-        st.error(f"Could not load destinations data: {e}")
-        return
-
-    src_countries = sorted(df["source_country"].unique().tolist())  # the 10 sources
-    c1, c2 = st.columns([3, 2], gap="small")
-    with c1:
-        sel_source = st.selectbox("Source Country (Destinations)", src_countries, index=0, key="dest_source")
-    dest_opts = ["All"] + sorted(df[df["source_country"] == sel_source]["destination_country"].unique().tolist())
-    with c2:
-        sel_dest = st.selectbox("Destination Country", dest_opts, index=0, key="dest_destination")
-
-    metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
-    pretty = st.radio("Metric", list(metric_map.keys()), horizontal=True, key="dest_metric")
-    metric = metric_map[pretty]
-
-    download_destinations_csv(df, sel_source)
-
-    if sel_dest == "All":
-        fig = destinations_bar_for_source(df, sel_source, metric)
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        row = df[(df["source_country"] == sel_source) & (df["destination_country"] == sel_dest)].agg({metric:"sum"})
-        val = float(row.iloc[0]) if not row.empty else 0.0
-        st.markdown(f'<div class="title-left">{sel_source} → {sel_dest} • {pretty}</div>', unsafe_allow_html=True)
-        unit = {"companies":"", "jobs_created":"", "capex":"$M", "projects":""}[metric]
-        kpi_card(val, unit)
-
-# =============================================================================
-# SECTORS (uses sectors_tab_ui)
-# =============================================================================
 with tab_sectors:
     st.caption("Sectors Analysis")
-    sectors_tab_ui()
 
-# =============================================================================
-# DESTINATIONS (uses destinations_tab_ui)
-# =============================================================================
-with tab_dest:
-    st.caption("Destinations Analysis")
-    destinations_tab_ui()
+    # ── Filters
+    sc1, sc2 = st.columns([1, 2], gap="small")
+    with sc1:
+        sector_opt = ["All"] + SECTORS_CANON
+        sel_sector = st.selectbox("Sector", sector_opt, index=0, key="sector_sel")
+
+    with sc2:
+        # No "All" in country filter (only the 10 countries)
+        countries = SECTOR_COUNTRIES_10
+        default_c = st.session_state.get("sector_country", countries[0])
+        if default_c not in countries: default_c = countries[0]
+        sel_sector_country = st.selectbox("Country (Sectors)", countries,
+                                          index=countries.index(default_c), key="sector_country")
+
+    # Metric
+    metric = st.radio("Metric", ["Companies", "Jobs Created", "Capex", "Projects"],
+                      horizontal=True, index=0, key="metric_sel")
+
+    # Prepare data for the chosen country
+    cdf = sectors_df[sectors_df["country"] == sel_sector_country].copy()
+
+    # Download button (country_sectors_data.csv style)
+    if not cdf.empty:
+        out_cols = ["country","sector","companies","jobs_created","capex","projects"]
+        csv_bytes = cdf[out_cols].rename(columns={
+            "country":"Country","sector":"Sector",
+            "companies":"Companies","jobs_created":"Jobs Created",
+            "capex":"Capex","projects":"Projects"
+        }).to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label=f"Download {sel_sector_country} sectors CSV",
+            data=csv_bytes,
+            file_name=f"{sel_sector_country.lower().replace(' ','_')}_sectors_data.csv",
+            mime="text/csv",
+            key="dl_country_sectors_csv",
+        )
+
+    # Value column based on metric
+    value_col = {
+        "Companies":"companies",
+        "Jobs Created":"jobs_created",
+        "Capex":"capex",
+        "Projects":"projects",
+    }[metric]
+
+    # Plot / KPI logic
+    if sel_sector == "All":
+        # Bars across selected sectors for this country
+        bars = cdf[["sector", value_col]].copy()
+        bars = bars.set_index("sector").reindex(SECTORS_CANON, fill_value=0).reset_index()
+        title = f"{metric} by Sector — {sel_sector_country}"
+        if bars[value_col].sum() == 0:
+            st.info("No data for this selection.")
+        else:
+            fig = px.bar(
+                bars, x=value_col, y="sector", orientation="h",
+                title=title, labels={value_col:"", "sector":""},
+                color=value_col, color_continuous_scale="Blues"
+            )
+            fig.update_coloraxes(showscale=False)
+            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
+            st.plotly_chart(fig, use_container_width=True)
+    else:
+        # KPI for specific sector+country
+        val = float(cdf.loc[cdf["sector"] == sel_sector, value_col].sum()) if not cdf.empty else 0.0
+        unit = {"Companies":"", "Jobs Created":"", "Capex":" (USD m)", "Projects":""}[metric]
+        st.markdown(
+            f"""
+            <div class="kpi-box">
+              <div class="kpi-title">{sel_sector_country} — {sel_sector} • {metric}</div>
+              <div class="kpi-number">{val:,.0f}</div>
+              <div class="kpi-sub">{unit}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
