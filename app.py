@@ -213,7 +213,7 @@ def filt_wb_single_year(df: pd.DataFrame, year_any) -> tuple[pd.DataFrame, int]:
 # ──────────────────────────────────────────────────────────────────────────────
 # Tabs
 # ──────────────────────────────────────────────────────────────────────────────
-tab_scoring, tab_eda, tab_sectors, tab_dest = st.tabs(["Scoring", "EDA", "Sectors", "Destinations"])
+tab_scoring, tab_eda, tab_sectors, tab_dest = st.tabs(["Scoring", "CAPEX", "Sectors", "Destinations"])
 
 # =============================================================================
 # SCORING TAB  (unchanged)
@@ -349,7 +349,7 @@ with tab_scoring:
 # EDA TAB (unchanged behavior)
 # =============================================================================
 with tab_eda:
-    st.caption("Exploratory Data Analysis • (CAPEX)")
+    st.caption("CAPEX Analysis")
 
     # EDA-only Grade selector (and auto-grade when year+country picked)
     grade_options = ["All", "A+", "A", "B", "C", "D"]
