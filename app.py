@@ -410,7 +410,7 @@ with tab_eda:
             gval = str(g_rows["grade"].dropna().iloc[0])
             if gval in grade_options:
                 auto_grade = gval
-    sel_grade_eda = st.selectbox("Grade (EDA)", grade_options,
+    sel_grade_eda = st.selectbox("Grade", grade_options,
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
 
@@ -701,6 +701,7 @@ with tab_sectors:
     if sel_sector == "All":
         bars = cdf[["sector", value_col]].copy()
         bars = bars.set_index("sector").reindex(SECTORS_CANON, fill_value=0).reset_index()
+        bars = bars.sort_values(value_col)
         title = f"{metric} by Sector — {sel_sector_country}"
         if bars[value_col].sum() == 0:
             st.info("No data for this selection.")
