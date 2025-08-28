@@ -1,10 +1,10 @@
 # app.py
-import re
 import numpy as np
 import pandas as pd
+import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
-import streamlit as st
+import re
 from urllib.parse import quote
 from urllib.error import URLError, HTTPError
 
@@ -157,69 +157,62 @@ capx = load_capex_long()
 wb_year_cc = wb[["year", "country", "continent"]].dropna()
 capx_enriched = capx.merge(wb_year_cc, on=["year", "country"], how="left")
 
-# Reusable: years for filters (used inside tabs)
-YEARS_WB  = sorted(wb["year"].dropna().astype(int).unique().tolist())
-YEARS_CAP = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
-YEARS_ALL = ["All"] + sorted(set(YEARS_WB).union(YEARS_CAP))
-
-def render_common_filters(prefix_key: str):
-    """Year / Continent / Country filters (used inside Scoring & CAPEX tabs)."""
-    c1, c2, c3 = st.columns([1, 1, 2], gap="small")
-
-    with c1:
-        sel_year_any = st.selectbox("Year", YEARS_ALL, index=0, key=f"{prefix_key}_year_any")
-
-    prev_country = st.session_state.get(f"{prefix_key}_country", "All")
-    suggested_cont = None
-    if prev_country != "All":
-        rows = wb[(wb["year"] == sel_year_any) & (wb["country"] == prev_country)] if isinstance(sel_year_any, int) else wb[wb["country"] == prev_country]
-        if not rows.empty and rows["continent"].notna().any():
-            suggested_cont = rows["continent"].dropna().iloc[0]
-
-    valid_year_for_wb = sel_year_any if (isinstance(sel_year_any, int) and sel_year_any in YEARS_WB) else max(YEARS_WB)
-    cont_options = ["All"] + sorted(wb.loc[wb["year"] == valid_year_for_wb, "continent"].dropna().unique().tolist())
-
-    saved_cont = st.session_state.get(f"{prefix_key}_continent", "All")
-    default_cont = suggested_cont if (suggested_cont in cont_options) else (saved_cont if saved_cont in cont_options else "All")
-    with c2:
-        sel_cont = st.selectbox("Continent", cont_options, index=cont_options.index(default_cont), key=f"{prefix_key}_continent")
-
-    wb_scope = wb[wb["year"] == valid_year_for_wb].copy()
-    if sel_cont != "All":
-        wb_scope = wb_scope[wb_scope["continent"] == sel_cont]
-    country_options = ["All"] + sorted(wb_scope["country"].unique().tolist())
-    saved_country = st.session_state.get(f"{prefix_key}_country", "All")
-    default_country = saved_country if saved_country in country_options else "All"
-    with c3:
-        sel_country = st.selectbox("Country", country_options, index=country_options.index(default_country), key=f"{prefix_key}_country")
-
-    return sel_year_any, sel_cont, sel_country, valid_year_for_wb
-
-def filt_wb_single_year(df: pd.DataFrame, year_any, sel_cont, sel_country) -> tuple[pd.DataFrame, int]:
-    yy = int(year_any) if (isinstance(year_any, int) and year_any in YEARS_WB) else max(YEARS_WB)
-    out = df[df["year"] == yy].copy()
-    if sel_cont != "All":
-        out = out[out["continent"] == sel_cont]
-    if sel_country != "All":
-        out = out[out["country"] == sel_country]
-    return out, yy
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Tabs
 # ──────────────────────────────────────────────────────────────────────────────
 tab_scoring, tab_eda, tab_sectors, tab_dest = st.tabs(["Scoring", "CAPEX", "Sectors", "Destinations"])
 
 # =============================================================================
-# SCORING TAB
+# SCORING TAB  (unchanged)
 # =============================================================================
 with tab_scoring:
-    sel_year_any, sel_cont, sel_country, valid_year_for_wb = render_common_filters("sc")
+    # Global filters (Scoring only)
+    years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
+    years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
+    years_all = ["All"] + sorted(set(years_wb).union(years_cap))
+
+    c1, c2, c3 = st.columns([1, 1, 2], gap="small")
+    with c1:
+        sel_year_any = st.selectbox("Year", years_all, index=0, key="year_any")
+
+    prev_country = st.session_state.get("country", "All")
+    suggested_cont = None
+    if prev_country != "All":
+        rows = wb[(wb["year"] == sel_year_any) & (wb["country"] == prev_country)] if isinstance(sel_year_any, int) else wb[wb["country"] == prev_country]
+        if not rows.empty and rows["continent"].notna().any():
+            suggested_cont = rows["continent"].dropna().iloc[0]
+
+    valid_year_for_wb = sel_year_any if (isinstance(sel_year_any, int) and sel_year_any in years_wb) else max(years_wb)
+    cont_options = ["All"] + sorted(wb.loc[wb["year"] == valid_year_for_wb, "continent"].dropna().unique().tolist())
+
+    saved_cont = st.session_state.get("continent", "All")
+    default_cont = suggested_cont if (suggested_cont in cont_options) else (saved_cont if saved_cont in cont_options else "All")
+    with c2:
+        sel_cont = st.selectbox("Continent", cont_options, index=cont_options.index(default_cont), key="continent")
+
+    wb_scope = wb[wb["year"] == valid_year_for_wb].copy()
+    if sel_cont != "All":
+        wb_scope = wb_scope[wb_scope["continent"] == sel_cont]
+    country_options = ["All"] + sorted(wb_scope["country"].unique().tolist())
+    saved_country = st.session_state.get("country", "All")
+    default_country = saved_country if saved_country in country_options else "All"
+    with c3:
+        sel_country = st.selectbox("Country", country_options, index=country_options.index(default_country), key="country")
+
+    def filt_wb_single_year(df: pd.DataFrame, year_any) -> tuple[pd.DataFrame, int]:
+        yy = int(year_any) if (isinstance(year_any, int) and year_any in years_wb) else max(years_wb)
+        out = df[df["year"] == yy].copy()
+        if sel_cont != "All":
+            out = out[out["continent"] == sel_cont]
+        if sel_country != "All":
+            out = out[out["country"] == sel_country]
+        return out, yy
 
     st.caption("Scoring • (World Bank–based)")
     where_title = sel_country if sel_country != "All" else (sel_cont if sel_cont != "All" else "Worldwide")
     st.subheader(where_title)
 
-    wb_year_df, scoring_year = filt_wb_single_year(wb, sel_year_any, sel_cont, sel_country)
+    wb_year_df, scoring_year = filt_wb_single_year(wb, sel_year_any)
 
     if sel_country != "All":
         rows = wb[(wb["year"] == scoring_year) & (wb["country"] == sel_country)]
@@ -229,10 +222,13 @@ with tab_scoring:
         cont_avg = float(wb[(wb["year"] == scoring_year) & (wb["continent"] == ctry_cont)]["score"].mean()) if ctry_cont else np.nan
 
         k1, k2, k3 = st.columns(3, gap="large")
-        k1.metric("Country Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
-        k2.metric("Grade", country_grade)
-        label = f"{ctry_cont} Avg Score" if ctry_cont else "Continent Avg Score"
-        k3.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
+        with k1:
+            st.metric("Country Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
+        with k2:
+            st.metric("Grade", country_grade)
+        with k3:
+            label = f"{ctry_cont} Avg Score" if ctry_cont else "Continent Avg Score"
+            st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
 
     t1, t2 = st.columns([1, 2], gap="large")
     with t1:
@@ -316,7 +312,7 @@ with tab_scoring:
                 fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig_cont, use_container_width=True)
 
-    # Indicator weights ONLY in Scoring
+    # Indicator weights (Scoring only)
     st.markdown("### Indicator Weights (%)")
     weights = pd.DataFrame({
         "Indicator": [
@@ -339,14 +335,37 @@ with tab_scoring:
     st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# EDA (CAPEX) TAB
+# EDA TAB (unchanged behavior)
 # =============================================================================
 with tab_eda:
-    # Filters inside CAPEX tab (+ Grade)
-    sel_year_any, sel_cont, sel_country, _ = render_common_filters("eda")
+    # Filters only inside CAPEX tab (including Grade)
+    years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
+    years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
+    years_all = ["All"] + sorted(set(years_wb).union(years_cap))
+
+    c1, c2, c3 = st.columns([1, 1, 2], gap="small")
+    with c1:
+        sel_year_any = st.selectbox("Year", years_all, index=0, key="year_any_eda")
+
+    valid_year_for_wb = sel_year_any if (isinstance(sel_year_any, int) and sel_year_any in years_wb) else max(years_wb)
+    cont_options = ["All"] + sorted(wb.loc[wb["year"] == valid_year_for_wb, "continent"].dropna().unique().tolist())
+    saved_cont = st.session_state.get("continent_eda", "All")
+    with c2:
+        sel_cont = st.selectbox("Continent", cont_options,
+                                index=cont_options.index(saved_cont) if saved_cont in cont_options else 0,
+                                key="continent_eda")
+
+    wb_scope = wb[wb["year"] == valid_year_for_wb].copy()
+    if sel_cont != "All":
+        wb_scope = wb_scope[wb_scope["continent"] == sel_cont]
+    country_options = ["All"] + sorted(wb_scope["country"].unique().tolist())
+    saved_country = st.session_state.get("country_eda", "All")
+    with c3:
+        sel_country = st.selectbox("Country", country_options,
+                                   index=country_options.index(saved_country) if saved_country in country_options else 0,
+                                   key="country_eda")
 
     st.caption("CAPEX Analysis")
-
     grade_options = ["All", "A+", "A", "B", "C", "D"]
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
@@ -388,8 +407,7 @@ with tab_eda:
                 trend["year_str"] = trend["year"].astype(int).astype(str)
                 title = (f"{sel_country} CAPEX Trend" if sel_country != "All" else "Global CAPEX Trend")
                 fig = px.line(trend, x="year_str", y="capex", markers=True,
-                              labels={"year_str": "", "capex": "Global CAPEX ($B)"},
-                              title=title)
+                              labels={"year_str": "", "capex": "Global CAPEX ($B)"}, title=title)
                 fig.update_xaxes(type="category", categoryorder="array",
                                  categoryarray=trend["year_str"].tolist(), showgrid=False)
                 fig.update_yaxes(showgrid=False)
@@ -675,55 +693,29 @@ with tab_sectors:
         )
 
 # =============================================================================
-# DESTINATIONS TAB (with maps)
+# DESTINATIONS TAB (bar + side-by-side maps; clean white basemap)
 # =============================================================================
 
-# Minimal country centroids (lat, lon) for pin maps
-COUNTRY_CENTROIDS = {
-    "United States": (39.7837, -100.4459), "Canada": (56.1304, -106.3468),
-    "United Kingdom": (55.3781, -3.4360), "United Arab Emirates": (23.4241, 53.8478),
-    "France": (46.2276, 2.2137), "Germany": (51.1657, 10.4515), "India": (20.5937, 78.9629),
-    "Mexico": (23.6345, -102.5528), "Australia": (-25.2744, 133.7751), "China": (35.8617, 104.1954),
-    "Netherlands": (52.1326, 5.2913), "Singapore": (1.3521, 103.8198), "Ireland": (53.1424, -7.6921),
-    "Spain": (40.4637, -3.7492), "Japan": (36.2048, 138.2529), "Belgium": (50.5039, 4.4699),
-    "South Korea": (35.9078, 127.7669), "Italy": (41.8719, 12.5674), "Brazil": (-14.2350, -51.9253),
-    "South Africa": (-30.5595, 22.9375), "Turkey": (38.9637, 35.2433), "Saudi Arabia": (23.8859, 45.0792),
-    "Switzerland": (46.8182, 8.2275), "Sweden": (60.1282, 18.6435), "Norway": (60.4720, 8.4689),
-    "Denmark": (56.2639, 9.5018), "Finland": (61.9241, 25.7482), "Austria": (47.5162, 14.5501),
-    "Poland": (51.9194, 19.1451), "Portugal": (39.3999, -8.2245), "Greece": (39.0742, 21.8243),
-    "Indonesia": (-0.7893, 113.9213), "Malaysia": (4.2105, 101.9758), "Thailand": (15.8700, 100.9925),
-    "Vietnam": (14.0583, 108.2772), "Philippines": (12.8797, 121.7740), "Israel": (31.0461, 34.8516),
-    "Egypt": (26.8206, 30.8025), "Nigeria": (9.0820, 8.6753), "Kenya": (0.0236, 37.9062),
-    "Chile": (-35.6751, -71.5430), "Argentina": (-38.4161, -63.6167), "Colombia": (4.5709, -74.2973),
-    "Peru": (-9.1900, -75.0152), "Morocco": (31.7917, -7.0926), "Tunisia": (33.8869, 9.5375),
-    "Qatar": (25.3548, 51.1839), "Kuwait": (29.3117, 47.4818), "Bahrain": (26.0667, 50.5577),
-    "Oman": (21.4735, 55.9754), "New Zealand": (-40.9006, 174.8860), "Czechia": (49.8175, 15.4730),
-    "Hungary": (47.1625, 19.5033), "Romania": (45.9432, 24.9668), "Bulgaria": (42.7339, 25.4858),
-    "Slovakia": (48.6690, 19.6990), "Slovenia": (46.1512, 14.9955), "Croatia": (45.1000, 15.2000),
-    "Luxembourg": (49.8153, 6.1296), "Lithuania": (55.1694, 23.8813), "Latvia": (56.8796, 24.6032),
-    "Estonia": (58.5953, 25.0136), "Iceland": (64.9631, -19.0208), "Malta": (35.9375, 14.3754),
-    "Cyprus": (35.1264, 33.4299), "Pakistan": (30.3753, 69.3451), "Bangladesh": (23.6850, 90.3563),
-    "Sri Lanka": (7.8731, 80.7718), "Nepal": (28.3949, 84.1240),
-}
-def _centroids_df(countries: list[str]) -> pd.DataFrame:
-    rows = []
-    for c in countries:
-        if not isinstance(c, str): continue
-        c2 = c.strip()
-        if c2 in COUNTRY_CENTROIDS:
-            lat, lon = COUNTRY_CENTROIDS[c2]
-            rows.append({"country": c2, "lat": lat, "lon": lon})
-    return pd.DataFrame(rows)
+def _style_geo_white(fig: go.Figure, height: int = 360) -> go.Figure:
+    fig.update_geos(
+        projection_type="natural earth",
+        showcountries=True, countrycolor="#8a8a8a",
+        showcoastlines=True, coastlinecolor="#8a8a8a",
+        showland=True, landcolor="white",
+        showocean=False, lakecolor="white",
+        bgcolor="rgba(0,0,0,0)"
+    )
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=10, r=10, t=40, b=10),
+        height=height,
+        legend=dict(yanchor="top", y=1.02, x=0.02)
+    )
+    return fig
 
 @st.cache_data(show_spinner=True)
 def load_destinations_raw() -> pd.DataFrame:
-    """
-    Load and normalize merged destinations CSV.
-    Expected columns (matched flexibly):
-      - source country
-      - destination country
-      - companies, jobs created, capex, projects
-    """
     url = gh_raw_url(FILES["destinations"])
     df = pd.read_csv(url)
 
@@ -757,21 +749,60 @@ def load_destinations_raw() -> pd.DataFrame:
     df["source_country"]      = df["source_raw"].astype(str).map(_canon_country)
     df["destination_country"] = df["dest_raw"].astype(str).map(_canon_country)
 
-    # remove 'Total' style rows if they exist
     bad_labels = {"total", "all destinations", "all", "overall"}
     df = df[~df["destination_country"].astype(str).str.strip().str.lower().isin(bad_labels)]
 
-    df = (df.groupby(["source_country","destination_country"], as_index=False)
-            [["companies","jobs_created","capex","projects"]].sum(min_count=1))
+    df = (df.groupby(["source_country","destination_country"], as_index=False)[
+            ["companies","jobs_created","capex","projects"]
+          ].sum(min_count=1))
 
     return df
+
+def make_top_map(source_country: str, dest_list: list[str]) -> go.Figure:
+    fig = go.Figure()
+    # Source (red star)
+    fig.add_trace(go.Scattergeo(
+        locationmode="country names",
+        locations=[source_country],
+        mode="markers",
+        marker=dict(symbol="star", size=14, color="#d62728"),
+        name="Source"
+    ))
+    # Destinations (blue circles)
+    if dest_list:
+        fig.add_trace(go.Scattergeo(
+            locationmode="country names",
+            locations=dest_list,
+            mode="markers",
+            marker=dict(symbol="circle", size=9, color="#1f77b4"),
+            name="Destinations"
+        ))
+    return _style_geo_white(fig, height=420)
+
+def make_route_map(source_country: str, dest_country: str) -> go.Figure:
+    fig = go.Figure()
+    fig.add_trace(go.Scattergeo(
+        locationmode="country names",
+        locations=[source_country],
+        mode="markers",
+        marker=dict(symbol="star", size=14, color="#d62728"),
+        name="Source"
+    ))
+    fig.add_trace(go.Scattergeo(
+        locationmode="country names",
+        locations=[dest_country],
+        mode="markers",
+        marker=dict(symbol="diamond", size=11, color="#1f77b4"),
+        name="Destination"
+    ))
+    return _style_geo_white(fig, height=360)
 
 with tab_dest:
     st.caption("Destinations Analysis")
 
     dest_df = load_destinations_raw()
 
-    # SOURCE country options (driven by the dataset)
+    # Source country options (10 countries in dataset)
     src_countries = sorted(dest_df["source_country"].dropna().unique().tolist())
     default_src = st.session_state.get("dest_src", src_countries[0] if src_countries else "")
     if default_src not in src_countries and src_countries:
@@ -779,12 +810,13 @@ with tab_dest:
 
     c1, c2 = st.columns([1, 3], gap="small")
 
+    # Render real source selector first
     with c2:
         sel_src_country = st.selectbox("Source Country", src_countries,
                                        index=(src_countries.index(default_src) if default_src in src_countries else 0),
                                        key="dest_src")
 
-    # destination options for the selected source
+    # Destination options based on selected source
     dest_opts_all = sorted(
         dest_df.loc[dest_df["source_country"] == sel_src_country,
                     "destination_country"].dropna().unique().tolist()
@@ -795,7 +827,6 @@ with tab_dest:
     with c1:
         sel_dest_country = st.selectbox("Destination Country", dest_options, index=0, key="dest_country")
 
-    # Metric selector
     metric_dest = st.radio("Metric", ["Companies","Jobs Created","Capex","Projects"],
                            horizontal=True, index=0, key="metric_dest")
     value_col_dest = {
@@ -805,7 +836,7 @@ with tab_dest:
         "Projects":"projects",
     }[metric_dest]
 
-    # Download CSV for the selected source (all destinations)
+    # Download CSV for the selected source (all destinations, no 'Total')
     export = dest_df[dest_df["source_country"] == sel_src_country].copy()
     export = export[export["destination_country"].astype(str).str.strip().str.lower() != "total"]
     if not export.empty:
@@ -824,101 +855,56 @@ with tab_dest:
             key="dl_country_destinations_csv",
         )
 
-    # Plot / KPI + MAP
     ddf = dest_df[dest_df["source_country"] == sel_src_country].copy()
     ddf = ddf[ddf["destination_country"].astype(str).str.strip().str.lower() != "total"]
 
     if sel_dest_country == "All":
-        # Top 15 destinations for that source (bars + pins)
+        # Top 15 destinations by chosen metric
         bars = (ddf[["destination_country", value_col_dest]]
-                .groupby("destination_country", as_index=False)[value_col_dest].sum()
-                .sort_values(value_col_dest, ascending=False)
-                .head(15))
+                    .groupby("destination_country", as_index=False)[value_col_dest]
+                    .sum()
+                    .sort_values(value_col_dest, ascending=False)
+                    .head(15))
 
-        cbar, cmap = st.columns([1.2, 1], gap="large")
-
-        with cbar:
+        left, right = st.columns([1.2, 1], gap="large")
+        with left:
             title = f"{metric_dest} by Destination Country — {sel_src_country} (Top 15)"
             if bars.empty or (bars[value_col_dest].sum() == 0):
                 st.info("No data for this selection.")
             else:
                 fig = px.bar(
-                    bars.sort_values(value_col_dest), x=value_col_dest, y="destination_country",
-                    orientation="h", title=title, labels={value_col_dest:"", "destination_country":""},
+                    bars.sort_values(value_col_dest),
+                    x=value_col_dest, y="destination_country",
+                    orientation="h", title=title,
+                    labels={value_col_dest:"", "destination_country":""},
                     color=value_col_dest, color_continuous_scale="Blues"
                 )
                 fig.update_coloraxes(showscale=False)
                 fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
                 st.plotly_chart(fig, use_container_width=True)
-
-        with cmap:
-            dest_list = bars["destination_country"].tolist()
-            df_dest_pts = _centroids_df(dest_list)
-            df_src_pt   = _centroids_df([sel_src_country])
-
-            figm = go.Figure()
-            if not df_dest_pts.empty:
-                figm.add_trace(go.Scattergeo(
-                    lat=df_dest_pts["lat"], lon=df_dest_pts["lon"],
-                    mode="markers", name="Destinations",
-                    marker=dict(size=8, color="#1f77b4", symbol="circle", line=dict(width=0)),
-                    text=df_dest_pts["country"]
-                ))
-            if not df_src_pt.empty:
-                figm.add_trace(go.Scattergeo(
-                    lat=df_src_pt["lat"], lon=df_src_pt["lon"],
-                    mode="markers", name="Source",
-                    marker=dict(size=12, color="#d62728", symbol="star"),
-                    text=df_src_pt["country"]
-                ))
-
-            figm.update_layout(
-                title=f"Top Destinations Map — {sel_src_country}",
-                geo=dict(
-                    projection_type="natural earth",
-                    showcountries=True, showcoastlines=True, showland=True,
-                ),
-                margin=dict(l=10, r=10, t=50, b=10), height=520, showlegend=True
-            )
-            st.plotly_chart(figm, use_container_width=True)
+        with right:
+            top_dests = bars["destination_country"].tolist()
+            fig_top_map = make_top_map(sel_src_country, top_dests)
+            fig_top_map.update_layout(title=f"Top Destinations Map — {sel_src_country}")
+            st.plotly_chart(fig_top_map, use_container_width=True)
 
     else:
-        # KPI for a specific destination + two-pin map
-        val = float(ddf.loc[ddf["destination_country"] == sel_dest_country, value_col_dest].sum()) if not ddf.empty else 0.0
-        unit = {"Companies":"", "Jobs Created":"", "Capex":" (USD m)", "Projects":""}[metric_dest]
-        st.markdown(
-            f"""
-            <div class="kpi-box">
-              <div class="kpi-title">{sel_src_country} → {sel_dest_country} • {metric_dest}</div>
-              <div class="kpi-number">{val:,.0f}</div>
-              <div class="kpi-sub">{unit}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        c1_map, _ = st.columns([1, 1])
-        with c1_map:
-            df_pts = _centroids_df([sel_src_country, sel_dest_country])
-            figm = go.Figure()
-            src_df = df_pts[df_pts["country"] == sel_src_country]
-            if not src_df.empty:
-                figm.add_trace(go.Scattergeo(
-                    lat=src_df["lat"], lon=src_df["lon"], mode="markers", name="Source",
-                    marker=dict(size=12, color="#d62728", symbol="star"),
-                    text=src_df["country"]
-                ))
-            dst_df = df_pts[df_pts["country"] == sel_dest_country]
-            if not dst_df.empty:
-                figm.add_trace(go.Scattergeo(
-                    lat=dst_df["lat"], lon=dst_df["lon"], mode="markers", name="Destination",
-                    marker=dict(size=10, color="#1f77b4", symbol="diamond"),
-                    text=dst_df["country"]
-                ))
-
-            figm.update_layout(
-                title=f"Route Map — {sel_src_country} → {sel_dest_country}",
-                geo=dict(projection_type="natural earth", showcountries=True, showcoastlines=True, showland=True),
-                margin=dict(l=10, r=10, t=50, b=10), height=420, showlegend=True
+        # KPI + route map side-by-side
+        left, right = st.columns([0.9, 1.4], gap="large")
+        with left:
+            val = float(ddf.loc[ddf["destination_country"] == sel_dest_country, value_col_dest].sum()) if not ddf.empty else 0.0
+            unit = {"Companies":"", "Jobs Created":"", "Capex":" (USD m)", "Projects":""}[metric_dest]
+            st.markdown(
+                f"""
+                <div class="kpi-box">
+                  <div class="kpi-title">{sel_src_country} → {sel_dest_country} • {metric_dest}</div>
+                  <div class="kpi-number">{val:,.0f}</div>
+                  <div class="kpi-sub">{unit}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
-            st.plotly_chart(figm, use_container_width=True)
+        with right:
+            fig_route = make_route_map(sel_src_country, sel_dest_country)
+            fig_route.update_layout(title=f"Route Map — {sel_src_country} → {sel_dest_country}")
+            st.plotly_chart(fig_route, use_container_width=True)
