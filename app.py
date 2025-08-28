@@ -194,10 +194,9 @@ def load_capex_long() -> pd.DataFrame:
 
 wb   = load_world_bank()
 capx = load_capex_long()
-
-# Allow 2024 CAPEX to retain continent by merging on country (not on year)
 wb_cc = wb.drop_duplicates(subset=["country", "continent"])[["country", "continent"]]
 capx_enriched = capx.merge(wb_cc, on="country", how="left")
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Filter blocks
@@ -452,7 +451,7 @@ with tab_scoring:
     st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB — includes Top-10 fix and % growth logic
+# CAPEX TAB — UPDATED per request
 # =============================================================================
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
@@ -474,6 +473,7 @@ with tab_eda:
 
     def _bars_or_kpi(df: pd.DataFrame, value_col: str, name_col: str, title: str,
                      unit: str, height: int = 420, ascending_for_hbar: bool = False):
+        # Count rows that would render as bars (non-null)
         valid = df[df[value_col].notna()].copy()
         if valid.empty:
             st.info("No data for this selection.")
@@ -483,6 +483,7 @@ with tab_eda:
             val = float(valid[value_col].iloc[0])
             _kpi_block(f"{title} — {label}", val, unit)
             return
+        # Otherwise render the bar chart as usual
         ordered = valid.sort_values(value_col, ascending=ascending_for_hbar)
         fig = px.bar(
             ordered, x=value_col, y=name_col, orientation="h",
@@ -570,30 +571,17 @@ with tab_eda:
     else:
         b1, b3 = st.columns([1.2, 1.6], gap="large")
 
-    # ───────────── FIXED: Build Top-10 without country filter ─────────────
     with b1:
-        # Build Top-10 scope that IGNORES the selected country
-        level_scope = capx_enriched.copy()
         if isinstance(sel_year_any, int):
-            level_scope = level_scope[level_scope["year"] == sel_year_any]
-        if sel_cont != "All":
-            level_scope = level_scope[level_scope["continent"] == sel_cont]
-        if sel_grade_eda != "All":
-            level_scope = level_scope[level_scope["grade"] == sel_grade_eda]
-
-        level_df = level_scope.groupby("country", as_index=False)["capex"].sum()
-
-        if isinstance(sel_year_any, int):
-            title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
+            level_df = capx_eda.copy(); title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
         else:
+            level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
             title_top10 = "Top 10 Countries by CAPEX — All Years (aggregated)"
-        if sel_cont != "All":
-            title_top10 += f" — {sel_cont}"
-
         top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
         if top10.empty:
             st.info("No CAPEX data for Top 10 with this filter.")
         else:
+            # Replace single-bar case with KPI
             _bars_or_kpi(
                 df=top10.sort_values("capex"),
                 value_col="capex",
@@ -603,12 +591,12 @@ with tab_eda:
                 height=420,
                 ascending_for_hbar=True
             )
-    # ──────────────────────────────────────────────────────────────────────
 
     if show_grade_trend:
         with b2:
             if "grade" in capx_eda.columns and not capx_eda.empty:
                 if isinstance(sel_year_any, int):
+                    # Bar chart by grade for the selected year (or KPI if single bar)
                     gb = (capx_enriched.copy()
                           .pipe(lambda d: d[(d["year"] == sel_year_any) &
                                             ((d["continent"] == sel_cont) if sel_cont != "All" else True) &
@@ -617,6 +605,7 @@ with tab_eda:
                           .groupby("grade", as_index=False)["capex"].sum())
                     grades = ["A+", "A", "B", "C", "D"]
                     gb = gb.set_index("grade").reindex(grades, fill_value=0).reset_index()
+                    # If only one non-zero / non-null grade -> KPI
                     nonzero = gb.loc[gb["capex"].fillna(0) != 0, ["grade", "capex"]]
                     if nonzero.shape[0] <= 1:
                         if nonzero.empty:
@@ -670,28 +659,19 @@ with tab_eda:
                 start = agg[agg["year"] == first_year][["country", "capex"]].rename(columns={"capex": "capex_start"})
                 end   = agg[agg["year"] == last_year][["country", "capex"]].rename(columns={"capex": "capex_end"})
                 joined = start.merge(end, on="country", how="inner")
-
-                # percentage growth instead of absolute $B change
-                joined = joined[joined["capex_start"].notna()]
-                joined = joined.assign(
-                    growth_pct=lambda d: np.where(
-                        d["capex_start"] == 0,
-                        np.nan,
-                        (d["capex_end"] - d["capex_start"]) / d["capex_start"] * 100.0
-                    )
-                )
-
+                joined["growth_abs"] = joined["capex_end"] - joined["capex_start"]
                 label_grade = f"(Grade {sel_grade_eda})" if sel_grade_eda != "All" else "(All Grades)"
-                top_growth = joined.sort_values("growth_pct").tail(10)
-                if top_growth.empty or top_growth["growth_pct"].notna().sum() == 0:
+                top_growth = joined.sort_values("growth_abs").tail(10)
+                if top_growth.empty:
                     st.info("No CAPEX data for growth ranking.")
                 else:
+                    # Replace single-bar case with KPI
                     _bars_or_kpi(
-                        df=top_growth.sort_values("growth_pct"),
-                        value_col="growth_pct",
+                        df=top_growth.sort_values("growth_abs"),
+                        value_col="growth_abs",
                         name_col="country",
                         title=f"Top 10 Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]",
-                        unit="%",
+                        unit="$B",
                         height=420,
                         ascending_for_hbar=True
                     )
