@@ -200,7 +200,6 @@ capx_enriched = capx.merge(wb_year_cc, on=["year", "country"], how="left")
 # ──────────────────────────────────────────────────────────────────────────────
 # Filter blocks
 # ──────────────────────────────────────────────────────────────────────────────
-
 years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
 years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
 years_all = ["All"] + sorted(set(years_wb).union(years_cap))
@@ -546,7 +545,7 @@ with tab_eda:
     else:
         b1, b3 = st.columns([1.2, 1.6], gap="large")
 
-    # SPECIAL: if a country is selected, the Top-10-by-CAPEX panel becomes a KPI (always).
+    # SPECIAL: KPI when a country is selected (replaces Top-10 bar)
     special_kpi_mode = (
         sel_year_any == "All" and
         sel_cont != "All" and
@@ -590,9 +589,12 @@ with tab_eda:
             top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
             if top10.empty: st.info("No CAPEX data for Top 10 with this filter.")
             else:
-                fig = px.bar(top10.sort_values("capex"), x="capex", y="country", orientation="h",
-                             color="capex", color_continuous_scale="Blues",
-                             labels({"capex": "", "country": ""}), title=title_top10)
+                fig = px.bar(
+                    top10.sort_values("capex"),
+                    x="capex", y="country", orientation="h",
+                    color="capex", color_continuous_scale="Blues",
+                    labels={"capex": "", "country": ""}, title=title_top10
+                )
                 fig.update_coloraxes(showscale=False)
                 fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig, use_container_width=True)
