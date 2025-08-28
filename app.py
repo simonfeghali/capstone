@@ -194,8 +194,9 @@ def load_capex_long() -> pd.DataFrame:
 
 wb   = load_world_bank()
 capx = load_capex_long()
-wb_year_cc = wb[["year", "country", "continent"]].dropna()
-capx_enriched = capx.merge(wb_year_cc, on=["year", "country"], how="left")
+wb_cc = wb.drop_duplicates(subset=["country", "continent"])[["country", "continent"]]
+capx_enriched = capx.merge(wb_cc, on="country", how="left")
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Filter blocks
