@@ -1,4 +1,4 @@
-# app.py 
+# app.py
 import base64
 from pathlib import Path
 import numpy as np
@@ -197,11 +197,9 @@ capx = load_capex_long()
 wb_cc = wb.drop_duplicates(subset=["country", "continent"])[["country", "continent"]]
 capx_enriched = capx.merge(wb_cc, on="country", how="left")
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Filter blocks
 # ──────────────────────────────────────────────────────────────────────────────
-
 years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
 years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
 years_all = ["All"] + sorted(set(years_wb).union(years_cap))
@@ -451,15 +449,22 @@ with tab_scoring:
     st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB — UPDATED per request
+# CAPEX TAB — with KPI de-duplication
 # =============================================================================
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
 
     st.caption("CAPEX Analysis")
 
-    # Helper to replace single-bar charts with a KPI
+    # Track KPI numbers we've already shown (rounded to 1 dp like display).
+    shown_kpi_values = set()
+
     def _kpi_block(title: str, value: float, unit: str = ""):
+        """Render a KPI, but suppress if the SAME number was already shown in this tab."""
+        shown_key = f"{round(value, 1):.1f}"  # compare by displayed number only
+        if shown_key in shown_kpi_values:
+            return
+        shown_kpi_values.add(shown_key)
         st.markdown(
             f"""
             <div class="kpi-box">
@@ -473,7 +478,6 @@ with tab_eda:
 
     def _bars_or_kpi(df: pd.DataFrame, value_col: str, name_col: str, title: str,
                      unit: str, height: int = 420, ascending_for_hbar: bool = False):
-        # Count rows that would render as bars (non-null)
         valid = df[df[value_col].notna()].copy()
         if valid.empty:
             st.info("No data for this selection.")
@@ -483,7 +487,6 @@ with tab_eda:
             val = float(valid[value_col].iloc[0])
             _kpi_block(f"{title} — {label}", val, unit)
             return
-        # Otherwise render the bar chart as usual
         ordered = valid.sort_values(value_col, ascending=ascending_for_hbar)
         fig = px.bar(
             ordered, x=value_col, y=name_col, orientation="h",
@@ -516,7 +519,7 @@ with tab_eda:
 
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
-        # KPI when a specific year is selected (regardless of country)
+        # First KPI (this one is always allowed to show)
         if isinstance(sel_year_any, int):
             total_capex = float(capx_eda["capex"].sum()) if not capx_eda.empty else 0.0
             where_bits = []
@@ -581,7 +584,6 @@ with tab_eda:
         if top10.empty:
             st.info("No CAPEX data for Top 10 with this filter.")
         else:
-            # Replace single-bar case with KPI
             _bars_or_kpi(
                 df=top10.sort_values("capex"),
                 value_col="capex",
@@ -596,7 +598,6 @@ with tab_eda:
         with b2:
             if "grade" in capx_eda.columns and not capx_eda.empty:
                 if isinstance(sel_year_any, int):
-                    # Bar chart by grade for the selected year (or KPI if single bar)
                     gb = (capx_enriched.copy()
                           .pipe(lambda d: d[(d["year"] == sel_year_any) &
                                             ((d["continent"] == sel_cont) if sel_cont != "All" else True) &
@@ -605,7 +606,6 @@ with tab_eda:
                           .groupby("grade", as_index=False)["capex"].sum())
                     grades = ["A+", "A", "B", "C", "D"]
                     gb = gb.set_index("grade").reindex(grades, fill_value=0).reset_index()
-                    # If only one non-zero / non-null grade -> KPI
                     nonzero = gb.loc[gb["capex"].fillna(0) != 0, ["grade", "capex"]]
                     if nonzero.shape[0] <= 1:
                         if nonzero.empty:
@@ -665,7 +665,6 @@ with tab_eda:
                 if top_growth.empty:
                     st.info("No CAPEX data for growth ranking.")
                 else:
-                    # Replace single-bar case with KPI
                     _bars_or_kpi(
                         df=top_growth.sort_values("growth_abs"),
                         value_col="growth_abs",
