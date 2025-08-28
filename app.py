@@ -728,6 +728,24 @@ with tab_sectors:
 # =============================================================================
 # DESTINATIONS TAB (unchanged from your working version)
 # =============================================================================
+def _style_geo_white(fig: go.Figure, height: int = 360) -> go.Figure:
+    fig.update_geos(
+        projection_type="natural earth",
+        showcountries=True, countrycolor="#8a8a8a",
+        showcoastlines=True, coastlinecolor="#8a8a8a",
+        showland=True, landcolor="white",
+        showocean=False, lakecolor="white",
+        bgcolor="rgba(0,0,0,0)"
+    )
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=10, r=10, t=40, b=10),
+        height=height,
+        legend=dict(yanchor="top", y=1.02, x=0.02)
+    )
+    return fig
+
 @st.cache_data(show_spinner=True)
 def load_destinations_raw() -> pd.DataFrame:
     url = gh_raw_url(FILES["destinations"])
@@ -769,71 +787,68 @@ def load_destinations_raw() -> pd.DataFrame:
     df = (df.groupby(["source_country","destination_country"], as_index=False)[
             ["companies","jobs_created","capex","projects"]
           ].sum(min_count=1))
+
     return df
 
-def make_route_map(src: str, dest: str, title_suffix: str):
-    dfm = pd.DataFrame({
-        "country": [src, dest],
-        "role": ["Source", "Destination"],
-        "size": [20, 14],
-    })
-    fig = px.scatter_geo(
-        dfm, locations="country", locationmode="country names",
-        color="role", symbol="role", size="size", size_max=22,
-        color_discrete_map={"Source":"#d62728","Destination":"#1f77b4"},
-        symbol_map={"Source":"star","Destination":"diamond"},
-        title=f"Route Map — {src} → {dest}"
-    )
-    fig.update_traces(marker_line_width=0)
-    fig.update_geos(projection_type="natural earth", showcountries=True, showcoastlines=True,
-                    landcolor="white", bgcolor="white")
-    fig.update_layout(margin=dict(l=10, r=10, t=60, b=10),
-                      height=420, paper_bgcolor="white", plot_bgcolor="white",
-                      legend_title_text="")
-    return fig
+def make_top_map(source_country: str, dest_list: list[str]) -> go.Figure:
+    fig = go.Figure()
+    # Source (red star)
+    fig.add_trace(go.Scattergeo(
+        locationmode="country names",
+        locations=[source_country],
+        mode="markers",
+        marker=dict(symbol="star", size=14, color="#d62728"),
+        name="Source"
+    ))
+    # Destinations (blue circles)
+    if dest_list:
+        fig.add_trace(go.Scattergeo(
+            locationmode="country names",
+            locations=dest_list,
+            mode="markers",
+            marker=dict(symbol="circle", size=9, color="#1f77b4"),
+            name="Destinations"
+        ))
+    return _style_geo_white(fig, height=420)
 
-def make_top_dest_map(src: str, bars_df: pd.DataFrame, metric_col: str, metric_label: str):
-    if bars_df.empty:
-        return None
-    vals = bars_df[metric_col].astype(float)
-    sizes = (8 + 12 * (vals - vals.min()) / (vals.max() - vals.min() + 1e-9)).clip(8, 20)
-    d_df = bars_df.rename(columns={"destination_country":"country"})[["country", metric_col]].copy()
-    d_df["role"] = "Destinations"
-    d_df["size"] = sizes.values
-    src_df = pd.DataFrame({"country":[src], "role":["Source"], "size":[22], metric_col:[np.nan]})
-    dfm = pd.concat([d_df, src_df], ignore_index=True)
-    fig = px.scatter_geo(
-        dfm, locations="country", locationmode="country names",
-        color="role", symbol="role", size="size", size_max=22,
-        hover_name="country", hover_data={metric_col: True, "role": False, "size": False},
-        color_discrete_map={"Source":"#d62728","Destinations":"#1f77b4"},
-        symbol_map={"Source":"star","Destinations":"circle"},
-        title=f"Top Destinations Map — {src}"
-    )
-    fig.update_traces(marker_line_width=0)
-    fig.update_geos(projection_type="natural earth", showcountries=True, showcoastlines=True,
-                    landcolor="white", bgcolor="white")
-    fig.update_layout(margin=dict(l=10, r=10, t=60, b=10),
-                      height=520, paper_bgcolor="white", plot_bgcolor="white",
-                      legend_title_text="")
-    return fig
+def make_route_map(source_country: str, dest_country: str) -> go.Figure:
+    fig = go.Figure()
+    fig.add_trace(go.Scattergeo(
+        locationmode="country names",
+        locations=[source_country],
+        mode="markers",
+        marker=dict(symbol="star", size=14, color="#d62728"),
+        name="Source"
+    ))
+    fig.add_trace(go.Scattergeo(
+        locationmode="country names",
+        locations=[dest_country],
+        mode="markers",
+        marker=dict(symbol="diamond", size=11, color="#1f77b4"),
+        name="Destination"
+    ))
+    return _style_geo_white(fig, height=360)
 
 with tab_dest:
     st.caption("Destinations Analysis")
 
     dest_df = load_destinations_raw()
 
+    # Source country options (10 countries in dataset)
     src_countries = sorted(dest_df["source_country"].dropna().unique().tolist())
     default_src = st.session_state.get("dest_src", src_countries[0] if src_countries else "")
     if default_src not in src_countries and src_countries:
         default_src = src_countries[0]
 
     c1, c2 = st.columns([1, 3], gap="small")
+
+    # Render real source selector first
     with c2:
         sel_src_country = st.selectbox("Source Country", src_countries,
                                        index=(src_countries.index(default_src) if default_src in src_countries else 0),
                                        key="dest_src")
 
+    # Destination options based on selected source
     dest_opts_all = sorted(
         dest_df.loc[dest_df["source_country"] == sel_src_country,
                     "destination_country"].dropna().unique().tolist()
@@ -853,7 +868,8 @@ with tab_dest:
         "Projects":"projects",
     }[metric_dest]
 
-    export = (dest_df[dest_df["source_country"] == sel_src_country].copy())
+    # Download CSV for the selected source (all destinations, no 'Total')
+    export = dest_df[dest_df["source_country"] == sel_src_country].copy()
     export = export[export["destination_country"].astype(str).str.strip().str.lower() != "total"]
     if not export.empty:
         out_cols = ["source_country","destination_country","companies","jobs_created","capex","projects"]
@@ -875,31 +891,39 @@ with tab_dest:
     ddf = ddf[ddf["destination_country"].astype(str).str.strip().str.lower() != "total"]
 
     if sel_dest_country == "All":
+        # Top 15 destinations by chosen metric
         bars = (ddf[["destination_country", value_col_dest]]
-                    .groupby("destination_country", as_index=False)[value_col_dest].sum()
+                    .groupby("destination_country", as_index=False)[value_col_dest]
+                    .sum()
                     .sort_values(value_col_dest, ascending=False)
                     .head(15))
-        left, right = st.columns([1.25, 1.25], gap="large")
+
+        left, right = st.columns([1.2, 1], gap="large")
         with left:
             title = f"{metric_dest} by Destination Country — {sel_src_country} (Top 15)"
             if bars.empty or (bars[value_col_dest].sum() == 0):
                 st.info("No data for this selection.")
             else:
                 fig = px.bar(
-                    bars.sort_values(value_col_dest), x=value_col_dest, y="destination_country",
-                    orientation="h", title=title, labels={value_col_dest:"", "destination_country":""},
+                    bars.sort_values(value_col_dest),
+                    x=value_col_dest, y="destination_country",
+                    orientation="h", title=title,
+                    labels={value_col_dest:"", "destination_country":""},
                     color=value_col_dest, color_continuous_scale="Blues"
                 )
                 fig.update_coloraxes(showscale=False)
                 fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
                 st.plotly_chart(fig, use_container_width=True)
         with right:
-            fig_map = make_top_dest_map(sel_src_country, bars, value_col_dest, metric_dest)
-            if fig_map is not None:
-                st.plotly_chart(fig_map, use_container_width=True)
+            top_dests = bars["destination_country"].tolist()
+            fig_top_map = make_top_map(sel_src_country, top_dests)
+            fig_top_map.update_layout(title=f"Top Destinations Map — {sel_src_country}")
+            st.plotly_chart(fig_top_map, use_container_width=True)
+
     else:
-        lcol, rcol = st.columns([1.0, 1.4], gap="large")
-        with lcol:
+        # KPI + route map side-by-side
+        left, right = st.columns([0.9, 1.4], gap="large")
+        with left:
             val = float(ddf.loc[ddf["destination_country"] == sel_dest_country, value_col_dest].sum()) if not ddf.empty else 0.0
             unit = {"Companies":"", "Jobs Created":"", "Capex":" (USD m)", "Projects":""}[metric_dest]
             st.markdown(
@@ -912,6 +936,7 @@ with tab_dest:
                 """,
                 unsafe_allow_html=True,
             )
-        with rcol:
-            fig_route = make_route_map(sel_src_country, sel_dest_country, metric_dest)
+        with right:
+            fig_route = make_route_map(sel_src_country, sel_dest_country)
+            fig_route.update_layout(title=f"Route Map — {sel_src_country} → {sel_dest_country}")
             st.plotly_chart(fig_route, use_container_width=True)
