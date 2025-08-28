@@ -37,8 +37,8 @@ FILES = {
     "cap_csv": "capex_EDA_cleaned_filled.csv",
     "cap_csv_alt": "capex_EDA_cleaned_filled.csv",
     "cap_xlsx": "capex_EDA.xlsx",
-    "sectors": "merged_sectors_data.csv",          # sectors data from your notebook
-    "destinations": "merged_destinations_data.csv" # destinations data
+    "sectors": "merged_sectors_data.csv",
+    "destinations": "merged_destinations_data.csv",
 }
 
 def gh_raw_url(fname: str) -> str:
@@ -60,7 +60,7 @@ def find_col(cols, *cands):
 # Load World Bank (Scoring)  + CAPEX (EDA)
 # ──────────────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=True)
-def load_world_bank() -> pd.DataFrame]:
+def load_world_bank() -> pd.DataFrame:
     url = gh_raw_url(FILES["wb"])
     try:
         df = pd.read_csv(url)
@@ -152,11 +152,10 @@ def load_capex_long() -> pd.DataFrame:
 wb   = load_world_bank()
 capx = load_capex_long()
 
-# enrich CAPEX with continent
+# Enrich CAPEX with continent
 wb_year_cc = wb[["year", "country", "continent"]].dropna()
 capx_enriched = capx.merge(wb_year_cc, on=["year", "country"], how="left")
 
-# small helper used inside tabs
 def filt_wb_single_year(df: pd.DataFrame, year_any, sel_cont, sel_country, years_wb) -> tuple[pd.DataFrame, int]:
     yy = int(year_any) if (isinstance(year_any, int) and year_any in years_wb) else int(max(years_wb))
     out = df[df["year"] == yy].copy()
@@ -167,23 +166,21 @@ def filt_wb_single_year(df: pd.DataFrame, year_any, sel_cont, sel_country, years
     return out, yy
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Tabs (filters are now INSIDE Scoring and CAPEX only)
+# Tabs (filters are INSIDE Scoring and CAPEX only)
 # ──────────────────────────────────────────────────────────────────────────────
 tab_scoring, tab_eda, tab_sectors, tab_dest = st.tabs(["Scoring", "CAPEX", "Sectors", "Destinations"])
 
 # =============================================================================
-# SCORING TAB (now owns Year/Continent/Country filters)
+# SCORING (local filters)
 # =============================================================================
 with tab_scoring:
-    # --- local filters for Scoring
     years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
-    years_all = ["All"] + years_wb  # union not needed here; WB drives Scoring
+    years_all = ["All"] + years_wb
 
     c1, c2, c3 = st.columns([1, 1, 2], gap="small")
     with c1:
         sel_year_any_sc = st.selectbox("Year", years_all, index=0, key="sc_year_any")
 
-    # auto continent suggestion based on previously chosen country in this tab
     prev_country = st.session_state.get("sc_country", "All")
     suggested_cont = None
     if prev_country != "All":
@@ -210,7 +207,6 @@ with tab_scoring:
     with c3:
         sel_country_sc = st.selectbox("Country", country_options, index=country_options.index(default_country), key="sc_country")
 
-    # --- scoring visuals
     st.caption("Scoring • (World Bank–based)")
     where_title = sel_country_sc if sel_country_sc != "All" else (sel_cont_sc if sel_cont_sc != "All" else "Worldwide")
     st.subheader(where_title)
@@ -225,13 +221,9 @@ with tab_scoring:
         cont_avg = float(wb[(wb["year"] == scoring_year) & (wb["continent"] == ctry_cont)]["score"].mean()) if ctry_cont else np.nan
 
         k1, k2, k3 = st.columns(3, gap="large")
-        with k1:
-            st.metric("Country Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
-        with k2:
-            st.metric("Grade", country_grade)
-        with k3:
-            label = f"{ctry_cont} Avg Score" if ctry_cont else "Continent Avg Score"
-            st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
+        k1.metric("Country Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
+        k2.metric("Grade", country_grade)
+        k3.metric(f"{ctry_cont} Avg Score" if ctry_cont else "Continent Avg Score", "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
 
     t1, t2 = st.columns([1, 2], gap="large")
     with t1:
@@ -315,7 +307,6 @@ with tab_scoring:
                 fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig_cont, use_container_width=True)
 
-    # Indicator weights table
     st.markdown("### Indicator Weights (%)")
     weights = pd.DataFrame({
         "Indicator": [
@@ -338,12 +329,11 @@ with tab_scoring:
     st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB (now owns Year/Continent/Country + Grade filters)
+# CAPEX TAB (local filters + grade)
 # =============================================================================
 with tab_eda:
     st.caption("CAPEX Analysis")
 
-    # local filters
     years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
     years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
     years_all = ["All"] + sorted(set(years_wb).union(years_cap))
@@ -377,7 +367,7 @@ with tab_eda:
     with c3:
         sel_country_eda = st.selectbox("Country", country_options, index=country_options.index(default_country), key="eda_country")
 
-    # grade (EDA)
+    # Grade (EDA)
     grade_options = ["All", "A+", "A", "B", "C", "D"]
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country_eda != "All" and isinstance(sel_year_any_eda, int):
@@ -390,7 +380,6 @@ with tab_eda:
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
 
-    # filter CAPEX with continent/country/grade; keep all years if Year == All
     capx_eda = capx_enriched.copy()
     if sel_cont_eda != "All":    capx_eda = capx_eda[capx_eda["continent"] == sel_cont_eda]
     if sel_country_eda != "All": capx_eda = capx_eda[capx_eda["country"] == sel_country_eda]
@@ -401,7 +390,6 @@ with tab_eda:
 
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
-        # KPI if specific country + year; else trend
         if sel_country_eda != "All" and isinstance(sel_year_any_eda, int):
             cval = capx_eda["capex"].sum()
             st.markdown(
@@ -419,8 +407,7 @@ with tab_eda:
             if trend.empty: st.info("No CAPEX data for the selected filters.")
             else:
                 trend["year_str"] = trend["year"].astype(int).astype(str)
-                title = (f"{sel_country_eda} CAPEX Trend" if sel_country_eda != "All"
-                         else "Global CAPEX Trend")
+                title = (f"{sel_country_eda} CAPEX Trend" if sel_country_eda != "All" else "Global CAPEX Trend")
                 fig = px.line(trend, x="year_str", y="capex", markers=True,
                               labels={"year_str": "", "capex": "Global CAPEX ($B)"},
                               title=title)
@@ -525,7 +512,7 @@ with tab_eda:
                 st.plotly_chart(fig, use_container_width=True)
 
 # =============================================================================
-# SECTORS TAB (unchanged)
+# SECTORS (unchanged behavior)
 # =============================================================================
 SECTORS_CANON = [
     "Software & IT services","Business services","Communications","Financial services",
@@ -533,7 +520,6 @@ SECTORS_CANON = [
     "Automotive OEM","Automotive components","Chemicals","Pharmaceuticals",
     "Metals","Coal, oil & gas","Space & defence","Leisure & entertainment"
 ]
-
 SECTOR_COUNTRIES_10 = [
     "United States","United Kingdom","Germany","France","China",
     "Japan","South Korea","Canada","Netherlands","United Arab Emirates"
@@ -557,17 +543,13 @@ def _canon_country(name: str) -> str:
     }
     low = s.lower()
     if low in swap: return swap[low]
-    t = " ".join(w.capitalize() for w in low.split())
-    t = t.replace("Of", "of")
+    t = " ".join(w.capitalize() for w in low.split()).replace("Of", "of")
     return t
 
 def _canon_sector(sector: str) -> str:
     if not isinstance(sector, str): return ""
-    s = sector.strip().lower()
-    s = s.replace("&amp;", "&").replace(" and ", " & ")
-    s = s.replace("defense", "defence")
+    s = sector.strip().lower().replace("&amp;", "&").replace(" and ", " & ").replace("defense", "defence")
     s = re.sub(r"\s+", " ", s)
-
     mapping = [
         (["software", "it"], "Software & IT services"),
         (["business services"], "Business services"),
@@ -670,12 +652,7 @@ with tab_sectors:
             key="dl_country_sectors_csv",
         )
 
-    value_col = {
-        "Companies":"companies",
-        "Jobs Created":"jobs_created",
-        "Capex":"capex",
-        "Projects":"projects",
-    }[metric]
+    value_col = {"Companies":"companies", "Jobs Created":"jobs_created", "Capex":"capex", "Projects":"projects"}[metric]
 
     if sel_sector == "All":
         bars = cdf[["sector", value_col]].copy()
@@ -684,11 +661,9 @@ with tab_sectors:
         if bars[value_col].sum() == 0:
             st.info("No data for this selection.")
         else:
-            fig = px.bar(
-                bars, x=value_col, y="sector", orientation="h",
-                title=title, labels={value_col:"", "sector":""},
-                color=value_col, color_continuous_scale="Blues"
-            )
+            fig = px.bar(bars, x=value_col, y="sector", orientation="h",
+                         title=title, labels={value_col:"", "sector":""},
+                         color=value_col, color_continuous_scale="Blues")
             fig.update_coloraxes(showscale=False)
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
             st.plotly_chart(fig, use_container_width=True)
@@ -707,7 +682,7 @@ with tab_sectors:
         )
 
 # =============================================================================
-# DESTINATIONS TAB (unchanged behavior)
+# DESTINATIONS (unchanged behavior)
 # =============================================================================
 @st.cache_data(show_spinner=True)
 def load_destinations_raw() -> pd.DataFrame:
@@ -764,13 +739,11 @@ with tab_dest:
 
     c1, c2 = st.columns([1, 3], gap="small")
 
-    # Source first
     with c2:
         sel_src_country = st.selectbox("Source Country", src_countries,
                                        index=(src_countries.index(default_src) if default_src in src_countries else 0),
                                        key="dest_src")
 
-    # Destinations options for that source
     dest_opts_all = sorted(
         dest_df.loc[dest_df["source_country"] == sel_src_country,
                     "destination_country"].dropna().unique().tolist()
@@ -783,15 +756,9 @@ with tab_dest:
 
     metric_dest = st.radio("Metric", ["Companies","Jobs Created","Capex","Projects"],
                            horizontal=True, index=0, key="metric_dest")
-    value_col_dest = {
-        "Companies":"companies",
-        "Jobs Created":"jobs_created",
-        "Capex":"capex",
-        "Projects":"projects",
-    }[metric_dest]
+    value_col_dest = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}[metric_dest]
 
-    export = (dest_df[dest_df["source_country"] == sel_src_country]
-                 .copy())
+    export = dest_df[dest_df["source_country"] == sel_src_country].copy()
     export = export[export["destination_country"].astype(str).str.strip().str.lower() != "total"]
     if not export.empty:
         out_cols = ["source_country","destination_country","companies","jobs_created","capex","projects"]
@@ -814,19 +781,16 @@ with tab_dest:
 
     if sel_dest_country == "All":
         bars = (ddf[["destination_country", value_col_dest]]
-                    .groupby("destination_country", as_index=False)
-                    [value_col_dest].sum()
+                    .groupby("destination_country", as_index=False)[value_col_dest].sum()
                     .sort_values(value_col_dest, ascending=False)
                     .head(15))
         title = f"{metric_dest} by Destination Country — {sel_src_country} (Top 15)"
         if bars.empty or (bars[value_col_dest].sum() == 0):
             st.info("No data for this selection.")
         else:
-            fig = px.bar(
-                bars.sort_values(value_col_dest), x=value_col_dest, y="destination_country",
-                orientation="h", title=title, labels={value_col_dest:"", "destination_country":""},
-                color=value_col_dest, color_continuous_scale="Blues"
-            )
+            fig = px.bar(bars.sort_values(value_col_dest), x=value_col_dest, y="destination_country",
+                         orientation="h", title=title, labels={value_col_dest:"", "destination_country":""},
+                         color=value_col_dest, color_continuous_scale="Blues")
             fig.update_coloraxes(showscale=False)
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
             st.plotly_chart(fig, use_container_width=True)
