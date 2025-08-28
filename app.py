@@ -511,7 +511,6 @@ with tab_eda:
             _kpi_block(f"{title} — {label}", val, unit)
             return
         ordered = valid.sort_values(value_col, ascending=ascending_for_hbar)
-        # Dedupe identical bar series (labels + values)
         sig = _series_key("BAR",
                           ordered[name_col].astype(str).tolist(),
                           ordered[value_col].astype(float).tolist())
@@ -638,7 +637,6 @@ with tab_eda:
                             _kpi_block(f"CAPEX by Grade — {sel_year_any} — {nonzero['grade'].iloc[0]}",
                                        float(nonzero["capex"].iloc[0]), "$B")
                     else:
-                        # Bar by grade (no dedupe with Top10 since data shape differs)
                         fig = px.bar(gb, x="capex", y="grade", orientation="h",
                                      labels={"capex": "", "grade": ""},
                                      title=f"CAPEX by Grade — {sel_year_any}",
@@ -647,21 +645,32 @@ with tab_eda:
                         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                         st.plotly_chart(fig, use_container_width=True)
                 else:
+                    # ✅ One combined multi-line chart with legend labels for grades (as before)
                     tg = (capx_eda.assign(grade=capx_eda["grade"].astype(str))
                                    .groupby(["year", "grade"], as_index=False, observed=True)["capex"]
                                    .sum()
                                    .sort_values("year"))
-                    if tg.empty: st.info("No CAPEX data for grade trend.")
+                    if tg.empty:
+                        st.info("No CAPEX data for grade trend.")
                     else:
-                        # If only one grade exists, this line could duplicate the global trend; dedupe by series
-                        for g, gg in tg.groupby("grade"):
-                            x_vals = gg["year"].astype(int).astype(str).tolist()
-                            y_vals = gg["capex"].astype(float).tolist()
-                            _plotly_line_once(
-                                x_vals, y_vals,
-                                title="CAPEX Trend by Grade",
-                                labels_x="", labels_y="CAPEX ($B)", height=420
-                            )
+                        tg["year_str"] = tg["year"].astype(int).astype(str)
+                        blues = px.colors.sequential.Blues
+                        shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]
+                        grades = ["A+", "A", "B", "C", "D"]
+                        cmap = {g:c for g,c in zip(grades, shades)}
+                        fig = px.line(
+                            tg, x="year_str", y="capex", color="grade",
+                            color_discrete_map=cmap,
+                            labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
+                            title="CAPEX Trend by Grade"
+                        )
+                        fig.update_xaxes(type="category",
+                                         categoryorder="array",
+                                         categoryarray=sorted(tg["year_str"].unique().tolist()),
+                                         showgrid=False)
+                        fig.update_yaxes(showgrid=False)
+                        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, legend_title_text="Grade")
+                        st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("No CAPEX data for grade view.")
 
