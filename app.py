@@ -42,10 +42,6 @@ def _b64_png(path: Path) -> str:
         return ""
 
 def inject_tab_icons():
-    """
-    Adds the PNG icons next to the 4 tab labels (Scoring, CAPEX, Sectors, Destinations).
-    Works by injecting CSS that prepends a small background-image before the label text.
-    """
     icons_in_order = [
         ROOT / "score.png",         # Scoring
         ROOT / "capex.png",         # CAPEX
@@ -58,7 +54,6 @@ def inject_tab_icons():
         if not b64:
             continue
         css_blocks.append(f"""
-        /* Streamlit tab icon for tab {i} */
         .stTabs [data-baseweb="tab-list"] > [data-baseweb="tab"]:nth-child({i}) p::before,
         div[data-baseweb="tab-list"] > div[role="tab"]:nth-child({i}) p::before {{
             content: "";
@@ -93,7 +88,6 @@ def gh_raw_url(fname: str) -> str:
     return f"{RAW_BASE}/{quote(fname)}"
 
 def find_col(cols, *cands):
-    """Find a column by exact (case-insensitive) name or substring."""
     low = {c.lower(): c for c in cols}
     for c in cands:
         if c.lower() in low:
@@ -203,18 +197,27 @@ wb_year_cc = wb[["year", "country", "continent"]].dropna()
 capx_enriched = capx.merge(wb_year_cc, on=["year", "country"], how="left")
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Filters block used ONLY inside SCORING & CAPEX tabs
+# Filters block used ONLY inside SCORING & CAPEX tabs (keys are namespaced)
 # ──────────────────────────────────────────────────────────────────────────────
 years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
 years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
 years_all = ["All"] + sorted(set(years_wb).union(years_cap))
 
-def render_filters_block():
-    c1, c2, c3 = st.columns([1, 1, 2], gap="small")
-    with c1:
-        sel_year_any = st.selectbox("Year", years_all, index=0, key="year_any")
+def render_filters_block(prefix: str):
+    """
+    prefix: short string to namespace keys, e.g. 'sc' or 'eda'
+    Returns: sel_year_any, sel_cont, sel_country, filt_fn
+    """
+    k_year = f"{prefix}_year_any"
+    k_cont = f"{prefix}_continent"
+    k_ctry = f"{prefix}_country"
 
-    prev_country = st.session_state.get("country", "All")
+    c1, c2, c3 = st.columns([1, 1, 2], gap="small")
+
+    with c1:
+        sel_year_any = st.selectbox("Year", years_all, index=0, key=k_year)
+
+    prev_country = st.session_state.get(k_ctry, "All")
     suggested_cont = None
     if prev_country != "All":
         rows = wb[(wb["year"] == sel_year_any) & (wb["country"] == prev_country)] if isinstance(sel_year_any, int) else wb[wb["country"] == prev_country]
@@ -224,20 +227,21 @@ def render_filters_block():
     valid_year_for_wb = sel_year_any if (isinstance(sel_year_any, int) and sel_year_any in years_wb) else max(years_wb)
     cont_options = ["All"] + sorted(wb.loc[wb["year"] == valid_year_for_wb, "continent"].dropna().unique().tolist())
 
-    saved_cont = st.session_state.get("continent", "All")
+    saved_cont = st.session_state.get(k_cont, "All")
     default_cont = suggested_cont if (suggested_cont in cont_options) else (saved_cont if saved_cont in cont_options else "All")
 
     with c2:
-        sel_cont = st.selectbox("Continent", cont_options, index=cont_options.index(default_cont), key="continent")
+        sel_cont = st.selectbox("Continent", cont_options, index=cont_options.index(default_cont), key=k_cont)
 
     wb_scope = wb[wb["year"] == valid_year_for_wb].copy()
     if sel_cont != "All":
         wb_scope = wb_scope[wb_scope["continent"] == sel_cont]
     country_options = ["All"] + sorted(wb_scope["country"].unique().tolist())
-    saved_country = st.session_state.get("country", "All")
+    saved_country = st.session_state.get(k_ctry, "All")
     default_country = saved_country if saved_country in country_options else "All"
+
     with c3:
-        sel_country = st.selectbox("Country", country_options, index=country_options.index(default_country), key="country")
+        sel_country = st.selectbox("Country", country_options, index=country_options.index(default_country), key=k_ctry)
 
     def filt_wb_single_year(df: pd.DataFrame, year_any) -> tuple[pd.DataFrame, int]:
         yy = int(year_any) if (isinstance(year_any, int) and year_any in years_wb) else max(years_wb)
@@ -259,7 +263,7 @@ tab_scoring, tab_eda, tab_sectors, tab_dest = st.tabs(["Scoring", "CAPEX", "Sect
 # SCORING TAB
 # =============================================================================
 with tab_scoring:
-    sel_year_any, sel_cont, sel_country, filt_wb_single_year = render_filters_block()
+    sel_year_any, sel_cont, sel_country, filt_wb_single_year = render_filters_block("sc")
 
     st.caption("Scoring • (World Bank–based)")
     where_title = sel_country if sel_country != "All" else (sel_cont if sel_cont != "All" else "Worldwide")
@@ -389,10 +393,10 @@ with tab_scoring:
     st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB (unchanged behavior; filters live inside)
+# CAPEX TAB (unchanged behavior; filters live inside, namespaced keys)
 # =============================================================================
 with tab_eda:
-    sel_year_any, sel_cont, sel_country, _filt = render_filters_block()
+    sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
 
     st.caption("CAPEX Analysis")
 
@@ -543,7 +547,7 @@ with tab_eda:
                 st.plotly_chart(fig, use_container_width=True)
 
 # =============================================================================
-# SECTORS TAB (unchanged logic)
+# SECTORS TAB (unchanged)
 # =============================================================================
 SECTORS_CANON = [
     "Software & IT services","Business services","Communications","Financial services",
@@ -722,17 +726,10 @@ with tab_sectors:
         )
 
 # =============================================================================
-# DESTINATIONS TAB (bar+map for All; KPI+route map for specific)
+# DESTINATIONS TAB (unchanged from your working version)
 # =============================================================================
 @st.cache_data(show_spinner=True)
 def load_destinations_raw() -> pd.DataFrame:
-    """
-    Load and normalize merged destinations CSV.
-    Expected columns (matched flexibly):
-      - source country
-      - destination country
-      - companies, jobs created, capex, projects
-    """
     url = gh_raw_url(FILES["destinations"])
     df = pd.read_csv(url)
 
@@ -798,17 +795,13 @@ def make_route_map(src: str, dest: str, title_suffix: str):
 def make_top_dest_map(src: str, bars_df: pd.DataFrame, metric_col: str, metric_label: str):
     if bars_df.empty:
         return None
-    # Normalize sizes for better visual separation
     vals = bars_df[metric_col].astype(float)
     sizes = (8 + 12 * (vals - vals.min()) / (vals.max() - vals.min() + 1e-9)).clip(8, 20)
-
     d_df = bars_df.rename(columns={"destination_country":"country"})[["country", metric_col]].copy()
     d_df["role"] = "Destinations"
     d_df["size"] = sizes.values
-
     src_df = pd.DataFrame({"country":[src], "role":["Source"], "size":[22], metric_col:[np.nan]})
     dfm = pd.concat([d_df, src_df], ignore_index=True)
-
     fig = px.scatter_geo(
         dfm, locations="country", locationmode="country names",
         color="role", symbol="role", size="size", size_max=22,
@@ -886,7 +879,6 @@ with tab_dest:
                     .groupby("destination_country", as_index=False)[value_col_dest].sum()
                     .sort_values(value_col_dest, ascending=False)
                     .head(15))
-
         left, right = st.columns([1.25, 1.25], gap="large")
         with left:
             title = f"{metric_dest} by Destination Country — {sel_src_country} (Top 15)"
@@ -905,7 +897,6 @@ with tab_dest:
             fig_map = make_top_dest_map(sel_src_country, bars, value_col_dest, metric_dest)
             if fig_map is not None:
                 st.plotly_chart(fig_map, use_container_width=True)
-
     else:
         lcol, rcol = st.columns([1.0, 1.4], gap="large")
         with lcol:
