@@ -37,7 +37,8 @@ FILES = {
     "cap_csv": "capex_EDA_cleaned_filled.csv",
     "cap_csv_alt": "capex_EDA_cleaned_filled.csv",
     "cap_xlsx": "capex_EDA.xlsx",
-    "sectors": "merged_sectors_data.csv",   # sectors data from your notebook
+    "sectors": "merged_sectors_data.csv",            # sectors data from your notebook
+    "destinations": "merged_destinations_data.csv",  # NEW: destinations data
 }
 
 def gh_raw_url(fname: str) -> str:
@@ -212,7 +213,7 @@ def filt_wb_single_year(df: pd.DataFrame, year_any) -> tuple[pd.DataFrame, int]:
 # ──────────────────────────────────────────────────────────────────────────────
 # Tabs
 # ──────────────────────────────────────────────────────────────────────────────
-tab_scoring, tab_eda, tab_sectors = st.tabs(["Scoring", "EDA", "Sectors"])
+tab_scoring, tab_eda, tab_sectors, tab_dest = st.tabs(["Scoring", "EDA", "Sectors", "Destinations"])
 
 # =============================================================================
 # SCORING TAB  (unchanged)
@@ -509,7 +510,7 @@ SECTORS_CANON = [
     "Metals","Coal, oil & gas","Space & defence","Leisure & entertainment"
 ]
 
-# 10 allowed countries from the notebook
+# 10 allowed countries from the notebook (used for both Sectors and Destinations as "Source Country")
 SECTOR_COUNTRIES_10 = [
     "United States","United Kingdom","Germany","France","China",
     "Japan","South Korea","Canada","Netherlands","United Arab Emirates"
@@ -691,6 +692,156 @@ with tab_sectors:
             <div class="kpi-box">
               <div class="kpi-title">{sel_sector_country} — {sel_sector} • {metric}</div>
               <div class="kpi-number">{val:,.0f}</div>
+              <div class="kpi-sub">{unit}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+# =============================================================================
+# DESTINATIONS TAB (new)
+# =============================================================================
+
+@st.cache_data(show_spinner=True)
+def load_destinations_raw() -> pd.DataFrame:
+    """
+    Load and normalize the destinations CSV.
+    Expected logical columns (may vary by name): source country, destination country,
+    companies, jobs_created, capex, projects.
+    """
+    url = gh_raw_url(FILES["destinations"])
+    df = pd.read_csv(url)
+
+    col_src   = find_col(df.columns, "country", "source country", "source")
+    col_dest  = find_col(df.columns, "destination_country", "destination country", "destination")
+    col_comp  = find_col(df.columns, "companies", "# companies", "number of companies")
+    col_jobs  = find_col(df.columns, "jobs created", "jobs", "job")
+    col_capex = find_col(df.columns, "capex", "capital expenditure", "capex (in million usd)")
+    col_proj  = find_col(df.columns, "projects", "project count", "nb_projects")
+
+    for need, col in [
+        ("source country", col_src), ("destination country", col_dest),
+        ("companies", col_comp), ("jobs", col_jobs),
+        ("capex", col_capex), ("projects", col_proj)
+    ]:
+        if col is None:
+            raise ValueError(f"Destinations CSV missing column for {need}. Found: {list(df.columns)}")
+
+    df = df.rename(columns={
+        col_src  : "source_raw",
+        col_dest : "dest_raw",
+        col_comp : "companies",
+        col_jobs : "jobs_created",
+        col_capex: "capex",
+        col_proj : "projects",
+    })
+
+    for c in ["companies", "jobs_created", "capex", "projects"]:
+        df[c] = df[c].map(_numify_generic)
+
+    # canonicalize source & destination country names
+    df["source_country"]      = df["source_raw"].astype(str).map(_canon_country)
+    df["destination_country"] = df["dest_raw"].astype(str).map(_canon_country)
+
+    # only the 10 source countries
+    df = df[df["source_country"].isin(SECTOR_COUNTRIES_10)]
+
+    # aggregate (source, destination)
+    df = (df.groupby(["source_country", "destination_country"], as_index=False)
+            [["companies","jobs_created","capex","projects"]].sum(min_count=1))
+
+    return df
+
+dest_df = load_destinations_raw()
+
+with tab_dest:
+    st.caption("Destinations Analysis")
+
+    # ── Filters
+    dc1, dc2 = st.columns([1, 2], gap="small")
+    with dc2:
+        # Source Country (same fixed 10)
+        src_countries = SECTOR_COUNTRIES_10
+        default_src = st.session_state.get("dest_source", src_countries[0])
+        if default_src not in src_countries: default_src = src_countries[0]
+        sel_src_country = st.selectbox("Source Country", src_countries,
+                                       index=src_countries.index(default_src), key="dest_source")
+
+    with dc1:
+        # Destination options depend on source selection; include "All"
+        dest_opts_all = sorted(dest_df.loc[dest_df["source_country"] == sel_src_country,
+                                           "destination_country"].dropna().unique().tolist())
+        dest_opts = ["All"] + dest_opts_all
+        default_dest = st.session_state.get("dest_country", "All")
+        if default_dest not in dest_opts: default_dest = "All"
+        sel_dest_country = st.selectbox("Destination Country", dest_opts,
+                                        index=dest_opts.index(default_dest), key="dest_country")
+
+    # Metric (same four)
+    dest_metric = st.radio("Metric", ["Companies", "Jobs Created", "Capex", "Projects"],
+                           horizontal=True, index=0, key="dest_metric")
+
+    value_col_dest = {
+        "Companies":"companies",
+        "Jobs Created":"jobs_created",
+        "Capex":"capex",
+        "Projects":"projects",
+    }[dest_metric]
+
+    # Slice for the selected source country
+    ddf = dest_df[dest_df["source_country"] == sel_src_country].copy()
+
+    # Download CSV (all destinations for this source)
+    if not ddf.empty:
+        out_cols = ["source_country","destination_country","companies","jobs_created","capex","projects"]
+        csv_bytes = ddf[out_cols].rename(columns={
+            "source_country":"Source Country",
+            "destination_country":"Destination Country",
+            "companies":"Companies","jobs_created":"Jobs Created",
+            "capex":"Capex","projects":"Projects"
+        }).to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label=f"Download {sel_src_country} destinations CSV",
+            data=csv_bytes,
+            file_name=f"{sel_src_country.lower().replace(' ','_')}_destinations_data.csv",
+            mime="text/csv",
+            key="dl_country_dest_csv",
+        )
+
+    # Behavior:
+    # - If Destination Country == "All": show TOP 15 destinations (by selected metric)
+    # - Else: show KPI for (source, destination) pair
+    if sel_dest_country == "All":
+        if ddf.empty:
+            st.info("No data for this selection.")
+        else:
+            top = (ddf.groupby("destination_country", as_index=False)[value_col_dest]
+                     .sum()
+                     .sort_values(value_col_dest, ascending=False)
+                     .head(15))
+            if top[value_col_dest].sum() == 0:
+                st.info("No data for this selection.")
+            else:
+                fig = px.bar(
+                    top.sort_values(value_col_dest),
+                    x=value_col_dest, y="destination_country", orientation="h",
+                    title=f"{dest_metric} by Destination Country — {sel_src_country} (Top 15)",
+                    labels={value_col_dest:"", "destination_country":""},
+                    color=value_col_dest, color_continuous_scale="Blues"
+                )
+                fig.update_coloraxes(showscale=False)
+                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
+                st.plotly_chart(fig, use_container_width=True)
+    else:
+        row_val = float(
+            ddf.loc[ddf["destination_country"] == sel_dest_country, value_col_dest].sum()
+        ) if not ddf.empty else 0.0
+        unit = {"Companies":"", "Jobs Created":"", "Capex":" (USD m)", "Projects":""}[dest_metric]
+        st.markdown(
+            f"""
+            <div class="kpi-box">
+              <div class="kpi-title">{sel_src_country} → {sel_dest_country} • {dest_metric}</div>
+              <div class="kpi-number">{row_val:,.0f}</div>
               <div class="kpi-sub">{unit}</div>
             </div>
             """,
