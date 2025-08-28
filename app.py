@@ -200,6 +200,7 @@ capx_enriched = capx.merge(wb_year_cc, on=["year", "country"], how="left")
 # ──────────────────────────────────────────────────────────────────────────────
 # Filter blocks
 # ──────────────────────────────────────────────────────────────────────────────
+
 years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
 years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
 years_all = ["All"] + sorted(set(years_wb).union(years_cap))
@@ -210,6 +211,7 @@ def render_filters_block(prefix: str):
     k_ctry = f"{prefix}_country"
 
     c1, c2, c3 = st.columns([1, 1, 2], gap="small")
+
     with c1:
         sel_year_any = st.selectbox("Year", years_all, index=0, key=k_year)
 
@@ -225,6 +227,7 @@ def render_filters_block(prefix: str):
 
     saved_cont = st.session_state.get(k_cont, "All")
     default_cont = suggested_cont if (suggested_cont in cont_options) else (saved_cont if saved_cont in cont_options else "All")
+
     with c2:
         sel_cont = st.selectbox("Continent", cont_options, index=cont_options.index(default_cont), key=k_cont)
 
@@ -234,6 +237,7 @@ def render_filters_block(prefix: str):
     country_options = ["All"] + sorted(wb_scope["country"].unique().tolist())
     saved_country = st.session_state.get(k_ctry, "All")
     default_country = saved_country if saved_country in country_options else "All"
+
     with c3:
         sel_country = st.selectbox("Country", country_options, index=country_options.index(default_country), key=k_ctry)
 
@@ -290,7 +294,7 @@ def filt_wb_scoping(df: pd.DataFrame, year_any, cont, country):
 tab_scoring, tab_eda, tab_sectors, tab_dest = st.tabs(["Scoring", "CAPEX", "Sectors", "Destinations"])
 
 # =============================================================================
-# SCORING TAB (unchanged)
+# SCORING TAB
 # =============================================================================
 with tab_scoring:
     sel_year_sc, sel_cont_sc, sel_country_sc = scoring_filters_block(wb)
@@ -376,8 +380,7 @@ with tab_scoring:
                 base = wb_scope[["country", "score"]]
                 title_top = f"Top 10 Performing Countries — {sel_year_sc}"
             top10 = base.dropna().sort_values("score", ascending=False).head(10)
-            if top10.empty:
-                st.info("No countries available for Top 10 with this filter.")
+            if top10.empty: st.info("No countries available for Top 10 with this filter.")
             else:
                 fig_top = px.bar(top10.sort_values("score"), x="score", y="country", orientation="h",
                                  color="score", color_continuous_scale="Blues",
@@ -391,8 +394,7 @@ with tab_scoring:
                 st.info("Select a specific year to see grade distribution.")
             else:
                 donut_base = wb_scope.copy()
-                if donut_base.empty or donut_base["grade"].isna().all():
-                    st.info("No grade data for this selection.")
+                if donut_base.empty or donut_base["grade"].isna().all(): st.info("No grade data for this selection.")
                 else:
                     grades = ["A+", "A", "B", "C", "D"]
                     donut = (donut_base.assign(grade=donut_base["grade"].astype(str))
@@ -417,8 +419,7 @@ with tab_scoring:
                 if sel_cont_sc != "All": cont_base = cont_base[cont_base["continent"] == sel_cont_sc]
                 cont_bar = cont_base.groupby("continent", as_index=False)["score"].mean().sort_values("score", ascending=True)
                 title_cont = f"Continent Viability Score — {sel_year_sc}"
-            if cont_bar.empty:
-                st.info("No continent data for this selection.")
+            if cont_bar.empty: st.info("No continent data for this selection.")
             else:
                 fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
                                   color="score", color_continuous_scale="Blues",
@@ -449,7 +450,7 @@ with tab_scoring:
     st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB — UPDATED
+# CAPEX TAB — UPDATED per request
 # =============================================================================
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
@@ -478,7 +479,7 @@ with tab_eda:
 
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
-        # KPI when a specific year is selected (no line)
+        # NEW: KPI when a specific year is selected (regardless of country)
         if isinstance(sel_year_any, int):
             total_capex = float(capx_eda["capex"].sum()) if not capx_eda.empty else 0.0
             where_bits = []
@@ -497,8 +498,7 @@ with tab_eda:
             )
         else:
             trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
-            if trend.empty:
-                st.info("No CAPEX data for the selected filters.")
+            if trend.empty: st.info("No CAPEX data for the selected filters.")
             else:
                 trend["year_str"] = trend["year"].astype(int).astype(str)
                 title = (f"{sel_country} CAPEX Trend" if sel_country != "All"
@@ -518,8 +518,7 @@ with tab_eda:
         else:
             map_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
             map_title = "CAPEX Map — All Years (aggregated)"
-        if map_df.empty:
-            st.info("No CAPEX data for this selection.")
+        if map_df.empty: st.info("No CAPEX data for this selection.")
         else:
             fig = px.choropleth(map_df, locations="country", locationmode="country names",
                                 color="capex", color_continuous_scale="Blues", title=map_title)
@@ -536,44 +535,43 @@ with tab_eda:
                               paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig, use_container_width=True)
 
-    # Decide which lower panels to show
+    # When Grade == All we show a grade chart.
+    # If a single year is selected -> BAR by grade; else -> LINE trend by grade across years.
     show_grade_trend = (sel_grade_eda == "All")
-    show_top10_and_growth = (sel_country == "All")  # hide both when a country is selected
-
-    if show_grade_trend and show_top10_and_growth:
-        # Three-panel layout (Top10 | Grade | Growth)
+    if show_grade_trend:
         b1, b2, b3 = st.columns([1.2, 1.2, 1.6], gap="large")
+    else:
+        b1, b3 = st.columns([1.2, 1.6], gap="large")
 
-        # Top 10 (only when country == All)
-        with b1:
-            if isinstance(sel_year_any, int):
-                level_df = capx_eda.copy(); title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
-            else:
-                level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
-                title_top10 = "Top 10 Countries by CAPEX — All Years (aggregated)"
-            top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
-            if top10.empty:
-                st.info("No CAPEX data for Top 10 with this filter.")
-            else:
-                fig = px.bar(top10.sort_values("capex"), x="capex", y="country", orientation="h",
-                             color="capex", color_continuous_scale="Blues",
-                             labels={"capex": "", "country": ""}, title=title_top10)
-                fig.update_coloraxes(showscale=False)
-                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                st.plotly_chart(fig, use_container_width=True)
+    with b1:
+        if isinstance(sel_year_any, int):
+            level_df = capx_eda.copy(); title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
+        else:
+            level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
+            title_top10 = "Top 10 Countries by CAPEX — All Years (aggregated)"
+        top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
+        if top10.empty: st.info("No CAPEX data for Top 10 with this filter.")
+        else:
+            fig = px.bar(top10.sort_values("capex"), x="capex", y="country", orientation="h",
+                         color="capex", color_continuous_scale="Blues",
+                         labels={"capex": "", "country": ""}, title=title_top10)
+            fig.update_coloraxes(showscale=False)
+            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+            st.plotly_chart(fig, use_container_width=True)
 
-        # Grade view (bar for single year, line across years otherwise)
+    if show_grade_trend:
         with b2:
-            if "grade" in capx_enriched.columns:
+            if "grade" in capx_eda.columns and not capx_eda.empty:
                 if isinstance(sel_year_any, int):
-                    gb = (capx_enriched
-                          .loc[(capx_enriched["year"] == sel_year_any)
-                               & ((capx_enriched["continent"] == sel_cont) if sel_cont != "All" else True)
-                               & ((capx_enriched["country"] == sel_country) if sel_country != "All" else True)]
+                    # NEW: Bar chart by grade for the selected year
+                    gb = (capx_enriched.copy()
+                          .pipe(lambda d: d[(d["year"] == sel_year_any) &
+                                            ((d["continent"] == sel_cont) if sel_cont != "All" else True) &
+                                            ((d["country"] == sel_country) if sel_country != "All" else True)])
                           .assign(grade=lambda d: d["grade"].astype(str))
-                          .groupby("grade", as_index=False)["capex"].sum()
-                          .query("grade in ['A+','A','B','C','D']")
-                          .sort_values("capex", ascending=False))
+                          .groupby("grade", as_index=False)["capex"].sum())
+                    grades = ["A+", "A", "B", "C", "D"]
+                    gb = gb.set_index("grade").reindex(grades, fill_value=0).reset_index()
                     fig = px.bar(gb, x="capex", y="grade", orientation="h",
                                  labels={"capex": "", "grade": ""},
                                  title=f"CAPEX by Grade — {sel_year_any}",
@@ -586,8 +584,7 @@ with tab_eda:
                                    .groupby(["year", "grade"], as_index=False, observed=True)["capex"]
                                    .sum()
                                    .sort_values("year"))
-                    if tg.empty:
-                        st.info("No CAPEX data for grade trend.")
+                    if tg.empty: st.info("No CAPEX data for grade trend.")
                     else:
                         tg["year_str"] = tg["year"].astype(int).astype(str)
                         blues = px.colors.sequential.Blues
@@ -606,77 +603,33 @@ with tab_eda:
             else:
                 st.info("No CAPEX data for grade view.")
 
-        # Growth (only when country == All)
-        with b3:
-            growth_base = capx_eda.copy()
-            if growth_base.empty:
-                st.info("No CAPEX data for growth ranking.")
+    with b3:
+        growth_base = capx_eda.copy()
+        if growth_base.empty:
+            st.info("No CAPEX data for growth ranking.")
+        else:
+            agg = growth_base.groupby(["country", "year"], as_index=False)["capex"].sum()
+            first_year = int(agg["year"].min()) if not agg.empty else None
+            last_year  = int(agg["year"].max()) if not agg.empty else None
+            if first_year is None or last_year is None or first_year == last_year:
+                st.info("Not enough years to compute growth.")
             else:
-                agg = growth_base.groupby(["country", "year"], as_index=False)["capex"].sum()
-                first_year = int(agg["year"].min()) if not agg.empty else None
-                last_year  = int(agg["year"].max()) if not agg.empty else None
-                if first_year is None or last_year is None or first_year == last_year:
-                    st.info("Not enough years to compute growth.")
-                else:
-                    start = agg[agg["year"] == first_year][["country", "capex"]].rename(columns={"capex": "capex_start"})
-                    end   = agg[agg["year"] == last_year][["country", "capex"]].rename(columns={"capex": "capex_end"})
-                    joined = start.merge(end, on="country", how="inner")
-                    joined["growth_abs"] = joined["capex_end"] - joined["capex_start"]
-                    fig = px.bar(joined.sort_values("growth_abs").tail(10),
-                                 x="growth_abs", y="country", orientation="h",
-                                 color="growth_abs", color_continuous_scale="Blues",
-                                 labels={"growth_abs": "", "country": ""},
-                                 title=f"Top 10 Countries by CAPEX Growth (All Grades) [{first_year} → {last_year}]")
-                    fig.update_coloraxes(showscale=False)
-                    fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                    st.plotly_chart(fig, use_container_width=True)
-
-    else:
-        # Either Grade != All or country selected; we do NOT show Top10 or Growth.
-        if show_grade_trend:
-            # Only show the grade chart full-width
-            if "grade" in capx_enriched.columns:
-                if isinstance(sel_year_any, int):
-                    gb = (capx_enriched
-                          .loc[(capx_enriched["year"] == sel_year_any)
-                               & ((capx_enriched["continent"] == sel_cont) if sel_cont != "All" else True)
-                               & ((capx_enriched["country"] == sel_country) if sel_country != "All" else True)]
-                          .assign(grade=lambda d: d["grade"].astype(str))
-                          .groupby("grade", as_index=False)["capex"].sum()
-                          .query("grade in ['A+','A','B','C','D']")
-                          .sort_values("capex", ascending=False))
-                    fig = px.bar(gb, x="capex", y="grade", orientation="h",
-                                 labels={"capex": "", "grade": ""},
-                                 title=f"CAPEX by Grade — {sel_year_any}",
-                                 color="capex", color_continuous_scale="Blues")
-                    fig.update_coloraxes(showscale=False)
-                    fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    tg = (capx_eda.assign(grade=capx_eda["grade"].astype(str))
-                                   .groupby(["year", "grade"], as_index=False, observed=True)["capex"]
-                                   .sum()
-                                   .sort_values("year"))
-                    if tg.empty:
-                        st.info("No CAPEX data for grade trend.")
-                    else:
-                        tg["year_str"] = tg["year"].astype(int).astype(str)
-                        blues = px.colors.sequential.Blues
-                        shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]
-                        grades = ["A+", "A", "B", "C", "D"]
-                        cmap = {g:c for g,c in zip(grades, shades)}
-                        fig = px.line(tg, x="year_str", y="capex", color="grade",
-                                      color_discrete_map=cmap,
-                                      labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
-                                      title="CAPEX Trend by Grade")
-                        fig.update_xaxes(type="category", categoryorder="array",
-                                         categoryarray=sorted(tg["year_str"].unique().tolist()), showgrid=False)
-                        fig.update_yaxes(showgrid=False)
-                        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                        st.plotly_chart(fig, use_container_width=True)
+                start = agg[agg["year"] == first_year][["country", "capex"]].rename(columns={"capex": "capex_start"})
+                end   = agg[agg["year"] == last_year][["country", "capex"]].rename(columns={"capex": "capex_end"})
+                joined = start.merge(end, on="country", how="inner")
+                joined["growth_abs"] = joined["capex_end"] - joined["capex_start"]
+                label_grade = f"(Grade {sel_grade_eda})" if sel_grade_eda != "All" else "(All Grades)"
+                fig = px.bar(joined.sort_values("growth_abs").tail(10),
+                             x="growth_abs", y="country", orientation="h",
+                             color="growth_abs", color_continuous_scale="Blues",
+                             labels={"growth_abs": "", "country": ""},
+                             title=f"Top 10 Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]")
+                fig.update_coloraxes(showscale=False)
+                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+                st.plotly_chart(fig, use_container_width=True)
 
 # =============================================================================
-# SECTORS TAB (unchanged)
+# SECTORS TAB
 # =============================================================================
 SECTORS_CANON = [
     "Software & IT services","Business services","Communications","Financial services",
@@ -856,7 +809,7 @@ with tab_sectors:
         )
 
 # =============================================================================
-# DESTINATIONS TAB (unchanged)
+# DESTINATIONS TAB
 # =============================================================================
 def _style_geo_white(fig: go.Figure, height: int = 360) -> go.Figure:
     fig.update_geos(
@@ -968,6 +921,7 @@ with tab_dest:
         default_src = src_countries[0]
 
     c1, c2 = st.columns([1, 3], gap="small")
+
     with c2:
         sel_src_country = st.selectbox("Source Country", src_countries,
                                        index=(src_countries.index(default_src) if default_src in src_countries else 0),
