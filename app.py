@@ -316,52 +316,58 @@ def scoring_filters_block(wb: pd.DataFrame):
     with c1:
         sel_year_sc = st.selectbox("Year", year_opts_sc, index=0, key="sc_year")
 
-    # 1) Build continent options for the selected year
+    # Build continent options for the chosen year (or all)
     cont_pool = wb["continent"] if sel_year_sc == "All" else wb.loc[wb["year"] == int(sel_year_sc), "continent"]
     cont_opts_sc = ["All"] + sorted(cont_pool.dropna().unique().tolist())
-    st.session_state["_sc_cont_opts"] = cont_opts_sc  # for other helpers if needed
-    
-    # 2) Initialize continent in session state
-    if "sc_cont" not in st.session_state or st.session_state["sc_cont"] not in cont_opts_sc:
-        st.session_state["sc_cont"] = "All"
+    st.session_state["_sc_cont_opts"] = cont_opts_sc
 
-
-    # 3) If a specific country is already selected, force continent to that country's continent
-    #    BEFORE rendering either widget (to avoid rerun resets).
-    if "sc_country" in st.session_state and st.session_state["sc_country"] != "All":
-        _cur_ctry = st.session_state["sc_country"]
+    # If a country is already chosen, suggest/force its continent BEFORE rendering widgets
+    cur_country = st.session_state.get("sc_country", "All")
+    suggested_cont = None
+    if cur_country != "All":
         if sel_year_sc == "All":
-            _lk = wb[wb["country"] == _cur_ctry]
+            lk = wb[wb["country"] == cur_country]
         else:
-            _lk = wb[(wb["year"] == int(sel_year_sc)) & (wb["country"] == _cur_ctry)]
-        if not _lk.empty and _lk["continent"].notna().any():
-            _suggest = str(_lk["continent"].dropna().iloc[0])
-            if _suggest in cont_opts_sc:
-                st.session_state["sc_cont"] = _suggest  # safe: done before widget creation
-    
-    # tentative continent (will auto-correct after country selection below if needed)
-    with c2:
-        current_cont = st.session_state.get("sc_cont", "All")
-        if current_cont not in cont_opts_sc:
-            current_cont = "All"
-        sel_cont_sc = st.selectbox("Continent", cont_opts_sc, key="sc_cont")
+            lk = wb[(wb["year"] == int(sel_year_sc)) & (wb["country"] == cur_country)]
+        if not lk.empty and lk["continent"].notna().any():
+            cand = str(lk["continent"].dropna().iloc[0])
+            if cand in cont_opts_sc:
+                suggested_cont = cand
 
-    # Country options depend on selected continent (or all)
+    # Decide the continent value to show (do NOT mutate if not needed)
+    current_cont = st.session_state.get("sc_cont", "All")
+    if suggested_cont and suggested_cont in cont_opts_sc:
+        current_cont = suggested_cont
+    if current_cont not in cont_opts_sc:
+        current_cont = "All"
+
+    with c2:
+        sel_cont_sc = st.selectbox(
+            "Continent",
+            cont_opts_sc,
+            index=cont_opts_sc.index(current_cont),
+            key="sc_cont",
+        )
+
+    # Build country options filtered by continent (or all)
     pool = wb if sel_year_sc == "All" else wb[wb["year"] == int(sel_year_sc)]
     if sel_cont_sc != "All":
         pool = pool[pool["continent"] == sel_cont_sc]
     country_opts_sc = ["All"] + sorted(pool["country"].dropna().unique().tolist())
-    
-    # 6) Initialize/persist country selection; only reset to "All" if truly invalid
-    if "sc_country" not in st.session_state:
-        st.session_state["sc_country"] = "All"
-    elif st.session_state["sc_country"] not in country_opts_sc:
-        st.session_state["sc_country"] = "All"
-        
-    with c3:
-        sel_country_sc = st.selectbox("Country", country_opts_sc, key="sc_country")
 
-    return sel_year_sc, st.session_state.get("sc_cont", sel_cont_sc), sel_country_sc
+    # Use the existing country value if still valid; DO NOT overwrite session_state here
+    cur_country = st.session_state.get("sc_country", "All")
+    country_index = country_opts_sc.index(cur_country) if cur_country in country_opts_sc else 0
+
+    with c3:
+        sel_country_sc = st.selectbox(
+            "Country",
+            country_opts_sc,
+            index=country_index,
+            key="sc_country",
+        )
+
+    return sel_year_sc, sel_cont_sc, sel_country_sc
 
 def filt_wb_scoping(df: pd.DataFrame, year_any, cont, country):
     out = df.copy()
