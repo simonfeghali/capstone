@@ -315,13 +315,29 @@ def scoring_filters_block(wb: pd.DataFrame):
     with c1:
         sel_year_sc = st.selectbox("Year", year_opts_sc, index=0, key="sc_year")
 
+    # 1) Build continent options for the selected year
     cont_pool = wb["continent"] if sel_year_sc == "All" else wb.loc[wb["year"] == int(sel_year_sc), "continent"]
     cont_opts_sc = ["All"] + sorted(cont_pool.dropna().unique().tolist())
-    st.session_state["_sc_cont_opts"] = cont_opts_sc  # used by the callback
-
+    st.session_state["_sc_cont_opts"] = cont_opts_sc  # for other helpers if needed
+    
+    # 2) Initialize continent in session state
     if "sc_cont" not in st.session_state or st.session_state["sc_cont"] not in cont_opts_sc:
         st.session_state["sc_cont"] = "All"
 
+
+    # 3) If a specific country is already selected, force continent to that country's continent
+    #    BEFORE rendering either widget (to avoid rerun resets).
+    if "sc_country" in st.session_state and st.session_state["sc_country"] != "All":
+        _cur_ctry = st.session_state["sc_country"]
+        if sel_year_sc == "All":
+            _lk = wb[wb["country"] == _cur_ctry]
+        else:
+            _lk = wb[(wb["year"] == int(sel_year_sc)) & (wb["country"] == _cur_ctry)]
+        if not _lk.empty and _lk["continent"].notna().any():
+            _suggest = str(_lk["continent"].dropna().iloc[0])
+            if _suggest in cont_opts_sc:
+                st.session_state["sc_cont"] = _suggest  # safe: done before widget creation
+    
     # tentative continent (will auto-correct after country selection below if needed)
     with c2:
         current_cont = st.session_state.get("sc_cont", "All")
@@ -334,21 +350,15 @@ def scoring_filters_block(wb: pd.DataFrame):
     if sel_cont_sc != "All":
         pool = pool[pool["continent"] == sel_cont_sc]
     country_opts_sc = ["All"] + sorted(pool["country"].dropna().unique().tolist())
-
-    # --- Keep/persist country selection safely
+    
+    # 6) Initialize/persist country selection; only reset to "All" if truly invalid
     if "sc_country" not in st.session_state:
         st.session_state["sc_country"] = "All"
     elif st.session_state["sc_country"] not in country_opts_sc:
-        # only reset when the selected country is no longer a valid option
         st.session_state["sc_country"] = "All"
-
+        
     with c3:
-        sel_country_sc = st.selectbox(
-            "Country",
-            country_opts_sc,
-            key="sc_country",                 # no index -> uses session_state value
-            on_change=_sync_continent_from_country,
-        )
+        sel_country_sc = st.selectbox("Country", country_opts_sc, key="sc_country")
 
     return sel_year_sc, st.session_state.get("sc_cont", sel_cont_sc), sel_country_sc
 
