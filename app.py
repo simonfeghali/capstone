@@ -108,7 +108,7 @@ st.markdown(
     <div class="app-page-title">
       <div class="app-page-title-left">
         <img class="icon" src="data:image/png;base64,{icon_b64}" alt="icon" />
-        <h1>FDI Analytics Dashboard</h1>
+        <h1>Country Viability and FDI Analytics Dashboard</h1>
       </div>
       <img class="logo" src="data:image/jpeg;base64,{logo_b64}" alt="logo" />
     </div>
