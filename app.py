@@ -285,6 +285,25 @@ def render_filters_block(prefix: str):
         return out, yy
 
     return sel_year_any, sel_cont, sel_country, filt_wb_single_year
+    
+def _sync_continent_from_country():
+    """Update continent to match the selected country (if possible)."""
+    country = st.session_state.get("sc_country", "All")
+    year = st.session_state.get("sc_year", "All")
+    if country == "All":
+        return
+
+    if year == "All":
+        lookup = wb[wb["country"] == country]
+    else:
+        lookup = wb[(wb["year"] == int(year)) & (wb["country"] == country)]
+
+    if not lookup.empty and lookup["continent"].notna().any():
+        cont = str(lookup["continent"].dropna().iloc[0])
+        # Only set if it's a valid option for the current year
+        cont_opts = st.session_state.get("_sc_cont_opts", [])
+        if cont in cont_opts:
+            st.session_state["sc_cont"] = cont
 
 # SCORING-only filters — UPDATED to auto-sync continent to selected country
 def scoring_filters_block(wb: pd.DataFrame):
@@ -298,34 +317,31 @@ def scoring_filters_block(wb: pd.DataFrame):
 
     cont_pool = wb["continent"] if sel_year_sc == "All" else wb.loc[wb["year"] == int(sel_year_sc), "continent"]
     cont_opts_sc = ["All"] + sorted(cont_pool.dropna().unique().tolist())
+    st.session_state["_sc_cont_opts"] = cont_opts_sc  # used by the callback
 
     # tentative continent (will auto-correct after country selection below if needed)
     with c2:
-        # preserve current selection if valid, else All
-        current = st.session_state.get("sc_cont", "All")
-        default_idx = cont_opts_sc.index(current) if current in cont_opts_sc else 0
-        sel_cont_sc = st.selectbox("Continent", cont_opts_sc, index=default_idx, key="sc_cont")
+        current_cont = st.session_state.get("sc_cont", "All")
+        if current_cont not in cont_opts_sc:
+            current_cont = "All"
+        sel_cont_sc = st.selectbox("Continent", cont_opts_sc,
+                                   index=cont_opts_sc.index(current_cont),
+                                   key="sc_cont")
 
-    pool = wb.copy()
-    if sel_year_sc != "All":
-        pool = pool[pool["year"] == int(sel_year_sc)]
+    # Country options depend on selected continent (or all)
+    pool = wb if sel_year_sc == "All" else wb[wb["year"] == int(sel_year_sc)]
     if sel_cont_sc != "All":
         pool = pool[pool["continent"] == sel_cont_sc]
     country_opts_sc = ["All"] + sorted(pool["country"].dropna().unique().tolist())
 
     with c3:
-        sel_country_sc = st.selectbox("Country", country_opts_sc, index=0, key="sc_country")
-
-    # ---- Auto-sync continent to the selected country's continent
-    if sel_country_sc != "All":
-        if sel_year_sc == "All":
-            lookup = wb[wb["country"] == sel_country_sc]
-        else:
-            lookup = wb[(wb["year"] == int(sel_year_sc)) & (wb["country"] == sel_country_sc)]
-        suggested = lookup["continent"].dropna().iloc[0] if not lookup.empty else None
-        if suggested and st.session_state.get("sc_cont") != suggested:
-            st.session_state["sc_cont"] = suggested
-            st.experimental_rerun()
+        sel_country_sc = st.selectbox(
+            "Country",
+            country_opts_sc,
+            index=0,
+            key="sc_country",
+            on_change=_sync_continent_from_country,  # <-- update continent safely
+        )
 
     return sel_year_sc, st.session_state.get("sc_cont", sel_cont_sc), sel_country_sc
 
