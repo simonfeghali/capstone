@@ -453,7 +453,7 @@ with tab_scoring:
                 st.info("No data for this selection.")
             else:
                 map_df = avg_scope.rename(columns={"avg_score": "score"})[["country", "score"]].copy()
-                map_title = "Global Performance Map — All Years (precomputed avg)"
+                map_title = "Global Performance Map — All Years"
                 fig_map = px.choropleth(map_df, locations="country", locationmode="country names",
                                         color="score", color_continuous_scale="Blues", title=map_title)
                 fig_map.update_coloraxes(showscale=True)
