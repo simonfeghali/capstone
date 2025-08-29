@@ -102,6 +102,17 @@ def find_col(cols, *cands):
                 return col
     return None
 
+def _numify_generic(x):
+    if pd.isna(x):
+        return np.nan
+    if isinstance(x, (int, float, np.integer, np.floating)):
+        return float(x)
+    s = re.sub(r"[^\d\.\-]", "", str(x))
+    try:
+        return float(s)
+    except Exception:
+        return np.nan
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Loaders
 # ──────────────────────────────────────────────────────────────────────────────
