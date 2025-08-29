@@ -9,6 +9,7 @@ import streamlit as st
 import re
 from urllib.parse import quote
 from urllib.error import URLError, HTTPError
+from compare_tab import render_compare_tab
 
 # ──────────────────────────────────────────────────────────────────────────────
 # App chrome / theme
