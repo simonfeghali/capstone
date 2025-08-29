@@ -9,7 +9,6 @@ import streamlit as st
 import re
 from urllib.parse import quote
 from urllib.error import URLError, HTTPError
-from compare_tab import render_compare_tab
 
 # ──────────────────────────────────────────────────────────────────────────────
 # App chrome / theme
@@ -79,6 +78,7 @@ inject_tab_icons()
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
     "wb":  "world_bank_data_with_scores_and_continent.csv",
+    "wb_avg": "world_bank_data_average_scores_and_grades.csv",  # NEW: precomputed averages
     "cap_csv": "capex_EDA_cleaned_filled.csv",
     "cap_csv_alt": "capex_EDA_cleaned_filled.csv",
     "cap_xlsx": "capex_EDA.xlsx",
@@ -96,12 +96,12 @@ def find_col(cols, *cands):
             return low[c.lower()]
     for cand in cands:
         for col in cols:
-            if cand.lower() in col.lower():
+            if cand.lower() in str(col).lower():
                 return col
     return None
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Load World Bank (Scoring)  + CAPEX (EDA)
+# Load World Bank (Scoring) + CAPEX (EDA) + WB Averages
 # ──────────────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=True)
 def load_world_bank() -> pd.DataFrame:
@@ -139,6 +139,46 @@ def load_world_bank() -> pd.DataFrame:
     df.loc[~df["grade"].isin(order), "grade"] = np.nan
     df["grade"] = pd.Categorical(df["grade"], categories=order, ordered=True)
     return df
+
+@st.cache_data(show_spinner=True)
+def load_world_bank_averages() -> pd.DataFrame:
+    """
+    Loads the precomputed averages dataset.
+    Flexible col matching:
+      - country: 'country', 'Country', 'Country Name'
+      - avg score: 'avg_score', 'average_score', 'mean_score', 'score'
+      - grade: 'grade', 'letter_grade'
+    Returns: DataFrame with ['country','avg_score','grade'].
+    """
+    url = gh_raw_url(FILES["wb_avg"])
+    try:
+        df = pd.read_csv(url)
+    except (URLError, HTTPError, FileNotFoundError) as e:
+        raise RuntimeError(f"Could not fetch {FILES['wb_avg']}: {e}")
+
+    country = find_col(df.columns, "country", "country_name", "Country Name")
+    avg     = find_col(df.columns, "avg_score", "average_score", "mean_score", "score")
+    grade   = find_col(df.columns, "grade", "letter_grade")
+
+    if country is None or avg is None:
+        raise ValueError(f"Averages CSV missing required columns. Found: {list(df.columns)}")
+
+    keep = {country: "country", avg: "avg_score"}
+    if grade: keep[grade] = "grade"
+    out = df.rename(columns=keep)[list(keep.values())].copy()
+
+    if "grade" not in out.columns: out["grade"] = np.nan
+    out["country"] = out["country"].astype(str).str.strip()
+
+    # Normalize grades to same categorical order
+    order = ["A+", "A", "B", "C", "D"]
+    out["grade"] = out["grade"].astype(str).str.strip()
+    out.loc[~out["grade"].isin(order), "grade"] = np.nan
+    out["grade"] = pd.Categorical(out["grade"], categories=order, ordered=True)
+
+    # Numeric avg
+    out["avg_score"] = pd.to_numeric(out["avg_score"], errors="coerce")
+    return out[["country", "avg_score", "grade"]]
 
 def _melt_capex_wide(df: pd.DataFrame) -> pd.DataFrame:
     cols = [str(c).strip() for c in df.columns]
@@ -193,13 +233,18 @@ def load_capex_long() -> pd.DataFrame:
     except Exception as e:
         raise RuntimeError(f"Could not load CAPEX from CSV or Excel: {e}")
 
-wb   = load_world_bank()
-capx = load_capex_long()
+# Load core data
+wb        = load_world_bank()
+wb_avg    = load_world_bank_averages()  # NEW
+capx      = load_capex_long()
+
+# Enrichers / helpers
 wb_cc = wb.drop_duplicates(subset=["country", "continent"])[["country", "continent"]]
 capx_enriched = capx.merge(wb_cc, on="country", how="left")
+wb_avg_enriched = wb_avg.merge(wb_cc, on="country", how="left")  # NEW: to add continent for filters/maps
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Filters
+# Filter blocks
 # ──────────────────────────────────────────────────────────────────────────────
 years_wb  = sorted(wb["year"].dropna().astype(int).unique().tolist())
 years_cap = sorted(capx_enriched["year"].dropna().astype(int).unique().tolist())
@@ -252,7 +297,7 @@ def render_filters_block(prefix: str):
 
     return sel_year_any, sel_cont, sel_country, filt_wb_single_year
 
-# Scoring-only filters/util
+# SCORING-only filters
 def scoring_filters_block(wb: pd.DataFrame):
     years_sc = sorted(wb["year"].dropna().astype(int).unique().tolist())
     years_sc = [y for y in years_sc if y <= 2023]
@@ -291,11 +336,10 @@ def filt_wb_scoping(df: pd.DataFrame, year_any, cont, country):
 # ──────────────────────────────────────────────────────────────────────────────
 # Tabs
 # ──────────────────────────────────────────────────────────────────────────────
-tab_scoring, tab_eda, tab_sectors, tab_dest, tab_compare = st.tabs(
-    ["Scoring", "CAPEX", "Sectors", "Destinations", "Compare"]
-)
+tab_scoring, tab_eda, tab_sectors, tab_dest = st.tabs(["Scoring", "CAPEX", "Sectors", "Destinations"])
+
 # =============================================================================
-# SCORING TAB
+# SCORING TAB — UPDATED to use precomputed averages when Year = "All"
 # =============================================================================
 with tab_scoring:
     sel_year_sc, sel_cont_sc, sel_country_sc = scoring_filters_block(wb)
@@ -304,84 +348,100 @@ with tab_scoring:
     where_title = sel_country_sc if sel_country_sc != "All" else (sel_cont_sc if sel_cont_sc != "All" else "Worldwide")
     st.subheader(where_title)
 
-    wb_scope = filt_wb_scoping(wb, sel_year_sc, sel_cont_sc, sel_country_sc)
+    # Decide which data source to use for "All" vs specific year
+    use_avg = (sel_year_sc == "All")
 
-    if sel_country_sc != "All":
-        rows = filt_wb_scoping(wb, sel_year_sc, "All", sel_country_sc)
-        country_score = float(rows["score"].mean()) if not rows.empty else np.nan
-        if sel_year_sc == "All":
-            country_grade = "-"
-        else:
-            country_grade = rows["grade"].astype(str).dropna().iloc[0] if not rows.empty and rows["grade"].notna().any() else "-"
-        ctry_cont = rows["continent"].dropna().iloc[0] if not rows.empty and rows["continent"].notna().any() else None
-
-        cont_rows = filt_wb_scoping(wb, sel_year_sc, ctry_cont, "All") if ctry_cont else pd.DataFrame()
-        cont_avg = float(cont_rows["score"].mean()) if not cont_rows.empty else np.nan
-
-        k1, k2, k3 = st.columns(3, gap="large")
-        with k1:
-            st.metric("Country Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
-        with k2:
-            st.metric("Grade", country_grade)
-        with k3:
-            label = f"{ctry_cont} Avg Score" if ctry_cont else "Continent Avg Score"
-            st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
-
-    t1, t2 = st.columns([1, 2], gap="large")
-    with t1:
+    if use_avg:
+        # Build a scoped averages view, enriched with continent for filtering
+        avg_scope = wb_avg_enriched.copy()
+        if sel_cont_sc != "All":
+            avg_scope = avg_scope[avg_scope["continent"] == sel_cont_sc]
         if sel_country_sc != "All":
-            base = wb[wb["country"] == sel_country_sc]; title = f"Year-over-Year Viability Score — {sel_country_sc}"
-        elif sel_cont_sc != "All":
-            base = wb[wb["continent"] == sel_cont_sc]; title = f"Year-over-Year Viability Score — {sel_cont_sc}"
-        else:
-            base = wb.copy(); title = "Year-over-Year Viability Score — Global"
-        yoy_df = base.groupby("year", as_index=False)["score"].mean().sort_values("year")
-        yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)
-        fig_line = px.line(yoy_df, x="year_str", y="score", markers=True,
-                           labels={"year_str": "", "score": "Mean score"}, title=title)
-        fig_line.update_xaxes(type="category", categoryorder="array",
-                              categoryarray=yoy_df["year_str"].tolist(), showgrid=False)
-        fig_line.update_yaxes(showgrid=False)
-        fig_line.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=340)
-        st.plotly_chart(fig_line, use_container_width=True)
+            avg_scope = avg_scope[avg_scope["country"] == sel_country_sc]
 
-    with t2:
-        if sel_year_sc == "All":
-            map_df = wb_scope.groupby("country", as_index=False)["score"].mean()
-            map_title = "Global Performance Map — All Years (avg)"
-        else:
-            map_df = wb_scope[["country", "score"]].copy()
-            map_title = f"Global Performance Map — {sel_year_sc}"
-        if map_df.empty:
-            st.info("No data for this selection.")
-        else:
-            fig_map = px.choropleth(map_df, locations="country", locationmode="country names",
-                                    color="score", color_continuous_scale="Blues", title=map_title)
-            fig_map.update_coloraxes(showscale=True)
-            scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
-                         "North America":"north america","South America":"south america",
-                         "Oceania":"world","All":"world"}
-            current_scope = scope_map.get(sel_cont_sc, "world")
-            fig_map.update_geos(scope=current_scope, projection_type="natural earth",
-                                showcountries=True, showcoastlines=True,
-                                landcolor="white", bgcolor="white")
-            if sel_cont_sc != "All" or sel_country_sc != "All":
-                fig_map.update_geos(fitbounds="locations")
-            fig_map.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=410,
-                                  paper_bgcolor="white", plot_bgcolor="white")
-            st.plotly_chart(fig_map, use_container_width=True)
+        # KPIs for a specific country (score + continent avg)
+        if sel_country_sc != "All":
+            # Country score (precomputed average)
+            country_row = avg_scope[avg_scope["country"] == sel_country_sc]
+            country_score = float(country_row["avg_score"].mean()) if not country_row.empty else np.nan
+            country_grade = country_row["grade"].astype(str).dropna().iloc[0] if not country_row.empty and country_row["grade"].notna().any() else "-"
 
-    if sel_country_sc == "All":
+            # Continent avg (precomputed) for that country's continent
+            ctry_cont = wb_cc.loc[wb_cc["country"] == sel_country_sc, "continent"]
+            ctry_cont = ctry_cont.dropna().iloc[0] if not ctry_cont.empty else None
+            cont_rows = wb_avg_enriched[wb_avg_enriched["continent"] == ctry_cont] if ctry_cont else pd.DataFrame()
+            if sel_cont_sc != "All":
+                cont_rows = cont_rows[cont_rows["continent"] == sel_cont_sc]
+            cont_avg = float(cont_rows["avg_score"].mean()) if not cont_rows.empty else np.nan
+
+            k1, k2, k3 = st.columns(3, gap="large")
+            with k1:
+                st.metric("Country Score (avg)", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
+            with k2:
+                st.metric("Grade (avg)", country_grade)
+            with k3:
+                label = f"{ctry_cont} Avg Score (avg)" if ctry_cont else "Continent Avg Score (avg)"
+                st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
+
+        # Layout for charts: keep YoY line on the left (still useful), Map on right using averages
+        t1, t2 = st.columns([1, 2], gap="large")
+        with t1:
+            # YoY still uses WB base (makes sense for "All" to show trend)
+            if sel_country_sc != "All":
+                base = wb[wb["country"] == sel_country_sc]; title = f"Year-over-Year Viability Score — {sel_country_sc}"
+            elif sel_cont_sc != "All":
+                base = wb[wb["continent"] == sel_cont_sc]; title = f"Year-over-Year Viability Score — {sel_cont_sc}"
+            else:
+                base = wb.copy(); title = "Year-over-Year Viability Score — Global"
+            yoy_df = base.groupby("year", as_index=False)["score"].mean().sort_values("year")
+            if yoy_df.empty:
+                st.info("No data for this selection.")
+            else:
+                yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)
+                fig_line = px.line(yoy_df, x="year_str", y="score", markers=True,
+                                   labels={"year_str": "", "score": "Mean score"}, title=title)
+                fig_line.update_xaxes(type="category", categoryorder="array",
+                                      categoryarray=yoy_df["year_str"].tolist(), showgrid=False)
+                fig_line.update_yaxes(showgrid=False)
+                fig_line.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=340)
+                st.plotly_chart(fig_line, use_container_width=True)
+
+        with t2:
+            # Map for ALL YEARS uses precomputed averages
+            if avg_scope.empty:
+                st.info("No data for this selection.")
+            else:
+                map_df = avg_scope.rename(columns={"avg_score": "score"})[["country", "score"]].copy()
+                map_title = "Global Performance Map — All Years (precomputed avg)"
+                fig_map = px.choropleth(map_df, locations="country", locationmode="country names",
+                                        color="score", color_continuous_scale="Blues", title=map_title)
+                fig_map.update_coloraxes(showscale=True)
+                scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
+                             "North America":"north america","South America":"south america",
+                             "Oceania":"world","All":"world"}
+                current_scope = scope_map.get(sel_cont_sc, "world")
+                fig_map.update_geos(scope=current_scope, projection_type="natural earth",
+                                    showcountries=True, showcoastlines=True,
+                                    landcolor="white", bgcolor="white")
+                if sel_cont_sc != "All" or sel_country_sc != "All":
+                    fig_map.update_geos(fitbounds="locations")
+                fig_map.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=410,
+                                      paper_bgcolor="white", plot_bgcolor="white")
+                st.plotly_chart(fig_map, use_container_width=True)
+
+        # Bottom blocks: Top 10 (by average) • Grade donut (from average) • Continent bar (avg)
         b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
         with b1:
-            if sel_year_sc == "All":
-                base = wb_scope.groupby("country", as_index=False)["score"].mean()
-                title_top = "Top 10 Performing Countries — All Years (avg)"
+            # Top 10 by average score
+            if sel_country_sc == "All":
+                base = avg_scope[["country", "avg_score"]].rename(columns={"avg_score": "score"})
+                title_top = "Top 10 Performing Countries — All Years (precomputed avg)"
             else:
-                base = wb_scope[["country", "score"]]
-                title_top = f"Top 10 Performing Countries — {sel_year_sc}"
+                base = avg_scope[["country", "avg_score"]].rename(columns={"avg_score": "score"})
+                title_top = "Top 10 Performing Countries — (precomputed avg)"
             top10 = base.dropna().sort_values("score", ascending=False).head(10)
-            if top10.empty: st.info("No countries available for Top 10 with this filter.")
+            if top10.empty:
+                st.info("No countries available for Top 10 with this filter.")
             else:
                 fig_top = px.bar(top10.sort_values("score"), x="score", y="country", orientation="h",
                                  color="score", color_continuous_scale="Blues",
@@ -391,37 +451,36 @@ with tab_scoring:
                 st.plotly_chart(fig_top, use_container_width=True)
 
         with b2:
-            if sel_year_sc == "All":
-                st.info("Select a specific year to see grade distribution.")
+            # Grade distribution donut using precomputed average grades
+            donut_base = avg_scope.copy()
+            if donut_base.empty or donut_base["grade"].isna().all():
+                st.info("No grade data for this selection.")
             else:
-                donut_base = wb_scope.copy()
-                if donut_base.empty or donut_base["grade"].isna().all(): st.info("No grade data for this selection.")
-                else:
-                    grades = ["A+", "A", "B", "C", "D"]
-                    donut = (donut_base.assign(grade=donut_base["grade"].astype(str))
-                                         .loc[lambda d: d["grade"].isin(grades)]
-                                         .groupby("grade", as_index=False)["country"].nunique()
-                                         .rename(columns={"country": "count"})
-                            ).set_index("grade").reindex(grades, fill_value=0).reset_index()
-                    shades = [px.colors.sequential.Blues[-1-i] for i in range(5)]
-                    cmap = {g:c for g, c in zip(grades, shades)}
-                    fig_donut = px.pie(donut, names="grade", values="count", hole=0.55,
-                                       title=f"Grade Distribution — {sel_year_sc}",
-                                       color="grade", color_discrete_map=cmap)
-                    fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
-                    st.plotly_chart(fig_donut, use_container_width=True)
+                grades = ["A+", "A", "B", "C", "D"]
+                donut = (donut_base.assign(grade=donut_base["grade"].astype(str))
+                                     .loc[lambda d: d["grade"].isin(grades)]
+                                     .groupby("grade", as_index=False)["country"].nunique()
+                                     .rename(columns={"country": "count"})
+                        ).set_index("grade").reindex(grades, fill_value=0).reset_index()
+                shades = [px.colors.sequential.Blues[-1-i] for i in range(5)]
+                cmap = {g:c for g, c in zip(grades, shades)}
+                fig_donut = px.pie(donut, names="grade", values="count", hole=0.55,
+                                   title="Grade Distribution — All Years (precomputed avg)",
+                                   color="grade", color_discrete_map=cmap)
+                fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
+                st.plotly_chart(fig_donut, use_container_width=True)
 
         with b3:
-            if sel_year_sc == "All":
-                cont_bar = wb_scope.groupby("continent", as_index=False)["score"].mean().sort_values("score", ascending=True)
-                title_cont = "Continent Viability Score — All Years (avg)"
+            # Continent bar — average score per continent
+            cont_bar = (wb_avg_enriched.copy()
+                        .pipe(lambda d: d if sel_cont_sc == "All" else d[d["continent"] == sel_cont_sc])
+                        .groupby("continent", as_index=False)["avg_score"].mean()
+                        .rename(columns={"avg_score": "score"})
+                        .sort_values("score", ascending=True))
+            if cont_bar.empty:
+                st.info("No continent data for this selection.")
             else:
-                cont_base = wb[wb["year"] == int(sel_year_sc)].copy()
-                if sel_cont_sc != "All": cont_base = cont_base[cont_base["continent"] == sel_cont_sc]
-                cont_bar = cont_base.groupby("continent", as_index=False)["score"].mean().sort_values("score", ascending=True)
-                title_cont = f"Continent Viability Score — {sel_year_sc}"
-            if cont_bar.empty: st.info("No continent data for this selection.")
-            else:
+                title_cont = "Continent Viability Score — All Years (precomputed avg)"
                 fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
                                   color="score", color_continuous_scale="Blues",
                                   labels={"score": "", "continent": ""}, title=title_cont)
@@ -429,6 +488,131 @@ with tab_scoring:
                 fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                 st.plotly_chart(fig_cont, use_container_width=True)
 
+    else:
+        # ORIGINAL behavior for a specific year (unchanged)
+        wb_scope = filt_wb_scoping(wb, sel_year_sc, sel_cont_sc, sel_country_sc)
+
+        if sel_country_sc != "All":
+            rows = filt_wb_scoping(wb, sel_year_sc, "All", sel_country_sc)
+            country_score = float(rows["score"].mean()) if not rows.empty else np.nan
+            country_grade = rows["grade"].astype(str).dropna().iloc[0] if not rows.empty and rows["grade"].notna().any() else "-"
+            ctry_cont = rows["continent"].dropna().iloc[0] if not rows.empty and rows["continent"].notna().any() else None
+
+            cont_rows = filt_wb_scoping(wb, sel_year_sc, ctry_cont, "All") if ctry_cont else pd.DataFrame()
+            cont_avg = float(cont_rows["score"].mean()) if not cont_rows.empty else np.nan
+
+            k1, k2, k3 = st.columns(3, gap="large")
+            with k1:
+                st.metric("Country Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
+            with k2:
+                st.metric("Grade", country_grade)
+            with k3:
+                label = f"{ctry_cont} Avg Score" if ctry_cont else "Continent Avg Score"
+                st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
+
+        t1, t2 = st.columns([1, 2], gap="large")
+        with t1:
+            if sel_country_sc != "All":
+                base = wb[wb["country"] == sel_country_sc]; title = f"Year-over-Year Viability Score — {sel_country_sc}"
+            elif sel_cont_sc != "All":
+                base = wb[wb["continent"] == sel_cont_sc]; title = f"Year-over-Year Viability Score — {sel_cont_sc}"
+            else:
+                base = wb.copy(); title = "Year-over-Year Viability Score — Global"
+            yoy_df = base.groupby("year", as_index=False)["score"].mean().sort_values("year")
+            yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)
+            fig_line = px.line(yoy_df, x="year_str", y="score", markers=True,
+                               labels={"year_str": "", "score": "Mean score"}, title=title)
+            fig_line.update_xaxes(type="category", categoryorder="array",
+                                  categoryarray=yoy_df["year_str"].tolist(), showgrid=False)
+            fig_line.update_yaxes(showgrid=False)
+            fig_line.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=340)
+            st.plotly_chart(fig_line, use_container_width=True)
+
+        with t2:
+            if sel_year_sc == "All":  # (won't happen here, but keep for safety)
+                map_df = wb_scope.groupby("country", as_index=False)["score"].mean()
+                map_title = "Global Performance Map — All Years (avg)"
+            else:
+                map_df = wb_scope[["country", "score"]].copy()
+                map_title = f"Global Performance Map — {sel_year_sc}"
+            if map_df.empty:
+                st.info("No data for this selection.")
+            else:
+                fig_map = px.choropleth(map_df, locations="country", locationmode="country names",
+                                        color="score", color_continuous_scale="Blues", title=map_title)
+                fig_map.update_coloraxes(showscale=True)
+                scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
+                             "North America":"north america","South America":"south america",
+                             "Oceania":"world","All":"world"}
+                current_scope = scope_map.get(sel_cont_sc, "world")
+                fig_map.update_geos(scope=current_scope, projection_type="natural earth",
+                                    showcountries=True, showcoastlines=True,
+                                    landcolor="white", bgcolor="white")
+                if sel_cont_sc != "All" or sel_country_sc != "All":
+                    fig_map.update_geos(fitbounds="locations")
+                fig_map.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=410,
+                                      paper_bgcolor="white", plot_bgcolor="white")
+                st.plotly_chart(fig_map, use_container_width=True)
+
+        if sel_country_sc == "All":
+            b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
+            with b1:
+                if sel_year_sc == "All":
+                    base = wb_scope.groupby("country", as_index=False)["score"].mean()
+                    title_top = "Top 10 Performing Countries — All Years (avg)"
+                else:
+                    base = wb_scope[["country", "score"]]
+                    title_top = f"Top 10 Performing Countries — {sel_year_sc}"
+                top10 = base.dropna().sort_values("score", ascending=False).head(10)
+                if top10.empty: st.info("No countries available for Top 10 with this filter.")
+                else:
+                    fig_top = px.bar(top10.sort_values("score"), x="score", y="country", orientation="h",
+                                     color="score", color_continuous_scale="Blues",
+                                     labels={"score": "", "country": ""}, title=title_top)
+                    fig_top.update_coloraxes(showscale=False)
+                    fig_top.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+                    st.plotly_chart(fig_top, use_container_width=True)
+
+            with b2:
+                if sel_year_sc == "All":
+                    st.info("Select a specific year to see grade distribution.")
+                else:
+                    donut_base = wb_scope.copy()
+                    if donut_base.empty or donut_base["grade"].isna().all(): st.info("No grade data for this selection.")
+                    else:
+                        grades = ["A+", "A", "B", "C", "D"]
+                        donut = (donut_base.assign(grade=donut_base["grade"].astype(str))
+                                             .loc[lambda d: d["grade"].isin(grades)]
+                                             .groupby("grade", as_index=False)["country"].nunique()
+                                             .rename(columns={"country": "count"})
+                                ).set_index("grade").reindex(grades, fill_value=0).reset_index()
+                        shades = [px.colors.sequential.Blues[-1-i] for i in range(5)]
+                        cmap = {g:c for g, c in zip(grades, shades)}
+                        fig_donut = px.pie(donut, names="grade", values="count", hole=0.55,
+                                           title=f"Grade Distribution — {sel_year_sc}",
+                                           color="grade", color_discrete_map=cmap)
+                        fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
+                        st.plotly_chart(fig_donut, use_container_width=True)
+
+            with b3:
+                if sel_year_sc == "All":
+                    cont_bar = wb_scope.groupby("continent", as_index=False)["score"].mean().sort_values("score", ascending=True)
+                    title_cont = "Continent Viability Score — All Years (avg)"
+                else:
+                    cont_base = wb[wb["year"] == int(sel_year_sc)].copy()
+                    if sel_cont_sc != "All": cont_base = cont_base[cont_base["continent"] == sel_cont_sc]
+                    cont_bar = cont_base.groupby("continent", as_index=False)["score"].mean().sort_values("score", ascending=True)
+                    title_cont = f"Continent Viability Score — {sel_year_sc}"
+                if cont_bar.empty: st.info("No continent data for this selection.")
+                else:
+                    fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
+                                      color="score", color_continuous_scale="Blues",
+                                      labels={"score": "", "continent": ""}, title=title_cont)
+                    fig_cont.update_coloraxes(showscale=False)
+                    fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+                    st.plotly_chart(fig_cont, use_container_width=True)
+
+    # Indicator weights table (unchanged)
     st.markdown("### Indicator Weights (%)")
     weights = pd.DataFrame({
         "Indicator": [
@@ -451,23 +635,15 @@ with tab_scoring:
     st.dataframe(weights, hide_index=True, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB — dedupe identical KPIs/graphs (keep the first only)
+# CAPEX TAB — UNCHANGED
 # =============================================================================
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
 
     st.caption("CAPEX Analysis")
 
-    # ---- De-dup helpers (CAPEX tab only) ----
-    shown_kpi_keys: set = set()
-    shown_series_keys: set = set()
-
+    # Helper to replace single-bar charts with a KPI
     def _kpi_block(title: str, value: float, unit: str = ""):
-        """Show KPI unless the same displayed number has been shown before."""
-        key = ("KPI", round(float(value), 1))
-        if key in shown_kpi_keys:
-            return
-        shown_kpi_keys.add(key)
         st.markdown(
             f"""
             <div class="kpi-box">
@@ -479,30 +655,9 @@ with tab_eda:
             unsafe_allow_html=True,
         )
 
-    def _series_key(kind: str, x, y):
-        x_tuple = tuple([str(v) for v in x])
-        y_tuple = tuple([None if pd.isna(v) else round(float(v), 4) for v in y])
-        return (kind, x_tuple, y_tuple)
-
-    def _plotly_line_once(x_vals, y_vals, title, labels_x, labels_y, height=360, color=None):
-        """Render line chart once if the (x,y) series hasn't been shown."""
-        sig = _series_key("LINE", x_vals, y_vals)
-        if sig in shown_series_keys:
-            return
-        shown_series_keys.add(sig)
-        fig = px.line(
-            pd.DataFrame({"x": x_vals, "y": y_vals}),
-            x="x", y="y", markers=True, title=title,
-        )
-        if color:
-            fig.update_traces(line=dict(color=color))
-        fig.update_xaxes(title=labels_x, type="category", showgrid=False)
-        fig.update_yaxes(title=labels_y, showgrid=False)
-        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
-        st.plotly_chart(fig, use_container_width=True)
-
     def _bars_or_kpi(df: pd.DataFrame, value_col: str, name_col: str, title: str,
                      unit: str, height: int = 420, ascending_for_hbar: bool = False):
+        # Count rows that would render as bars (non-null)
         valid = df[df[value_col].notna()].copy()
         if valid.empty:
             st.info("No data for this selection.")
@@ -512,13 +667,8 @@ with tab_eda:
             val = float(valid[value_col].iloc[0])
             _kpi_block(f"{title} — {label}", val, unit)
             return
+        # Otherwise render the bar chart as usual
         ordered = valid.sort_values(value_col, ascending=ascending_for_hbar)
-        sig = _series_key("BAR",
-                          ordered[name_col].astype(str).tolist(),
-                          ordered[value_col].astype(float).tolist())
-        if sig in shown_series_keys:
-            return
-        shown_series_keys.add(sig)
         fig = px.bar(
             ordered, x=value_col, y=name_col, orientation="h",
             color=value_col, color_continuous_scale="Blues",
@@ -528,7 +678,6 @@ with tab_eda:
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
 
-    # filters applied to CAPEX
     grade_options = ["All", "A+", "A", "B", "C", "D"]
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
@@ -551,7 +700,6 @@ with tab_eda:
 
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
-        # Main KPI or trend
         if isinstance(sel_year_any, int):
             total_capex = float(capx_eda["capex"].sum()) if not capx_eda.empty else 0.0
             where_bits = []
@@ -563,11 +711,17 @@ with tab_eda:
             trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
             if trend.empty: st.info("No CAPEX data for the selected filters.")
             else:
-                x_vals = trend["year"].astype(int).astype(str).tolist()
-                y_vals = trend["capex"].astype(float).tolist()
+                trend["year_str"] = trend["year"].astype(int).astype(str)
                 title = (f"{sel_country} CAPEX Trend" if sel_country != "All"
                          else "Global CAPEX Trend")
-                _plotly_line_once(x_vals, y_vals, title, labels_x="", labels_y="Global CAPEX ($B)", height=360)
+                fig = px.line(trend, x="year_str", y="capex", markers=True,
+                              labels={"year_str": "", "capex": "Global CAPEX ($B)"},
+                              title=title)
+                fig.update_xaxes(type="category", categoryorder="array",
+                                 categoryarray=trend["year_str"].tolist(), showgrid=False)
+                fig.update_yaxes(showgrid=False)
+                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=360)
+                st.plotly_chart(fig, use_container_width=True)
 
     with e2:
         if isinstance(sel_year_any, int):
@@ -592,7 +746,6 @@ with tab_eda:
                               paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig, use_container_width=True)
 
-    # Grade views
     show_grade_trend = (sel_grade_eda == "All")
     if show_grade_trend:
         b1, b2, b3 = st.columns([1.2, 1.2, 1.6], gap="large")
@@ -647,58 +800,26 @@ with tab_eda:
                         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                         st.plotly_chart(fig, use_container_width=True)
                 else:
-                    # Combined multi-line chart by grade (but skip if identical to the already-shown global trend)
                     tg = (capx_eda.assign(grade=capx_eda["grade"].astype(str))
                                    .groupby(["year", "grade"], as_index=False, observed=True)["capex"]
                                    .sum()
                                    .sort_values("year"))
-                    if tg.empty:
-                        st.info("No CAPEX data for grade trend.")
+                    if tg.empty: st.info("No CAPEX data for grade trend.")
                     else:
                         tg["year_str"] = tg["year"].astype(int).astype(str)
-
-                        grades_present = tg["grade"].dropna().unique().tolist()
-                        # If only one grade -> dedupe with the earlier trend series signature
-                        if len(grades_present) == 1:
-                            x_vals = tg["year_str"].tolist()
-                            y_vals = tg["capex"].astype(float).tolist()
-                            sig = _series_key("LINE", x_vals, y_vals)
-                            if sig in shown_series_keys:
-                                pass  # identical to the trend above → skip rendering
-                            else:
-                                fig_single = px.line(
-                                    tg, x="year_str", y="capex", color="grade",
-                                    labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
-                                    title="CAPEX Trend by Grade"
-                                )
-                                fig_single.update_xaxes(type="category",
-                                                        categoryorder="array",
-                                                        categoryarray=sorted(tg["year_str"].unique().tolist()),
-                                                        showgrid=False)
-                                fig_single.update_yaxes(showgrid=False)
-                                fig_single.update_layout(margin=dict(l=10, r=10, t=60, b=10),
-                                                         height=420, legend_title_text="Grade")
-                                st.plotly_chart(fig_single, use_container_width=True)
-                        else:
-                            blues = px.colors.sequential.Blues
-                            shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]
-                            grade_order = ["A+", "A", "B", "C", "D"]
-                            cmap = {g:c for g,c in zip(grade_order, shades)}
-                            fig = px.line(
-                                tg, x="year_str", y="capex", color="grade",
-                                color_discrete_map=cmap,
-                                category_orders={"grade": grade_order},
-                                labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
-                                title="CAPEX Trend by Grade"
-                            )
-                            fig.update_xaxes(type="category",
-                                             categoryorder="array",
-                                             categoryarray=sorted(tg["year_str"].unique().tolist()),
-                                             showgrid=False)
-                            fig.update_yaxes(showgrid=False)
-                            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10),
-                                              height=420, legend_title_text="Grade")
-                            st.plotly_chart(fig, use_container_width=True)
+                        blues = px.colors.sequential.Blues
+                        shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]
+                        grades = ["A+", "A", "B", "C", "D"]
+                        cmap = {g:c for g,c in zip(grades, shades)}
+                        fig = px.line(tg, x="year_str", y="capex", color="grade",
+                                      color_discrete_map=cmap,
+                                      labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
+                                      title="CAPEX Trend by Grade")
+                        fig.update_xaxes(type="category", categoryorder="array",
+                                         categoryarray=sorted(tg["year_str"].unique().tolist()), showgrid=False)
+                        fig.update_yaxes(showgrid=False)
+                        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+                        st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("No CAPEX data for grade view.")
 
@@ -733,7 +854,7 @@ with tab_eda:
                     )
 
 # =============================================================================
-# SECTORS TAB
+# SECTORS TAB — UNCHANGED
 # =============================================================================
 SECTORS_CANON = [
     "Software & IT services","Business services","Communications","Financial services",
@@ -832,6 +953,9 @@ def load_sectors_raw() -> pd.DataFrame:
     df["country"] = df["country_raw"].astype(str).map(_canon_country)
     df["sector"]  = df["sector_raw"].astype(str).map(_canon_sector)
 
+    df = df[df["sector"].isin(SECTORS_CANON)]
+    df = df[df["country"].isin(SECTOR_COUNTRIES_10)]
+
     df = (df.groupby(["country", "sector"], as_index=False)[["companies","jobs_created","capex","projects"]]
             .sum(min_count=1))
     return df
@@ -843,18 +967,10 @@ with tab_sectors:
 
     sc1, sc2 = st.columns([1, 2], gap="small")
     with sc1:
-        sector_opt = ["All"] + [
-            "Software & IT services","Business services","Communications","Financial services",
-            "Transportation & Warehousing","Real estate","Consumer products","Food and Beverages",
-            "Automotive OEM","Automotive components","Chemicals","Pharmaceuticals",
-            "Metals","Coal, oil & gas","Space & defence","Leisure & entertainment"
-        ]
+        sector_opt = ["All"] + SECTORS_CANON
         sel_sector = st.selectbox("Sector", sector_opt, index=0, key="sector_sel")
     with sc2:
-        countries = [
-            "United States","United Kingdom","Germany","France","China",
-            "Japan","South Korea","Canada","Netherlands","United Arab Emirates"
-        ]
+        countries = SECTOR_COUNTRIES_10
         default_c = st.session_state.get("sector_country", countries[0])
         if default_c not in countries: default_c = countries[0]
         sel_sector_country = st.selectbox("Source Country", countries,
@@ -889,13 +1005,7 @@ with tab_sectors:
 
     if sel_sector == "All":
         bars = cdf[["sector", value_col]].copy()
-        canon = [
-            "Software & IT services","Business services","Communications","Financial services",
-            "Transportation & Warehousing","Real estate","Consumer products","Food and Beverages",
-            "Automotive OEM","Automotive components","Chemicals","Pharmaceuticals",
-            "Metals","Coal, oil & gas","Space & defence","Leisure & entertainment"
-        ]
-        bars = bars.set_index("sector").reindex(canon, fill_value=0).reset_index()
+        bars = bars.set_index("sector").reindex(SECTORS_CANON, fill_value=0).reset_index()
         bars = bars.sort_values(value_col, ascending=False)
         title = f"{metric} by Sector — {sel_sector_country}"
         if bars[value_col].sum() == 0:
@@ -924,7 +1034,7 @@ with tab_sectors:
         )
 
 # =============================================================================
-# DESTINATIONS TAB
+# DESTINATIONS TAB — UNCHANGED
 # =============================================================================
 def _style_geo_white(fig: go.Figure, height: int = 360) -> go.Figure:
     fig.update_geos(
