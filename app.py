@@ -336,7 +336,8 @@ def filt_wb_scoping(df: pd.DataFrame, year_any, cont, country):
 # ──────────────────────────────────────────────────────────────────────────────
 # Tabs
 # ──────────────────────────────────────────────────────────────────────────────
-tab_scoring, tab_eda, tab_sectors, tab_dest = st.tabs(["Scoring", "CAPEX", "Sectors", "Destinations"])
+from compare_tab import render_compare_tab
+tab_scoring, tab_eda, tab_sectors, tab_dest, tab_compare = st.tabs(["Scoring", "CAPEX", "Sectors", "Destinations", "Compare"])
 
 # =============================================================================
 # SCORING TAB — UPDATED to use precomputed averages when Year = "All"
