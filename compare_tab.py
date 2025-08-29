@@ -7,13 +7,18 @@ from urllib.parse import quote
 from urllib.error import URLError, HTTPError
 import re
 
-# =============== Config ===============
+# ================= Config =================
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
     "wb":  "world_bank_data_with_scores_and_continent.csv",
     "cap": "capex_EDA_cleaned_filled.csv",
     "sectors": "merged_sectors_data.csv",
     "destinations": "merged_destinations_data.csv",
+}
+
+SECT_DEST_ALLOWED = {
+    "Canada","China","France","Germany","Japan","Netherlands",
+    "South Korea","United Arab Emirates","United Kingdom","United States"
 }
 
 def _raw(fname: str) -> str:
@@ -30,7 +35,7 @@ def _find_col(cols, *cands):
                 return col
     return None
 
-# =============== Loaders ===============
+# ================= Loaders =================
 @st.cache_data(show_spinner=False)
 def load_wb():
     try:
@@ -84,8 +89,8 @@ def load_capex():
         return pd.DataFrame(columns=["country","year","capex","grade"])
 
     id_vars = [src] + ([grade_col] if grade_col else [])
-    m = df.melt(id_vars=id_vars, value_vars=year_cols, var_name="year", value_name="capex")\
-         .rename(columns={src:"country"})
+    m = df.melt(id_vars=id_vars, value_vars=year_cols,
+                var_name="year", value_name="capex").rename(columns={src:"country"})
     if grade_col: m = m.rename(columns={grade_col:"grade"})
     else: m["grade"] = np.nan
 
@@ -175,7 +180,7 @@ def load_destinations():
             [["companies","jobs_created","capex","projects"]].sum(min_count=1))
     return df
 
-# =============== UI Helpers ===============
+# ================= UI helpers =================
 CSS = """
 <style>
   .kpi { text-align:center; padding:16px 0; }
@@ -200,10 +205,11 @@ def _kpi(title, value, unit=""):
     """, unsafe_allow_html=True)
 
 def _grade_pill(g: str) -> str:
-    if not g or g == "-" or g is np.nan: return '<span class="pill neutral">–</span>'
+    if not g or g == "-" or g is np.nan:
+        return '<span class="pill neutral">–</span>'
     return f'<span class="pill good">{g}</span>'
 
-# =============== Public Entrypoint ===============
+# ================= Public entrypoint =================
 def render_compare_tab():
     wb  = load_wb()
     cap = load_capex()
@@ -214,98 +220,68 @@ def render_compare_tab():
         st.info("World Bank data required.")
         st.stop()
 
-    # ------- Controls row (Metric + Year + Countries) -------
-    metrics = ["Score", "Grade", "CAPEX", "CAPEX by Grade", "Sectors", "Destinations"]
-    mcol, ycol, acol, bcol = st.columns([1.2, 0.8, 1.2, 1.2], gap="small")
-    with mcol:
-        metric = st.selectbox("Compare by", metrics, index=0, key="cmp_metric")
-
-    # Years
+    # -------- Controls: Year & Countries first (metric options depend on them) --------
     wb_years  = sorted(wb["year"].dropna().astype(int).unique().tolist())
     cap_years = sorted(cap["year"].dropna().astype(int).unique().tolist())
     years_all = sorted(set(wb_years).union(cap_years))
-    if metric in ["Grade", "CAPEX by Grade"]:
-        year_opts = years_all  # force specific year
-        year_help = "Select a specific year."
-        default_index = len(year_opts)-1
-    else:
-        year_opts = ["All"] + years_all
-        year_help = "Choose 'All' for a trend, or a specific year for point-in-time."
-        default_index = 0
-    with ycol:
-        year_any = st.selectbox("Year", year_opts, index=default_index, help=year_help, key="cmp_year")
 
+    c1, c2, c3 = st.columns([1, 1, 1.5], gap="small")
+    with c1:
+        year_opts = ["All"] + years_all
+        year_any = st.selectbox("Year", year_opts, index=0, key="cmp_year")
     latest_wb_year = max(wb_years) if wb_years else None
     countries = sorted(wb.loc[wb["year"] == latest_wb_year, "country"].dropna().unique().tolist()) if latest_wb_year else []
     if len(countries) < 2:
         st.info("Need at least two countries in data.")
         st.stop()
-
-    with acol:
+    with c2:
         a = st.selectbox("Country A", countries, index=0, key="cmp_a")
-    with bcol:
+    with c3:
         b = st.selectbox("Country B", countries, index=1, key="cmp_b")
 
     if a == b:
         st.warning("Please choose two different countries.")
         st.stop()
 
-    # ------- Metric-specific extra controls -------
-    extra = st.container()
-    sector_opt = None
-    sector_metric = None
-    dest_country = None
-    dest_metric = None
-    grade_order = ["A+","A","B","C","D"]
+    # Build metric options after we know A & B (to enforce allowed list for Sectors/Destinations)
+    allowed_pair = (a in SECT_DEST_ALLOWED) and (b in SECT_DEST_ALLOWED)
+    metric_options = ["Score & Grade", "CAPEX"]
+    if allowed_pair:
+        metric_options += ["Sectors", "Destinations"]
 
-    if metric == "Sectors":
-        # sector + metric selector
-        sectors_list = sorted(sec["sector"].dropna().unique().tolist()) if not sec.empty else []
-        with extra:
-            c1, c2 = st.columns([1.4, 1], gap="small")
-            with c1:
-                sector_opt = st.selectbox("Sector", sectors_list, index=0 if sectors_list else None, key="cmp_sector")
-            with c2:
-                sector_metric = st.selectbox("Metric", ["Companies","Jobs Created","Capex","Projects"], index=0, key="cmp_sector_metric")
-            if not sectors_list:
-                st.info("No sectors data available.")
-                st.stop()
-
-    if metric == "Destinations":
-        # destination + metric selector
-        destsA = sorted(dst.loc[dst["source_country"] == a, "destination_country"].dropna().unique().tolist()) if not dst.empty else []
-        destsB = sorted(dst.loc[dst["source_country"] == b, "destination_country"].dropna().unique().tolist()) if not dst.empty else []
-        union_dests = sorted(set(destsA).union(destsB))
-        with extra:
-            c1, c2 = st.columns([1.4, 1], gap="small")
-            with c1:
-                dest_country = st.selectbox("Destination country", union_dests, index=0 if union_dests else None, key="cmp_dest_country")
-            with c2:
-                dest_metric = st.selectbox("Metric", ["Companies","Jobs Created","Capex","Projects"], index=0, key="cmp_dest_metric")
-            if not union_dests:
-                st.info("No destinations data available.")
-                st.stop()
+    mcol = st.container()
+    with mcol:
+        metric = st.selectbox("Compare by", metric_options, index=0, key="cmp_metric")
 
     st.markdown("---")
 
-    # ------- Render -------
-    if metric == "Score":
-        left, right = st.columns(2, gap="large")
-        def _score_meta(country):
+    # ---------------- Metric: Score & Grade (combined) ----------------
+    if metric == "Score & Grade":
+        def _score_grade(country):
             s = wb[wb["country"] == country]
             cont = s["continent"].dropna().iloc[0] if not s.empty and s["continent"].notna().any() else "-"
             if year_any == "All":
                 score = float(s["score"].mean()) if not s.empty else np.nan
+                grade = None  # no specific year, so we don't show a grade
             else:
-                score = float(s.loc[s["year"] == int(year_any), "score"].mean()) if not s.empty else np.nan
-            return score, cont
+                row = s[s["year"] == int(year_any)]
+                score = float(row["score"].mean()) if not row.empty else np.nan
+                grade = row["grade"].astype(str).dropna().iloc[0] if not row.empty and row["grade"].notna().any() else "-"
+            return score, grade, cont
 
+        left, right = st.columns(2, gap="large")
         with left:
             st.subheader(a)
-            scA, contA = _score_meta(a)
-            c1, c2 = st.columns(2)
+            scA, gA, contA = _score_grade(a)
+            c1, c2 = st.columns([1, 1])
             with c1: _kpi("Score", scA)
-            with c2: st.markdown(f"**Continent:** {contA}")
+            with c2:
+                if gA is None:
+                    st.caption("Select a specific year to see Grade.")
+                else:
+                    st.markdown(_grade_pill(gA), unsafe_allow_html=True)
+            st.markdown(f"**Continent:** {contA}")
+
             if year_any == "All":
                 s_tr = wb[wb["country"] == a].groupby("year", as_index=False)["score"].mean()
                 if not s_tr.empty:
@@ -316,12 +292,19 @@ def render_compare_tab():
                     fig.update_xaxes(type="category", showgrid=False)
                     fig.update_yaxes(showgrid=False)
                     st.plotly_chart(fig, use_container_width=True)
+
         with right:
             st.subheader(b)
-            scB, contB = _score_meta(b)
-            c1, c2 = st.columns(2)
+            scB, gB, contB = _score_grade(b)
+            c1, c2 = st.columns([1, 1])
             with c1: _kpi("Score", scB)
-            with c2: st.markdown(f"**Continent:** {contB}")
+            with c2:
+                if gB is None:
+                    st.caption("Select a specific year to see Grade.")
+                else:
+                    st.markdown(_grade_pill(gB), unsafe_allow_html=True)
+            st.markdown(f"**Continent:** {contB}")
+
             if year_any == "All":
                 s_tr = wb[wb["country"] == b].groupby("year", as_index=False)["score"].mean()
                 if not s_tr.empty:
@@ -333,33 +316,7 @@ def render_compare_tab():
                     fig.update_yaxes(showgrid=False)
                     st.plotly_chart(fig, use_container_width=True)
 
-        st.markdown("### Head-to-Head")
-        _kpi("Score Δ (A − B)", (0 if pd.isna(scA) else scA) - (0 if pd.isna(scB) else scB))
-
-    elif metric == "Grade":
-        # Force specific year (handled above)
-        left, right = st.columns(2, gap="large")
-        def _grade_for(country, year):
-            s = wb[(wb["country"] == country) & (wb["year"] == int(year))]
-            g = s["grade"].astype(str).dropna().iloc[0] if not s.empty and s["grade"].notna().any() else "-"
-            sc = float(s["score"].mean()) if not s.empty else np.nan
-            return g, sc
-
-        with left:
-            st.subheader(f"{a} — {year_any}")
-            gA, scA = _grade_for(a, year_any)
-            st.markdown(_grade_pill(gA), unsafe_allow_html=True)
-            _kpi("Score", scA)
-        with right:
-            st.subheader(f"{b} — {year_any}")
-            gB, scB = _grade_for(b, year_any)
-            st.markdown(_grade_pill(gB), unsafe_allow_html=True)
-            _kpi("Score", scB)
-
-        st.markdown("### Head-to-Head")
-        _kpi("Score Δ (A − B)", (0 if pd.isna(scA) else scA) - (0 if pd.isna(scB) else scB))
-        st.markdown(f"**Grade A/B:** `{gA}` / `{gB}`")
-
+    # ---------------- Metric: CAPEX ----------------
     elif metric == "CAPEX":
         left, right = st.columns(2, gap="large")
         with left:
@@ -393,45 +350,22 @@ def render_compare_tab():
             else:
                 _kpi(f"{b} CAPEX — {year_any}", scope.loc[scope["year"] == int(year_any), "capex"].sum(), "$B")
 
-        st.markdown("### Head-to-Head")
-        if year_any == "All":
-            capA = cap.loc[cap["country"] == a, "capex"].sum()
-            capB = cap.loc[cap["country"] == b, "capex"].sum()
-        else:
-            capA = cap[(cap["country"] == a) & (cap["year"] == int(year_any))]["capex"].sum()
-            capB = cap[(cap["country"] == b) & (cap["year"] == int(year_any))]["capex"].sum()
-        _kpi("CAPEX Δ (A − B)", capA - capB, "$B")
+    # ---------------- Metric: Sectors (only if both A & B in whitelist) ----------------
+    elif metric == "Sectors" and allowed_pair:
+        if sec.empty:
+            st.info("No sectors data available.")
+            st.stop()
+        sectors_list = sorted(sec["sector"].dropna().unique().tolist())
+        c1, c2 = st.columns([1.4, 1], gap="small")
+        with c1:
+            sector_opt = st.selectbox("Sector", sectors_list, index=0, key="cmp_sector")
+        with c2:
+            sector_metric = st.selectbox("Metric", ["Companies","Jobs Created","Capex","Projects"], index=0, key="cmp_sector_metric")
 
-    elif metric == "CAPEX by Grade":
-        # Require specific year; group by grade and compare side-by-side
-        yr = int(year_any)
-        grades = grade_order
-        dfA = (cap[(cap["country"] == a) & (cap["year"] == yr)]
-               .assign(grade=lambda d: d["grade"].astype(str))
-               .groupby("grade", as_index=False)["capex"].sum())
-        dfB = (cap[(cap["country"] == b) & (cap["year"] == yr)]
-               .assign(grade=lambda d: d["grade"].astype(str))
-               .groupby("grade", as_index=False)["capex"].sum())
-
-        dfA = dfA.set_index("grade").reindex(grades, fill_value=0).reset_index().rename(columns={"capex": a})
-        dfB = dfB.set_index("grade").reindex(grades, fill_value=0).reset_index().rename(columns={"capex": b})
-        merged = dfA.merge(dfB, on="grade")
-        melted = merged.melt(id_vars="grade", var_name="country", value_name="capex")
-
-        if melted.empty or melted["capex"].fillna(0).sum() == 0:
-            st.info("No CAPEX by grade for the selected year.")
-        else:
-            fig = px.bar(melted, y="grade", x="capex", color="country", barmode="group",
-                         title=f"CAPEX by Grade — {yr}", labels={"grade":"", "capex":""})
-            fig.update_layout(margin=dict(l=10,r=10,t=50,b=10), height=420)
-            st.plotly_chart(fig, use_container_width=True)
-
-    elif metric == "Sectors":
-        # Compare single sector & picked metric across A vs B
         metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
         col = metric_map[sector_metric]
-        valA = float(sec.loc[(sec["country"] == a) & (sec["sector"] == sector_opt), col].sum()) if not sec.empty else np.nan
-        valB = float(sec.loc[(sec["country"] == b) & (sec["sector"] == sector_opt), col].sum()) if not sec.empty else np.nan
+        valA = float(sec.loc[(sec["country"] == a) & (sec["sector"] == sector_opt), col].sum())
+        valB = float(sec.loc[(sec["country"] == b) & (sec["sector"] == sector_opt), col].sum())
 
         left, right = st.columns(2, gap="large")
         with left:
@@ -441,16 +375,25 @@ def render_compare_tab():
             st.subheader(b)
             _kpi(f"{sector_opt} • {sector_metric}", valB, "USD m" if col == "capex" else "")
 
-        st.markdown("### Head-to-Head")
-        _kpi(f"{sector_metric} Δ (A − B)", (0 if pd.isna(valA) else valA) - (0 if pd.isna(valB) else valB),
-             "USD m" if col == "capex" else "")
+    # ---------------- Metric: Destinations (only if both A & B in whitelist) ----------------
+    elif metric == "Destinations" and allowed_pair:
+        if dst.empty:
+            st.info("No destinations data available.")
+            st.stop()
+        destsA = sorted(dst.loc[dst["source_country"] == a, "destination_country"].dropna().unique().tolist())
+        destsB = sorted(dst.loc[dst["source_country"] == b, "destination_country"].dropna().unique().tolist())
+        union_dests = sorted(set(destsA).union(destsB))
 
-    elif metric == "Destinations":
-        # Compare outbound flows to chosen destination
+        c1, c2 = st.columns([1.4, 1], gap="small")
+        with c1:
+            dest_country = st.selectbox("Destination country", union_dests, index=0 if union_dests else None, key="cmp_dest_country")
+        with c2:
+            dest_metric = st.selectbox("Metric", ["Companies","Jobs Created","Capex","Projects"], index=0, key="cmp_dest_metric")
+
         metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
         col = metric_map[dest_metric]
-        valA = float(dst.loc[(dst["source_country"] == a) & (dst["destination_country"] == dest_country), col].sum()) if not dst.empty else np.nan
-        valB = float(dst.loc[(dst["source_country"] == b) & (dst["destination_country"] == dest_country), col].sum()) if not dst.empty else np.nan
+        valA = float(dst.loc[(dst["source_country"] == a) & (dst["destination_country"] == dest_country), col].sum()) if union_dests else np.nan
+        valB = float(dst.loc[(dst["source_country"] == b) & (dst["destination_country"] == dest_country), col].sum()) if union_dests else np.nan
 
         left, right = st.columns(2, gap="large")
         with left:
@@ -460,6 +403,6 @@ def render_compare_tab():
             st.subheader(b)
             _kpi(f"{b} → {dest_country} • {dest_metric}", valB, "USD m" if col == "capex" else "")
 
-        st.markdown("### Head-to-Head")
-        _kpi(f"{dest_metric} Δ (A − B)", (0 if pd.isna(valA) else valA) - (0 if pd.isna(valB) else valB),
-             "USD m" if col == "capex" else "")
+    # If user somehow lands on a hidden metric
+    else:
+        st.info("Select a metric to compare.")
