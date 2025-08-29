@@ -377,11 +377,11 @@ with tab_scoring:
 
             k1, k2, k3 = st.columns(3, gap="large")
             with k1:
-                st.metric("Country Score (avg)", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
+                st.metric("Average Country Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
             with k2:
-                st.metric("Grade (avg)", country_grade)
+                st.metric("Overall Grade", country_grade)
             with k3:
-                label = f"{ctry_cont} Avg Score (avg)" if ctry_cont else "Continent Avg Score (avg)"
+                label = f"{ctry_cont} Avgerage Score" if ctry_cont else "Continent Avgerage Score"
                 st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
 
         # Layout for charts: keep YoY line on the left (still useful), Map on right using averages
@@ -413,7 +413,7 @@ with tab_scoring:
                 st.info("No data for this selection.")
             else:
                 map_df = avg_scope.rename(columns={"avg_score": "score"})[["country", "score"]].copy()
-                map_title = "Global Performance Map — All Years (precomputed avg)"
+                map_title = "Global Performance Map — All Years"
                 fig_map = px.choropleth(map_df, locations="country", locationmode="country names",
                                         color="score", color_continuous_scale="Blues", title=map_title)
                 fig_map.update_coloraxes(showscale=True)
@@ -436,7 +436,7 @@ with tab_scoring:
             # Top 10 by average score
             if sel_country_sc == "All":
                 base = avg_scope[["country", "avg_score"]].rename(columns={"avg_score": "score"})
-                title_top = "Top 10 Performing Countries — All Years (precomputed avg)"
+                title_top = "Top 10 Performing Countries — All Years"
             else:
                 base = avg_scope[["country", "avg_score"]].rename(columns={"avg_score": "score"})
                 title_top = "Top 10 Performing Countries — (precomputed avg)"
@@ -466,7 +466,7 @@ with tab_scoring:
                 shades = [px.colors.sequential.Blues[-1-i] for i in range(5)]
                 cmap = {g:c for g, c in zip(grades, shades)}
                 fig_donut = px.pie(donut, names="grade", values="count", hole=0.55,
-                                   title="Grade Distribution — All Years (precomputed avg)",
+                                   title="Grade Distribution — All Years",
                                    color="grade", color_discrete_map=cmap)
                 fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
                 st.plotly_chart(fig_donut, use_container_width=True)
@@ -481,7 +481,7 @@ with tab_scoring:
             if cont_bar.empty:
                 st.info("No continent data for this selection.")
             else:
-                title_cont = "Continent Viability Score — All Years (precomputed avg)"
+                title_cont = "Continent Viability Score — All Years"
                 fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
                                   color="score", color_continuous_scale="Blues",
                                   labels={"score": "", "continent": ""}, title=title_cont)
@@ -508,7 +508,7 @@ with tab_scoring:
             with k2:
                 st.metric("Grade", country_grade)
             with k3:
-                label = f"{ctry_cont} Avg Score" if ctry_cont else "Continent Avg Score"
+                label = f"{ctry_cont} Avgerage Score" if ctry_cont else "Continent Avgerage Score"
                 st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
 
         t1, t2 = st.columns([1, 2], gap="large")
