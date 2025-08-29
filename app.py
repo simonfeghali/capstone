@@ -47,6 +47,22 @@ def _b64_img(path: Path) -> str:
     except Exception:
         return ""
 
+def _b64_png(path_or_url) -> str:
+    """Return base64 for a local file or an http(s) URL (PNG/JPG)."""
+    try:
+        s = str(path_or_url)
+        if s.startswith("http://") or s.startswith("https://"):
+            import urllib.request
+            with urllib.request.urlopen(s) as r:
+                data = r.read()
+        else:
+            from pathlib import Path
+            data = Path(path_or_url).read_bytes()
+        return base64.b64encode(data).decode("ascii")
+    except Exception:
+        return ""
+
+
 # Build header HTML with left icon, centered title, and right logo
 logo_b64 = _b64_img(ROOT / LOGO_FILE)
 icon_b64 = _b64_img(ROOT / ICON_FILE)
