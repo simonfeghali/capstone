@@ -290,8 +290,9 @@ def filt_wb_scoping(df: pd.DataFrame, year_any, cont, country):
 # ──────────────────────────────────────────────────────────────────────────────
 # Tabs
 # ──────────────────────────────────────────────────────────────────────────────
-tab_scoring, tab_eda, tab_sectors, tab_dest = st.tabs(["Scoring", "CAPEX", "Sectors", "Destinations"])
-
+tab_scoring, tab_eda, tab_sectors, tab_dest, tab_compare = st.tabs(
+    ["Scoring", "CAPEX", "Sectors", "Destinations", "Compare"]
+)
 # =============================================================================
 # SCORING TAB
 # =============================================================================
@@ -1128,3 +1129,5 @@ with tab_dest:
             fig_route = make_route_map(sel_src_country, sel_dest_country)
             fig_route.update_layout(title=f"Route Map — {sel_src_country} → {sel_dest_country}")
             st.plotly_chart(fig_route, use_container_width=True)
+with tab_compare:
+    render_compare_tab()
