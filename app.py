@@ -10,19 +10,6 @@ import re
 from urllib.parse import quote
 from urllib.error import URLError, HTTPError
 
-# ── Sectors constants (define near the top, after imports) ──
-SECTORS_CANON = [
-    "Software & IT services","Business services","Communications","Financial services",
-    "Transportation & Warehousing","Real estate","Consumer products","Food and Beverages",
-    "Automotive OEM","Automotive components","Chemicals","Pharmaceuticals",
-    "Metals","Coal, oil & gas","Space & defence","Leisure & entertainment",
-]
-
-SECTOR_COUNTRIES_10 = [
-    "United States","United Kingdom","Germany","France","China",
-    "Japan","South Korea","Canada","Netherlands","United Arab Emirates",
-]
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # App chrome / theme
@@ -932,6 +919,20 @@ with tab_eda:
 # =============================================================================
 # SECTORS TAB — UNCHANGED
 # =============================================================================
+
+# ── Sectors constants ──
+SECTORS_CANON = [
+    "Software & IT services","Business services","Communications","Financial services",
+    "Transportation & Warehousing","Real estate","Consumer products","Food and Beverages",
+    "Automotive OEM","Automotive components","Chemicals","Pharmaceuticals",
+    "Metals","Coal, oil & gas","Space & defence","Leisure & entertainment",
+]
+
+SECTOR_COUNTRIES_10 = [
+    "United States","United Kingdom","Germany","France","China",
+    "Japan","South Korea","Canada","Netherlands","United Arab Emirates",
+]
+
 def _canon_country(name: str) -> str:
     if not isinstance(name, str): return ""
     s = name.strip()
@@ -1025,7 +1026,7 @@ with tab_sectors:
 
     sc1, sc2 = st.columns([1, 2], gap="small")
     with sc1:
-        sector_opt = ["All"] + sector_opt = ["All"] + SECTORS_CANON
+        sector_opt = ["All"] + SECTORS_CANON
 
         sel_sector = st.selectbox("Sector", sector_opt, index=0, key="sector_sel")
     with sc2:
