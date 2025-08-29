@@ -384,7 +384,7 @@ tab_scoring, tab_eda, tab_sectors, tab_dest, tab_compare = st.tabs(["Scoring", "
 with tab_scoring:
     sel_year_sc, sel_cont_sc, sel_country_sc = scoring_filters_block(wb)
 
-    st.caption("Scoring • (World Bank–based)")
+    st.caption("Scoring 2021-2023 • (World Bank–based)")
     where_title = sel_country_sc if sel_country_sc != "All" else (sel_cont_sc if sel_cont_sc != "All" else "Worldwide")
     st.subheader(where_title)
 
@@ -468,7 +468,7 @@ with tab_scoring:
             b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
             with b1:
                 base = avg_scope[["country", "avg_score"]].rename(columns={"avg_score": "score"})
-                title_top = "Top 10 Performing Countries — (precomputed avg)"
+                title_top = "Top 10 Performing Countries"
                 top10 = base.dropna().sort_values("score", ascending=False).head(10)
                 if top10.empty:
                     st.info("No countries available for Top 10 with this filter.")
@@ -494,7 +494,7 @@ with tab_scoring:
                     shades = [px.colors.sequential.Blues[-1-i] for i in range(5)]
                     cmap = {g:c for g, c in zip(grades, shades)}
                     fig_donut = px.pie(donut, names="grade", values="count", hole=0.55,
-                                       title="Grade Distribution — All Years (precomputed avg)",
+                                       title="Grade Distribution — All Years",
                                        color="grade", color_discrete_map=cmap)
                     fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
                     st.plotly_chart(fig_donut, use_container_width=True)
@@ -508,7 +508,7 @@ with tab_scoring:
                 if cont_bar.empty:
                     st.info("No continent data for this selection.")
                 else:
-                    title_cont = "Continent Viability Score — All Years (precomputed avg)"
+                    title_cont = "Continent Viability Score — All Years"
                     fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
                                       color="score", color_continuous_scale="Blues",
                                       labels={"score": "", "continent": ""}, title=title_cont)
@@ -534,7 +534,7 @@ with tab_scoring:
             with k2:
                 st.metric("Grade", country_grade)
             with k3:
-                label = f"{ctry_cont} Avg Score" if ctry_cont else "Continent Avg Score"
+                label = f"{ctry_cont} Average Score" if ctry_cont else "Continent Average Score"
                 st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
 
         t1, t2 = st.columns([1, 2], gap="large")
@@ -649,7 +649,7 @@ SECTOR_COUNTRIES_10 = [
 with tab_eda:
     # (CAPEX tab code unchanged)
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
-    st.caption("CAPEX Analysis")
+    st.caption("CAPEX Analysis for 2021-24")
 
     def _kpi_block(title: str, value: float, unit: str = ""):
         st.markdown(
@@ -951,7 +951,7 @@ def load_sectors_raw() -> pd.DataFrame:
 sectors_df = load_sectors_raw()
 
 with tab_sectors:
-    st.caption("Sectors Analysis")
+    st.caption("Sectors Analysis for 2021-2024")
 
     sc1, sc2 = st.columns([1, 2], gap="small")
     with sc1:
@@ -1124,7 +1124,7 @@ def make_route_map(source_country: str, dest_country: str) -> go.Figure:
     return _style_geo_white(fig, height=360)
 
 with tab_dest:
-    st.caption("Destinations Analysis")
+    st.caption("Destinations Analysis for 2021-2024")
 
     dest_df = load_destinations_raw()
 
