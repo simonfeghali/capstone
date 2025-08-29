@@ -633,32 +633,23 @@ with tab_scoring:
                     st.plotly_chart(fig_cont, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB — UNCHANGED
+# CAPEX TAB — dedupe identical KPIs/graphs (keep the first only)
 # =============================================================================
-def _numify_generic(x):
-    if pd.isna(x): return np.nan
-    if isinstance(x, (int, float, np.integer, np.floating)): return float(x)
-    s = re.sub(r"[^\d\.\-]", "", str(x))
-    try: return float(s)
-    except Exception: return np.nan
-
-SECTORS_CANON = [
-    "Software & IT services","Business services","Communications","Financial services",
-    "Transportation & Warehousing","Real estate","Consumer products","Food and Beverages",
-    "Automotive OEM","Automotive components","Chemicals","Pharmaceuticals",
-    "Metals","Coal, oil & gas","Space & defence","Leisure & entertainment"
-]
-SECTOR_COUNTRIES_10 = [
-    "United States","United Kingdom","Germany","France","China",
-    "Japan","South Korea","Canada","Netherlands","United Arab Emirates"
-]
-
 with tab_eda:
-    # (CAPEX tab code unchanged)
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
-    st.caption("CAPEX Analysis for 2021-24")
+
+    st.caption("CAPEX Analysis")
+
+    # ---- De-dup helpers (CAPEX tab only) ----
+    shown_kpi_keys: set = set()
+    shown_series_keys: set = set()
 
     def _kpi_block(title: str, value: float, unit: str = ""):
+        """Show KPI unless the same displayed number has been shown before."""
+        key = ("KPI", round(float(value), 1))
+        if key in shown_kpi_keys:
+            return
+        shown_kpi_keys.add(key)
         st.markdown(
             f"""
             <div class="kpi-box">
@@ -669,6 +660,28 @@ with tab_eda:
             """,
             unsafe_allow_html=True,
         )
+
+    def _series_key(kind: str, x, y):
+        x_tuple = tuple([str(v) for v in x])
+        y_tuple = tuple([None if pd.isna(v) else round(float(v), 4) for v in y])
+        return (kind, x_tuple, y_tuple)
+
+    def _plotly_line_once(x_vals, y_vals, title, labels_x, labels_y, height=360, color=None):
+        """Render line chart once if the (x,y) series hasn't been shown."""
+        sig = _series_key("LINE", x_vals, y_vals)
+        if sig in shown_series_keys:
+            return
+        shown_series_keys.add(sig)
+        fig = px.line(
+            pd.DataFrame({"x": x_vals, "y": y_vals}),
+            x="x", y="y", markers=True, title=title,
+        )
+        if color:
+            fig.update_traces(line=dict(color=color))
+        fig.update_xaxes(title=labels_x, type="category", showgrid=False)
+        fig.update_yaxes(title=labels_y, showgrid=False)
+        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
+        st.plotly_chart(fig, use_container_width=True)
 
     def _bars_or_kpi(df: pd.DataFrame, value_col: str, name_col: str, title: str,
                      unit: str, height: int = 420, ascending_for_hbar: bool = False):
@@ -682,6 +695,12 @@ with tab_eda:
             _kpi_block(f"{title} — {label}", val, unit)
             return
         ordered = valid.sort_values(value_col, ascending=ascending_for_hbar)
+        sig = _series_key("BAR",
+                          ordered[name_col].astype(str).tolist(),
+                          ordered[value_col].astype(float).tolist())
+        if sig in shown_series_keys:
+            return
+        shown_series_keys.add(sig)
         fig = px.bar(
             ordered, x=value_col, y=name_col, orientation="h",
             color=value_col, color_continuous_scale="Blues",
@@ -691,6 +710,7 @@ with tab_eda:
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
 
+    # filters applied to CAPEX
     grade_options = ["All", "A+", "A", "B", "C", "D"]
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
@@ -713,6 +733,7 @@ with tab_eda:
 
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
+        # Main KPI or trend
         if isinstance(sel_year_any, int):
             total_capex = float(capx_eda["capex"].sum()) if not capx_eda.empty else 0.0
             where_bits = []
@@ -724,17 +745,11 @@ with tab_eda:
             trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
             if trend.empty: st.info("No CAPEX data for the selected filters.")
             else:
-                trend["year_str"] = trend["year"].astype(int).astype(str)
+                x_vals = trend["year"].astype(int).astype(str).tolist()
+                y_vals = trend["capex"].astype(float).tolist()
                 title = (f"{sel_country} CAPEX Trend" if sel_country != "All"
                          else "Global CAPEX Trend")
-                fig = px.line(trend, x="year_str", y="capex", markers=True,
-                              labels={"year_str": "", "capex": "Global CAPEX ($B)"},
-                              title=title)
-                fig.update_xaxes(type="category", categoryorder="array",
-                                 categoryarray=trend["year_str"].tolist(), showgrid=False)
-                fig.update_yaxes(showgrid=False)
-                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=360)
-                st.plotly_chart(fig, use_container_width=True)
+                _plotly_line_once(x_vals, y_vals, title, labels_x="", labels_y="Global CAPEX ($B)", height=360)
 
     with e2:
         if isinstance(sel_year_any, int):
@@ -759,6 +774,7 @@ with tab_eda:
                               paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig, use_container_width=True)
 
+    # Grade views
     show_grade_trend = (sel_grade_eda == "All")
     if show_grade_trend:
         b1, b2, b3 = st.columns([1.2, 1.2, 1.6], gap="large")
@@ -813,26 +829,58 @@ with tab_eda:
                         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                         st.plotly_chart(fig, use_container_width=True)
                 else:
+                    # Combined multi-line chart by grade (but skip if identical to the already-shown global trend)
                     tg = (capx_eda.assign(grade=capx_eda["grade"].astype(str))
                                    .groupby(["year", "grade"], as_index=False, observed=True)["capex"]
                                    .sum()
                                    .sort_values("year"))
-                    if tg.empty: st.info("No CAPEX data for grade trend.")
+                    if tg.empty:
+                        st.info("No CAPEX data for grade trend.")
                     else:
                         tg["year_str"] = tg["year"].astype(int).astype(str)
-                        blues = px.colors.sequential.Blues
-                        shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]
-                        grades = ["A+", "A", "B", "C", "D"]
-                        cmap = {g:c for g,c in zip(grades, shades)}
-                        fig = px.line(tg, x="year_str", y="capex", color="grade",
-                                      color_discrete_map=cmap,
-                                      labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
-                                      title="CAPEX Trend by Grade")
-                        fig.update_xaxes(type="category", categoryorder="array",
-                                         categoryarray=sorted(tg["year_str"].unique().tolist()), showgrid=False)
-                        fig.update_yaxes(showgrid=False)
-                        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                        st.plotly_chart(fig, use_container_width=True)
+
+                        grades_present = tg["grade"].dropna().unique().tolist()
+                        # If only one grade -> dedupe with the earlier trend series signature
+                        if len(grades_present) == 1:
+                            x_vals = tg["year_str"].tolist()
+                            y_vals = tg["capex"].astype(float).tolist()
+                            sig = _series_key("LINE", x_vals, y_vals)
+                            if sig in shown_series_keys:
+                                pass  # identical to the trend above → skip rendering
+                            else:
+                                fig_single = px.line(
+                                    tg, x="year_str", y="capex", color="grade",
+                                    labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
+                                    title="CAPEX Trend by Grade"
+                                )
+                                fig_single.update_xaxes(type="category",
+                                                        categoryorder="array",
+                                                        categoryarray=sorted(tg["year_str"].unique().tolist()),
+                                                        showgrid=False)
+                                fig_single.update_yaxes(showgrid=False)
+                                fig_single.update_layout(margin=dict(l=10, r=10, t=60, b=10),
+                                                         height=420, legend_title_text="Grade")
+                                st.plotly_chart(fig_single, use_container_width=True)
+                        else:
+                            blues = px.colors.sequential.Blues
+                            shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]
+                            grade_order = ["A+", "A", "B", "C", "D"]
+                            cmap = {g:c for g,c in zip(grade_order, shades)}
+                            fig = px.line(
+                                tg, x="year_str", y="capex", color="grade",
+                                color_discrete_map=cmap,
+                                category_orders={"grade": grade_order},
+                                labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
+                                title="CAPEX Trend by Grade"
+                            )
+                            fig.update_xaxes(type="category",
+                                             categoryorder="array",
+                                             categoryarray=sorted(tg["year_str"].unique().tolist()),
+                                             showgrid=False)
+                            fig.update_yaxes(showgrid=False)
+                            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10),
+                                              height=420, legend_title_text="Grade")
+                            st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("No CAPEX data for grade view.")
 
@@ -865,6 +913,7 @@ with tab_eda:
                         height=420,
                         ascending_for_hbar=True
                     )
+
 
 # =============================================================================
 # SECTORS TAB — UNCHANGED
