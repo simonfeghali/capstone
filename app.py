@@ -703,7 +703,7 @@ with tab_scoring:
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
 
-    st.caption("CAPEX Analysis")
+    st.caption("CAPEX Analysis for 2021-2024")
 
     # ---- De-dup helpers (CAPEX tab only) ----
     shown_kpi_keys: set = set()
