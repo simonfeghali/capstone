@@ -335,13 +335,19 @@ def scoring_filters_block(wb: pd.DataFrame):
         pool = pool[pool["continent"] == sel_cont_sc]
     country_opts_sc = ["All"] + sorted(pool["country"].dropna().unique().tolist())
 
+    # --- Keep/persist country selection safely
+    if "sc_country" not in st.session_state:
+        st.session_state["sc_country"] = "All"
+    elif st.session_state["sc_country"] not in country_opts_sc:
+        # only reset when the selected country is no longer a valid option
+        st.session_state["sc_country"] = "All"
+
     with c3:
         sel_country_sc = st.selectbox(
             "Country",
             country_opts_sc,
-            index=0,
-            key="sc_country",
-            on_change=_sync_continent_from_country,  # <-- update continent safely
+            key="sc_country",                 # no index -> uses session_state value
+            on_change=_sync_continent_from_country,
         )
 
     return sel_year_sc, st.session_state.get("sc_cont", sel_cont_sc), sel_country_sc
