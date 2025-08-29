@@ -37,11 +37,70 @@ st.markdown(
 # ──────────────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).parent
 
-def _b64_png(path: Path) -> str:
+# ── Header assets ─────────────────────────────────────────────────────────────
+LOGO_FILE = "oco_global_logo.jpeg"   
+ICON_FILE = "data-analytics.png"        
+
+def _b64_img(path: Path) -> str:
     try:
         return base64.b64encode(path.read_bytes()).decode("ascii")
     except Exception:
         return ""
+
+# Build header HTML with left icon, centered title, and right logo
+logo_b64 = _b64_img(ROOT / LOGO_FILE)
+icon_b64 = _b64_img(ROOT / ICON_FILE)
+
+st.markdown(
+    f"""
+    <style>
+      /* Make sure the title area never clips and scales nicely */
+      .app-page-title {{
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between; 
+        gap: 12px;
+        margin: 0.5rem 0 1rem 0;
+      }}
+      .app-page-title-left {{
+        display: flex; 
+        align-items: center; 
+        gap: 12px;
+        min-width: 0; /* prevents text clipping on narrow screens */
+      }}
+      .app-page-title-left h1 {{
+        font-size: 32px; 
+        line-height: 1.1; 
+        margin: 0; 
+        white-space: nowrap; 
+        overflow: hidden; 
+        text-overflow: ellipsis;  /* truncate if screen is tiny */
+      }}
+      .app-page-title img.icon {{
+        width: 42px; 
+        height: 42px;
+      }}
+      .app-page-title img.logo {{
+        height: 48px; 
+        width: auto;
+      }}
+      @media (max-width: 640px) {{
+        .app-page-title-left h1 {{ font-size: 24px; }}
+        .app-page-title img.icon {{ width: 32px; height: 32px; }}
+        .app-page-title img.logo {{ height: 36px; }}
+      }}
+    </style>
+    <div class="app-page-title">
+      <div class="app-page-title-left">
+        <img class="icon" src="data:image/png;base64,{icon_b64}" alt="icon" />
+        <h1>FDI Analytics Dashboard</h1>
+      </div>
+      <img class="logo" src="data:image/jpeg;base64,{logo_b64}" alt="logo" />
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 def inject_tab_icons():
     icons_in_order = [
