@@ -14,8 +14,7 @@ from urllib.error import URLError, HTTPError
 # ──────────────────────────────────────────────────────────────────────────────
 # App chrome / theme
 # ──────────────────────────────────────────────────────────────────────────────
-st.set_page_config(page_title="FDI Analytics", layout="wide")
-st.title("FDI Analytics Dashboard")
+st.set_page_config(layout="wide")
 
 st.markdown(
     """
