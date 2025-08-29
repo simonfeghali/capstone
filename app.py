@@ -66,55 +66,34 @@ def _b64_png(path_or_url) -> str:
 logo_b64 = _b64_img(ROOT / LOGO_FILE)
 icon_b64 = _b64_img(ROOT / ICON_FILE)
 
-st.markdown(
-    f"""
-    <style>
-      /* Make sure the title area never clips and scales nicely */
-      .app-page-title {{
-        display: flex; 
-        align-items: center; 
-        justify-content: space-between; 
-        gap: 12px;
-        margin: 0.5rem 0 1rem 0;
-      }}
-      .app-page-title-left {{
-        display: flex; 
-        align-items: center; 
-        gap: 12px;
-        min-width: 0; /* prevents text clipping on narrow screens */
-      }}
-      .app-page-title-left h1 {{
-        font-size: 32px; 
-        line-height: 1.1; 
-        margin: 0; 
-        white-space: nowrap; 
-        overflow: hidden; 
-        text-overflow: ellipsis;  /* truncate if screen is tiny */
-      }}
-      .app-page-title img.icon {{
-        width: 42px; 
-        height: 42px;
-      }}
-      .app-page-title img.logo {{
-        height: 48px; 
-        width: auto;
-      }}
-      @media (max-width: 640px) {{
-        .app-page-title-left h1 {{ font-size: 24px; }}
-        .app-page-title img.icon {{ width: 32px; height: 32px; }}
-        .app-page-title img.logo {{ height: 36px; }}
-      }}
-    </style>
-    <div class="app-page-title">
-      <div class="app-page-title-left">
-        <img class="icon" src="data:image/png;base64,{icon_b64}" alt="icon" />
-        <h1>Country Viability and FDI Analytics Dashboard</h1>
-      </div>
-      <img class="logo" src="data:image/jpeg;base64,{logo_b64}" alt="logo" />
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+st.markdown(f"""
+<style>
+.header-row {{
+  display:flex; align-items:center; justify-content:space-between;
+  margin: 20px 0 24px 0;   /* increase top/bottom margin → pushes title lower */
+}}
+.header-left {{
+  display:flex; align-items:center; gap:14px;
+}}
+.header-title {{
+  font-size: 42px; font-weight: 800; line-height:1.2; margin:0;
+}}
+.header-icon {{
+  width: 42px; height: 42px;
+}}
+.header-logo {{
+  height: 60px;   /* was ~36–48px, now bigger */
+  width: auto;
+}}
+</style>
+<div class="header-row">
+  <div class="header-left">
+    <img class="header-icon" src="data:image/png;base64,{icon_b64}" />
+    <div class="header-title">Country Viability & FDI Analytics Dashboard</div>
+  </div>
+  <img class="header-logo" src="data:image/jpeg;base64,{logo_b64}" />
+</div>
+""", unsafe_allow_html=True)
 
 
 def inject_tab_icons():
