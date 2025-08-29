@@ -1229,4 +1229,6 @@ with tab_dest:
             fig_route = make_route_map(sel_src_country, sel_dest_country)
             fig_route.update_layout(title=f"Route Map — {sel_src_country} → {sel_dest_country}")
             st.plotly_chart(fig_route, use_container_width=True)
-render_compare_tab()
+with tab_compare:
+    render_compare_tab()
+
