@@ -319,14 +319,15 @@ def scoring_filters_block(wb: pd.DataFrame):
     cont_opts_sc = ["All"] + sorted(cont_pool.dropna().unique().tolist())
     st.session_state["_sc_cont_opts"] = cont_opts_sc  # used by the callback
 
+    if "sc_cont" not in st.session_state or st.session_state["sc_cont"] not in cont_opts_sc:
+        st.session_state["sc_cont"] = "All"
+
     # tentative continent (will auto-correct after country selection below if needed)
     with c2:
         current_cont = st.session_state.get("sc_cont", "All")
         if current_cont not in cont_opts_sc:
             current_cont = "All"
-        sel_cont_sc = st.selectbox("Continent", cont_opts_sc,
-                                   index=cont_opts_sc.index(current_cont),
-                                   key="sc_cont")
+        sel_cont_sc = st.selectbox("Continent", cont_opts_sc, key="sc_cont")
 
     # Country options depend on selected continent (or all)
     pool = wb if sel_year_sc == "All" else wb[wb["year"] == int(sel_year_sc)]
