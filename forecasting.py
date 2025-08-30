@@ -120,7 +120,7 @@ def _load_combined_panel() -> pd.DataFrame:
         ind = ind.rename(columns={ctry_i:"country", year_i:"year"})
         ind["country"] = ind["country"].astype(str).str.strip()
         ind["year"] = pd.to_numeric(ind["year"], errors="coerce").astype("Int64")
-    except Exception as e:
+    except Exception:
         # if indicators missing, just return capex
         return cap_long
 
@@ -137,7 +137,14 @@ EXOG_DEFAULT = [
 ]
 
 def _prep_country(df_all: pd.DataFrame, country: str):
-    """Return series endog (log CAPEX), train/test split, standardized exog, and future exog."""
+    """
+    Return dict with:
+      - full_endog_log, capex_actual
+      - train_endog, test_endog
+      - train_exog, test_exog, full_exog, future_exog   (all standardized with train stats)
+      - future_index
+      - exog_cols
+    """
     d = df_all[df_all["country"] == country].copy()
     d = d.dropna(subset=["year"]).sort_values("year")
     # endog
@@ -147,13 +154,12 @@ def _prep_country(df_all: pd.DataFrame, country: str):
     if d.shape[0] < 6:
         raise ValueError("Not enough datapoints (need ≥ 6 after cleaning).")
 
-    # try to find exog columns; use defaults if available, else use all numeric leftovers (excluding capex)
+    # try to find exog columns; use defaults if available, else any numeric leftovers (excluding capex)
     exog_cols = []
     for col in EXOG_DEFAULT:
         hit = _find_col(d.columns, col)
         if hit: exog_cols.append(hit)
     if not exog_cols:
-        # fallback: any numeric, excluding capex/year
         candidates = [c for c in d.columns if c not in {"country","year","capex"}]
         numers = []
         for c in candidates:
@@ -163,45 +169,51 @@ def _prep_country(df_all: pd.DataFrame, country: str):
                 numers.append(c)
         exog_cols = numers
 
-    # align index by year (int)
     d["year"] = d["year"].astype(int)
     d = d.set_index("year")
-    endog_log = np.log(d["capex"])
+    endog_log = np.log(d["capex"]).sort_index()
 
-    exog = None
+    exog_raw = None
     if exog_cols:
-        exog = d[exog_cols].apply(pd.to_numeric, errors="coerce")
-        # simple forward/backward fill for internal gaps
-        exog = exog.sort_index().interpolate(limit_direction="both")
+        exog_raw = d[exog_cols].apply(pd.to_numeric, errors="coerce").sort_index()
+        exog_raw = exog_raw.interpolate(limit_direction="both")
 
     # split: last 4 years test (min 2)
     split_years = min(4, max(2, int(np.ceil(0.15 * len(endog_log)))))
     train_endog, test_endog = endog_log.iloc[:-split_years], endog_log.iloc[-split_years:]
-    if exog is not None and not exog.empty:
-        train_exog, test_exog = exog.loc[train_endog.index], exog.loc[test_endog.index]
+
+    if exog_raw is not None and not exog_raw.empty:
+        train_exog_raw, test_exog_raw = exog_raw.loc[train_endog.index], exog_raw.loc[test_endog.index]
+
         # standardize using train stats ONLY
-        mean = train_exog.mean()
-        std = train_exog.std(ddof=0).replace(0, np.nan)
-        train_exog_std = (train_exog - mean) / std
-        test_exog_std  = (test_exog  - mean) / std
-        # future exog: repeat last observed exog row
-        last_row = exog.loc[[exog.index.max()]]
+        mean = train_exog_raw.mean()
+        std = train_exog_raw.std(ddof=0).replace(0, np.nan)
+
+        train_exog_std = (train_exog_raw - mean) / std
+        test_exog_std  = (test_exog_raw  - mean) / std
+
+        # FULL standardized exog for refit on full series
+        full_exog_std  = (exog_raw - mean) / std
+
+        # future exog: repeat last observed exog row (standardize with same train stats)
         future_years = 3
         future_index = pd.Index([int(d.index.max()) + i for i in range(1, future_years + 1)], name="year")
+        last_row = exog_raw.loc[[exog_raw.index.max()]]
         future_exog_raw = pd.DataFrame(np.repeat(last_row.values, repeats=future_years, axis=0),
                                        columns=exog_cols, index=future_index)
         future_exog_std = (future_exog_raw - mean) / std
     else:
-        train_exog_std = test_exog_std = future_exog_std = None
+        train_exog_std = test_exog_std = full_exog_std = future_exog_std = None
         future_index = pd.Index([int(d.index.max()) + i for i in range(1, 3 + 1)], name="year")
 
     return {
         "full_endog_log": endog_log,
+        "capex_actual": d["capex"],
         "train_endog": train_endog, "test_endog": test_endog,
         "train_exog": train_exog_std, "test_exog": test_exog_std,
+        "full_exog": full_exog_std,
         "future_index": future_index, "future_exog": future_exog_std,
         "exog_cols": exog_cols,
-        "capex_actual": d["capex"],
     }
 
 def _fit_eval_arima(train_y, test_y):
@@ -210,8 +222,7 @@ def _fit_eval_arima(train_y, test_y):
         for d in range(0, 3):
             for q in range(0, 3):
                 try:
-                    model = ARIMA(train_y, order=(p,d,q))
-                    res = model.fit()
+                    res = ARIMA(train_y, order=(p,d,q)).fit()
                     pred_log = res.forecast(steps=len(test_y))
                     rmse = _rmse(np.exp(test_y.values), np.exp(pred_log.values))
                     if rmse < best["rmse"]:
@@ -228,8 +239,7 @@ def _fit_eval_arimax(train_y, test_y, train_x, test_x):
         for d in range(0, 3):
             for q in range(0, 3):
                 try:
-                    model = ARIMA(train_y, exog=train_x, order=(p,d,q))
-                    res = model.fit()
+                    res = ARIMA(train_y, exog=train_x, order=(p,d,q)).fit()
                     pred_log = res.forecast(steps=len(test_y), exog=test_x)
                     rmse = _rmse(np.exp(test_y.values), np.exp(pred_log.values))
                     if rmse < best["rmse"]:
@@ -247,8 +257,8 @@ def _fit_eval_sarima(train_y, test_y):
                     for D in range(0, 2):
                         for Q in range(0, 2):
                             try:
-                                model = SARIMAX(train_y, order=(p,d,q), seasonal_order=(P,D,Q,1), enforce_stationarity=False, enforce_invertibility=False)
-                                res = model.fit(disp=False)
+                                res = SARIMAX(train_y, order=(p,d,q), seasonal_order=(P,D,Q,1),
+                                              enforce_stationarity=False, enforce_invertibility=False).fit(disp=False)
                                 pred_log = res.forecast(steps=len(test_y))
                                 rmse = _rmse(np.exp(test_y.values), np.exp(pred_log.values))
                                 if rmse < best["rmse"]:
@@ -268,9 +278,8 @@ def _fit_eval_sarimax(train_y, test_y, train_x, test_x):
                     for D in range(0, 2):
                         for Q in range(0, 2):
                             try:
-                                model = SARIMAX(train_y, exog=train_x, order=(p,d,q), seasonal_order=(P,D,Q,1),
-                                                enforce_stationarity=False, enforce_invertibility=False)
-                                res = model.fit(disp=False)
+                                res = SARIMAX(train_y, exog=train_x, order=(p,d,q), seasonal_order=(P,D,Q,1),
+                                              enforce_stationarity=False, enforce_invertibility=False).fit(disp=False)
                                 pred_log = res.forecast(steps=len(test_y), exog=test_x)
                                 rmse = _rmse(np.exp(test_y.values), np.exp(pred_log.values))
                                 if rmse < best["rmse"]:
@@ -279,12 +288,20 @@ def _fit_eval_sarimax(train_y, test_y, train_x, test_x):
                                 continue
     return best
 
-def _refit_and_forecast_full(best_model: dict, full_endog_log: pd.Series, exog_full: pd.DataFrame, future_index: pd.Index, future_exog: pd.DataFrame):
+def _refit_and_forecast_full(best_model: dict, full_endog_log: pd.Series,
+                             exog_full: pd.DataFrame, future_index: pd.Index,
+                             future_exog: pd.DataFrame):
+    """
+    Refit best model on full series and forecast +3 years.
+    exog_full is the FULL standardized exog aligned on the original index.
+    """
     name = best_model["name"]
-    if name in ("ARIMAX","SARIMAX"):
-        exog_full_std = exog_full.loc[full_endog_log.index] if exog_full is not None else None
-    else:
-        exog_full_std = None
+    exog_full_std = None
+    if name in ("ARIMAX", "SARIMAX"):
+        if exog_full is None or exog_full.empty:
+            raise ValueError(f"{name} requires exogenous features but none were prepared.")
+        # Align exog to endog index
+        exog_full_std = exog_full.reindex(full_endog_log.index)
 
     if name == "ARIMA":
         final = ARIMA(full_endog_log, order=best_model["order"]).fit()
@@ -383,10 +400,9 @@ def render_forecasting_tab():
         test_pred_log = best["fit"].forecast(steps=len(test_y), exog=test_x)
     test_pred = np.exp(test_pred_log.values)
 
-    # Refit on full data & 3-year forecast
+    # Refit on full data & 3-year forecast (use FULL exog here)
     fitted, future_pred = _refit_and_forecast_full(
-        best, prep["full_endog_log"], prep["train_exog"] if prep["train_exog"] is not None else None,
-        prep["future_index"], prep["future_exog"]
+        best, prep["full_endog_log"], prep["full_exog"], prep["future_index"], prep["future_exog"]
     )
 
     fig = _plot_result(
