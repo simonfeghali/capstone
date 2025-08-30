@@ -162,7 +162,7 @@ def _plot_best(country: str, result: dict):
         mode="lines", name="Actual CAPEX", line=dict(color="blue")
     ))
     # Fitted (train)
-    fig.add_trace(go.Scatte r(
+    fig.add_trace(go.Scatter(
         x=result["fitted_index"], y=result["fitted_values"],
         mode="lines", name="Fitted", line=dict(color="green")
     ))
