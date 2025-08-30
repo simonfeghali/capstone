@@ -37,8 +37,8 @@ st.markdown(
 ROOT = Path(__file__).parent
 
 # ── Header assets ─────────────────────────────────────────────────────────────
-LOGO_FILE = "oco_global_logo.jpeg"   
-ICON_FILE = "data-analytics.png"        
+LOGO_FILE = "oco_global_logo.jpeg"
+ICON_FILE = "data-analytics.png"
 
 def _b64_img(path: Path) -> str:
     try:
@@ -60,7 +60,6 @@ def _b64_png(path_or_url) -> str:
         return base64.b64encode(data).decode("ascii")
     except Exception:
         return ""
-
 
 # Build header HTML with left icon, centered title, and right logo
 logo_b64 = _b64_img(ROOT / LOGO_FILE)
@@ -95,14 +94,13 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-
 def inject_tab_icons():
     icons_in_order = [
         ROOT / "score.png",         # Scoring
         ROOT / "capex.png",         # CAPEX
         ROOT / "sectors.png",       # Sectors
         ROOT / "destinations.png",  # Destinations
-        ROOT / "compare.png",  # Destinations
+        ROOT / "compare.png",       # Compare
     ]
     css_blocks = []
     for i, icon_path in enumerate(icons_in_order, start=1):
@@ -351,7 +349,7 @@ def render_filters_block(prefix: str):
         return out, yy
 
     return sel_year_any, sel_cont, sel_country, filt_wb_single_year
-    
+
 def _sync_continent_from_country():
     """Update continent to match the selected country (if possible)."""
     country = st.session_state.get("sc_country", "All")
@@ -749,6 +747,28 @@ with tab_eda:
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # NEW: Contextual KPI title mapper for single-row “Top Countries …” results
+    # ──────────────────────────────────────────────────────────────────────────
+    def _pretty_kpi_title(orig_title: str, label: str) -> str:
+        t = str(orig_title).strip()
+
+        # Growth titles
+        m = re.search(r"Top Countries by CAPEX Growth(.*)", t, flags=re.IGNORECASE)
+        if m:
+            tail = m.group(1).strip()  # e.g. " (All Grades) [2021 → 2024]"
+            tail = tail.lstrip("—").strip()
+            return f"{label} — CAPEX Growth{(' ' + tail) if tail else ''}"
+
+        # Level titles (total CAPEX)
+        m = re.search(r"Top Countries by CAPEX\s*—\s*(.*)", t, flags=re.IGNORECASE)
+        if m:
+            tail = m.group(1).strip()  # e.g. "All Years (aggregated)" or "2024"
+            return f"{label} — Total CAPEX — {tail}" if tail else f"{label} — Total CAPEX"
+
+        # Fallback
+        return f"{label} — {t}"
+
     def _bars_or_kpi(df: pd.DataFrame, value_col: str, name_col: str, title: str,
                      unit: str, height: int = 420, ascending_for_hbar: bool = False):
         valid = df[df[value_col].notna()].copy()
@@ -758,7 +778,9 @@ with tab_eda:
         if valid.shape[0] == 1:
             label = str(valid[name_col].iloc[0])
             val = float(valid[value_col].iloc[0])
-            _kpi_block(f"{title} — {label}", val, unit)
+            # Use contextual KPI title instead of "Top Countries ..."
+            kpi_title = _pretty_kpi_title(title, label)
+            _kpi_block(kpi_title, val, unit)
             return
         ordered = valid.sort_values(value_col, ascending=ascending_for_hbar)
         sig = _series_key("BAR",
@@ -878,7 +900,7 @@ with tab_eda:
                           .assign(grade=lambda d: d["grade"].astype(str))
                           .groupby("grade", as_index=False)["capex"].sum())
 
-                    # ── CHANGE: order bars by CAPEX high→low (top→bottom)
+                    # order bars by CAPEX high→low (top→bottom)
                     gb_sorted = gb.sort_values("capex", ascending=True)
 
                     nonzero = gb_sorted.loc[gb_sorted["capex"].fillna(0) != 0, ["grade", "capex"]]
@@ -894,12 +916,10 @@ with tab_eda:
                                      title=f"CAPEX by Grade — {sel_year_any}",
                                      color="capex", color_continuous_scale="Blues")
                         fig.update_coloraxes(showscale=False)
-                        # ensure top→bottom follows our sorted order
                         fig.update_yaxes(categoryorder="array", categoryarray=gb_sorted["grade"].tolist())
                         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                         st.plotly_chart(fig, use_container_width=True)
                 else:
-                    # Combined multi-line chart by grade (but skip if identical to the already-shown global trend)
                     tg = (capx_eda.assign(grade=capx_eda["grade"].astype(str))
                                    .groupby(["year", "grade"], as_index=False, observed=True)["capex"]
                                    .sum()
@@ -910,13 +930,12 @@ with tab_eda:
                         tg["year_str"] = tg["year"].astype(int).astype(str)
 
                         grades_present = tg["grade"].dropna().unique().tolist()
-                        # If only one grade -> dedupe with the earlier trend series signature
                         if len(grades_present) == 1:
                             x_vals = tg["year_str"].tolist()
                             y_vals = tg["capex"].astype(float).tolist()
                             sig = _series_key("LINE", x_vals, y_vals)
                             if sig in shown_series_keys:
-                                pass  # identical to the trend above → skip rendering
+                                pass
                             else:
                                 fig_single = px.line(
                                     tg, x="year_str", y="capex", color="grade",
@@ -983,7 +1002,6 @@ with tab_eda:
                         height=420,
                         ascending_for_hbar=True
                     )
-
 
 # =============================================================================
 # SECTORS TAB — UNCHANGED
@@ -1369,7 +1387,9 @@ with tab_dest:
             fig_route = make_route_map(sel_src_country, sel_dest_country)
             fig_route.update_layout(title=f"Route Map — {sel_src_country} → {sel_dest_country}")
             st.plotly_chart(fig_route, use_container_width=True)
+
 with tab_compare:
     render_compare_tab()
+
 with tab_forecast:
     render_forecasting_tab()
