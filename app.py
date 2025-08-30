@@ -547,7 +547,7 @@ with tab_scoring:
                 else:
                     fig_top = px.bar(top10.sort_values("score"), x="score", y="country", orientation="h",
                                      color="score", color_continuous_scale="Blues",
-                                     labels={"score": "", "country": ""}, title=title_top)
+                                     labels={"score": "", "country": ""}, title=title_top.replace("Top 10", f"Top {min(10, len(top10))}"))
                     fig_top.update_coloraxes(showscale=False)
                     fig_top.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                     st.plotly_chart(fig_top, use_container_width=True)
@@ -660,7 +660,7 @@ with tab_scoring:
                 else:
                     fig_top = px.bar(top10.sort_values("score"), x="score", y="country", orientation="h",
                                      color="score", color_continuous_scale="Blues",
-                                     labels={"score": "", "country": ""}, title=title_top)
+                                     labels={"score": "", "country": ""}, title=title_top.replace("Top 10", f"Top {min(10, len(top10))}"))
                     fig_top.update_coloraxes(showscale=False)
                     fig_top.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                     st.plotly_chart(fig_top, use_container_width=True)
@@ -698,7 +698,7 @@ with tab_scoring:
                     st.plotly_chart(fig_cont, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB — dedupe identical KPIs/graphs (keep the first only)
+# CAPEX TAB — dedupe identical KPIs/graphs (keep the first only) + dynamic titles
 # =============================================================================
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
@@ -711,7 +711,7 @@ with tab_eda:
 
     def _kpi_block(title: str, value: float, unit: str = ""):
         """Show KPI unless the same displayed number has been shown before."""
-        key = ("KPI", round(float(value), 1))
+        key = ("KPI", round(float(value), 1), title)
         if key in shown_kpi_keys:
             return
         shown_kpi_keys.add(key)
@@ -749,27 +749,42 @@ with tab_eda:
         st.plotly_chart(fig, use_container_width=True)
 
     def _bars_or_kpi(df: pd.DataFrame, value_col: str, name_col: str, title: str,
-                     unit: str, height: int = 420, ascending_for_hbar: bool = False):
+                     unit: str, height: int = 420, ascending_for_hbar: bool = False,
+                     kpi_title_fmt: str | None = None):
+        """
+        If multiple rows -> bar chart with 'Top N' title.
+        If a single row    -> KPI with a clean title (from kpi_title_fmt).
+        """
         valid = df[df[value_col].notna()].copy()
         if valid.empty:
             st.info("No data for this selection.")
             return
+
+        # Single item → KPI with explicit title (no "Top 10" wording)
         if valid.shape[0] == 1:
             label = str(valid[name_col].iloc[0])
             val = float(valid[value_col].iloc[0])
-            _kpi_block(f"{title} — {label}", val, unit)
+            ktitle = (kpi_title_fmt.format(label=label) if kpi_title_fmt
+                      else f"{title} — {label}")
+            _kpi_block(ktitle, val, unit)
             return
+
+        # Multiple items → horizontal bar; make “Top 10” → “Top N”
+        n_items = int(valid.shape[0])
+        title_adj = re.sub(r"Top\s+10", f"Top {min(10, n_items)}", title)
         ordered = valid.sort_values(value_col, ascending=ascending_for_hbar)
+
         sig = _series_key("BAR",
                           ordered[name_col].astype(str).tolist(),
                           ordered[value_col].astype(float).tolist())
         if sig in shown_series_keys:
             return
         shown_series_keys.add(sig)
+
         fig = px.bar(
             ordered, x=value_col, y=name_col, orientation="h",
             color=value_col, color_continuous_scale="Blues",
-            labels={value_col: "", name_col: ""}, title=title
+            labels={value_col: "", name_col: ""}, title=title_adj
         )
         fig.update_coloraxes(showscale=False)
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
@@ -848,10 +863,13 @@ with tab_eda:
 
     with b1:
         if isinstance(sel_year_any, int):
-            level_df = capx_eda.copy(); title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
+            level_df = capx_eda.copy()
+            title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
+            kpi_fmt = f"CAPEX — {{label}} — {sel_year_any}"
         else:
             level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
             title_top10 = "Top 10 Countries by CAPEX — All Years (aggregated)"
+            kpi_fmt = "CAPEX — {label} — All Years (aggregated)"
         top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
         if top10.empty:
             st.info("No CAPEX data for Top 10 with this filter.")
@@ -863,7 +881,8 @@ with tab_eda:
                 title=title_top10,
                 unit="$B",
                 height=420,
-                ascending_for_hbar=True
+                ascending_for_hbar=True,
+                kpi_title_fmt=kpi_fmt
             )
 
     if show_grade_trend:
@@ -976,7 +995,8 @@ with tab_eda:
                         title=f"Top 10 Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]",
                         unit="$B",
                         height=420,
-                        ascending_for_hbar=True
+                        ascending_for_hbar=True,
+                        kpi_title_fmt=f"CAPEX Growth {label_grade} [{first_year} → {last_year}] — "+"{label}"
                     )
 
 
@@ -1364,6 +1384,6 @@ with tab_dest:
             fig_route = make_route_map(sel_src_country, sel_dest_country)
             fig_route.update_layout(title=f"Route Map — {sel_src_country} → {sel_dest_country}")
             st.plotly_chart(fig_route, use_container_width=True)
+
 with tab_compare:
     render_compare_tab()
-
