@@ -878,7 +878,7 @@ with tab_eda:
                           .groupby("grade", as_index=False)["capex"].sum())
 
                     # ── CHANGE: order bars by CAPEX high→low (top→bottom)
-                    gb_sorted = gb.sort_values("capex", ascending=False)
+                    gb_sorted = gb.sort_values("capex", ascending=True)
 
                     nonzero = gb_sorted.loc[gb_sorted["capex"].fillna(0) != 0, ["grade", "capex"]]
                     if nonzero.shape[0] <= 1:
