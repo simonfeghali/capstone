@@ -1134,7 +1134,7 @@ with tab_sectors:
     if sel_sector == "All":
         bars = cdf[["sector", value_col]].copy()
         bars = bars.set_index("sector").reindex(SECTORS_CANON, fill_value=0).reset_index()
-        bars = bars.sort_values(value_col, ascending=False)
+        bars = bars.sort_values(value_col, ascending=True)
         title = f"{metric} by Sector — {sel_sector_country}"
         if bars[value_col].sum() == 0:
             st.info("No data for this selection.")
