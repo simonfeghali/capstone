@@ -10,3 +10,6 @@ xlrd
 
 # (Optional but harmless) HTTP utilities used indirectly by pandas/plotly
 requests
+
+# Forecasting models
+statsmodels
