@@ -2,7 +2,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Forecasting tab: ARIMA, ARIMAX, SARIMA, SARIMAX with compact grid search.
 # Picks the model with the lowest RMSE (on original CAPEX scale) for each country.
-# Uses Plotly for charts; no sklearn/matplotlib needed.
+# Adds a Year filter (All, 2026, 2027, 2028). Uses Plotly for charts.
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -196,7 +196,7 @@ def _prep_country(df_all: pd.DataFrame, country: str):
         full_exog_std  = (exog_raw - mean) / std
 
         # future exog: repeat last observed exog row (standardize with same train stats)
-        future_years = 5
+        future_years = 5  # extend horizon to include up to 2028
         future_index = pd.Index([int(d.index.max()) + i for i in range(1, future_years + 1)], name="year")
         last_row = exog_raw.loc[[exog_raw.index.max()]]
         future_exog_raw = pd.DataFrame(np.repeat(last_row.values, repeats=future_years, axis=0),
@@ -204,7 +204,8 @@ def _prep_country(df_all: pd.DataFrame, country: str):
         future_exog_std = (future_exog_raw - mean) / std
     else:
         train_exog_std = test_exog_std = full_exog_std = future_exog_std = None
-        future_index = pd.Index([int(d.index.max()) + i for i in range(1, 3 + 1)], name="year")
+        future_years = 5
+        future_index = pd.Index([int(d.index.max()) + i for i in range(1, future_years + 1)], name="year")
 
     return {
         "full_endog_log": endog_log,
@@ -292,7 +293,7 @@ def _refit_and_forecast_full(best_model: dict, full_endog_log: pd.Series,
                              exog_full: pd.DataFrame, future_index: pd.Index,
                              future_exog: pd.DataFrame):
     """
-    Refit best model on full series and forecast +3 years.
+    Refit best model on full series and forecast future years.
     exog_full is the FULL standardized exog aligned on the original index.
     """
     name = best_model["name"]
@@ -344,7 +345,7 @@ def _plot_result(country: str, actual: pd.Series, fitted: pd.Series,
     # Forecast
     if len(future_idx) > 0:
         fig.add_trace(go.Scatter(x=future_idx, y=future_pred,
-                                 mode="lines", name="Future Forecast (3 yrs)",
+                                 mode="lines", name="Future Forecast",
                                  line=dict(color="orange", dash="dash")))
 
     extra = f" | order {order}" if order is not None else ""
@@ -368,7 +369,7 @@ def render_forecasting_tab():
         return
 
     countries = sorted(panel["country"].dropna().unique().tolist())
-    c1, _ = st.columns([1.4, 2], gap="small")
+    c1, c2 = st.columns([1.4, 1.2], gap="small")
     with c1:
         sel_country = st.selectbox("Country", countries, index=0, key="forecast_country")
 
@@ -400,25 +401,53 @@ def render_forecasting_tab():
         test_pred_log = best["fit"].forecast(steps=len(test_y), exog=test_x)
     test_pred = np.exp(test_pred_log.values)
 
-    # Refit on full data & 3-year forecast (use FULL exog here)
+    # Refit on full data & 5-year forecast (to reach up to 2028)
     fitted, future_pred = _refit_and_forecast_full(
         best, prep["full_endog_log"], prep["full_exog"], prep["future_index"], prep["future_exog"]
     )
 
-    fig = _plot_result(
-        sel_country,
-        actual=prep["capex_actual"],
-        fitted=fitted,
-        test_idx=test_y.index,
-        test_pred=test_pred,
-        future_idx=prep["future_index"],
-        future_pred=future_pred,
-        best_name=best_name,
-        rmse=best["rmse"],
-        order=best.get("order"),
-        seasonal=best.get("seasonal")
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    # -------- Year filter (All, 2026, 2027, 2028) --------
+    # Only show years present in the computed future_index
+    available_future_years = [int(y) for y in prep["future_index"].tolist()]
+    pickable_years = [y for y in (2026, 2027, 2028) if y in available_future_years]
+    with c2:
+        year_opts = ["All"] + pickable_years
+        sel_year = st.selectbox("Forecast Year", year_opts, index=0, key="forecast_year")
+
+    if sel_year == "All":
+        # Show full chart
+        fig = _plot_result(
+            sel_country,
+            actual=prep["capex_actual"],
+            fitted=fitted,
+            test_idx=test_y.index,
+            test_pred=test_pred,
+            future_idx=prep["future_index"],
+            future_pred=future_pred,
+            best_name=best_name,
+            rmse=best["rmse"],
+            order=best.get("order"),
+            seasonal=best.get("seasonal")
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    else:
+        # Show KPI for that selected year
+        try:
+            idx = available_future_years.index(int(sel_year))
+            val = float(future_pred[idx]) if idx < len(future_pred) else np.nan
+            st.markdown(
+                f"""
+                <div class="kpi-box">
+                  <div class="kpi-title">Forecasted CAPEX — {sel_year}</div>
+                  <div class="kpi-number">{val:,.1f}</div>
+                  <div class="kpi-sub">$B</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        except ValueError:
+            st.info(f"No forecast value available for {sel_year}. Choose 'All' to view the full chart.")
 
     # small summary
     left, right = st.columns(2)
@@ -430,4 +459,5 @@ def render_forecasting_tab():
             st.markdown(f"**Seasonal:** `{best['seasonal']}`")
     with right:
         st.markdown(f"**RMSE (test):** `{best['rmse']:.2f}`")
-        st.markdown(f"**Forecast horizon:** `{int(prep['future_index'][0])}–{int(prep['future_index'][-1])}`")
+        if len(prep["future_index"]) > 0:
+            st.markdown(f"**Forecast horizon:** `{int(prep['future_index'][0])}–{int(prep['future_index'][-1])}`")
