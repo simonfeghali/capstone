@@ -3,6 +3,7 @@
 # Forecasting tab: ARIMA, ARIMAX, SARIMA, SARIMAX with compact grid search.
 # Picks the model with the lowest RMSE (on original CAPEX scale) for each country.
 # Adds a Year filter (All, 2026, 2027, 2028). Uses Plotly for charts.
+# When "All" is selected: show ONLY Actual CAPEX + Future Forecast (no fitted/test).
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -419,37 +420,35 @@ def render_forecasting_tab():
         sel_year = st.selectbox("Forecast Year", year_opts, index=0, key="forecast_year")
 
     if sel_year == "All":
-    # Show chart with only Actual + Future Forecast
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=prep["capex_actual"].index, 
-        y=prep["capex_actual"].values,
-        mode="lines",
-        name="Actual CAPEX",
-        line=dict(color="blue")
-    ))
-    fig.add_trace(go.Scatter(
-        x=prep["future_index"], 
-        y=future_pred.values,
-        mode="lines",
-        name="Future Forecast",
-        line=dict(color="orange", dash="dash")
-    ))
-    fig.update_layout(
-        title=f"{best_name} Forecast for {sel_country} | RMSE: {best['rmse']:.2f}",
-        xaxis_title="", yaxis_title="CAPEX ($B)",
-        margin=dict(l=10, r=10, t=60, b=10), height=500, showlegend=True
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
+        # Show chart with ONLY Actual + Future Forecast (no fitted/test)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=prep["capex_actual"].index,
+            y=prep["capex_actual"].values,
+            mode="lines",
+            name="Actual CAPEX",
+            line=dict(color="blue")
+        ))
+        fig.add_trace(go.Scatter(
+            x=prep["future_index"],
+            y=future_pred.values,
+            mode="lines",
+            name="Future Forecast",
+            line=dict(color="orange", dash="dash")
+        ))
+        fig.update_layout(
+            title=f"{best_name} Forecast for {sel_country} | RMSE: {best['rmse']:.2f}",
+            xaxis_title="", yaxis_title="",
+            margin=dict(l=10, r=10, t=60, b=10), height=500, showlegend=True
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
     else:
-        # Show KPI for that selected year: use label lookup (avoid KeyError)
+        # Show KPI for that selected year: label lookup with fallback
         year_int = int(sel_year)
         if year_int in future_pred.index:
             val = float(future_pred.loc[year_int])
         else:
-            # fallback: positional if something unexpected happened
             try:
                 pos = available_future_years.index(year_int)
                 val = float(future_pred.iloc[pos])
