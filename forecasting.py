@@ -196,7 +196,7 @@ def _prep_country(df_all: pd.DataFrame, country: str):
         full_exog_std  = (exog_raw - mean) / std
 
         # future exog: repeat last observed exog row (standardize with same train stats)
-        future_years = 3
+        future_years = 4
         future_index = pd.Index([int(d.index.max()) + i for i in range(1, future_years + 1)], name="year")
         last_row = exog_raw.loc[[exog_raw.index.max()]]
         future_exog_raw = pd.DataFrame(np.repeat(last_row.values, repeats=future_years, axis=0),
