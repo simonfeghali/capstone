@@ -9,7 +9,7 @@ import streamlit as st
 import re
 from urllib.parse import quote
 from urllib.error import URLError, HTTPError
-
+from forecasting import render_forecasting_tab
 
 # ──────────────────────────────────────────────────────────────────────────────
 # App chrome / theme
@@ -448,8 +448,9 @@ def filt_wb_scoping(df: pd.DataFrame, year_any, cont, country):
 # Tabs
 # ──────────────────────────────────────────────────────────────────────────────
 from compare_tab import render_compare_tab
-tab_scoring, tab_eda, tab_sectors, tab_dest, tab_compare = st.tabs(["Scoring", "CAPEX", "Sectors", "Destinations", "Compare"])
-
+tab_scoring, tab_eda, tab_sectors, tab_dest, tab_compare, tab_forecast = st.tabs(
+    ["Scoring", "CAPEX", "Sectors", "Destinations", "Compare", "Forecasting"]
+)
 # =============================================================================
 # SCORING TAB — Averages for "All", auto-sync continent, hide bottom row when country selected
 # =============================================================================
@@ -1370,3 +1371,5 @@ with tab_dest:
             st.plotly_chart(fig_route, use_container_width=True)
 with tab_compare:
     render_compare_tab()
+with tab_forecast:
+    render_forecasting_tab()
