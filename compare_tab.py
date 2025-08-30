@@ -35,6 +35,28 @@ def _find_col(cols, *cands):
                 return col
     return None
 
+# === Canonicalize country names (same mapping used elsewhere) ===
+def _canon_country(name: str) -> str:
+    if not isinstance(name, str):
+        return ""
+    s = name.strip()
+    swap = {
+        "usa": "United States",
+        "us": "United States",
+        "u.s.": "United States",
+        "uk": "United Kingdom",
+        "u.k.": "United Kingdom",
+        "south korea": "South Korea",
+        "republic of korea": "South Korea",
+        "uae": "United Arab Emirates",
+    }
+    low = s.lower()
+    if low in swap:
+        return swap[low]
+    t = " ".join(w.capitalize() for w in low.split())
+    t = t.replace("Of", "of")
+    return t
+
 # ================= Loaders =================
 @st.cache_data(show_spinner=False)
 def load_wb():
@@ -104,6 +126,8 @@ def load_capex():
     m["year"]   = pd.to_numeric(m["year"], errors="coerce").astype("Int64")
     m["capex"]  = m["capex"].map(_numify)
     m["country"] = m["country"].astype(str).str.strip()
+    # canonicalize CAPEX country, too (be safe)
+    m["country"] = m["country"].map(_canon_country)
 
     order = ["A+", "A", "B", "C", "D"]
     m["grade"] = m["grade"].astype(str).str.strip()
@@ -139,8 +163,9 @@ def load_sectors():
     for c in ["companies","jobs_created","capex","projects"]:
         df[c] = pd.to_numeric(pd.Series(df[c]).astype(str).str.replace(",", "", regex=False)
                               .str.replace(r"[^\d\.\-]", "", regex=True), errors="coerce")
-    df["country"] = df["country"].astype(str).str.strip()
+    df["country"] = df["country"].astype(str).str.strip().map(_canon_country)  # <- canonicalize!
     df["sector"]  = df["sector"].astype(str).str.strip()
+
     df = (df.groupby(["country","sector"], as_index=False)[["companies","jobs_created","capex","projects"]]
             .sum(min_count=1))
     return df
@@ -172,10 +197,14 @@ def load_destinations():
     for c in ["companies","jobs_created","capex","projects"]:
         df[c] = pd.to_numeric(pd.Series(df[c]).astype(str).str.replace(",", "", regex=False)
                               .str.replace(r"[^\d\.\-]", "", regex=True), errors="coerce")
-    df["source_country"]      = df["source_raw"].astype(str).str.strip()
-    df["destination_country"] = df["dest_raw"].astype(str).str.strip()
+
+    # canonicalize both source and destination country names
+    df["source_country"]      = df["source_raw"].astype(str).str.strip().map(_canon_country)
+    df["destination_country"] = df["dest_raw"].astype(str).str.strip().map(_canon_country)
+
     bad = {"total","all destinations","all","overall"}
-    df = df[~df["destination_country"].str.lower().isin(bad)]
+    df = df[~df["destination_country"].astype(str).str.lower().isin(bad)]
+
     df = (df.groupby(["source_country","destination_country"], as_index=False)
             [["companies","jobs_created","capex","projects"]].sum(min_count=1))
     return df
@@ -238,6 +267,10 @@ def render_compare_tab():
         a = st.selectbox("Country A", countries, index=0, key="cmp_a")
     with c3:
         b = st.selectbox("Country B", countries, index=1, key="cmp_b")
+
+    # Ensure canonicalization on selections as well (harmless if already canonical)
+    a = _canon_country(a)
+    b = _canon_country(b)
 
     if a == b:
         st.warning("Please choose two different countries.")
