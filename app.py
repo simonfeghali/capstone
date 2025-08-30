@@ -655,7 +655,7 @@ with tab_scoring:
             b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
             with b1:
                 base = wb_scope[["country", "score"]]
-                title_top = f"Top 10 Performing Countries — {sel_year_sc}"
+                title_top = f"Top Performing Countries — {sel_year_sc}"
                 top10 = base.dropna().sort_values("score", ascending=False).head(10)
                 if top10.empty: st.info("No countries available for Top 10 with this filter.")
                 else:
@@ -849,10 +849,10 @@ with tab_eda:
 
     with b1:
         if isinstance(sel_year_any, int):
-            level_df = capx_eda.copy(); title_top10 = f"Top 10 Countries by CAPEX — {sel_year_any}"
+            level_df = capx_eda.copy(); title_top10 = f"Top Countries by CAPEX — {sel_year_any}"
         else:
             level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
-            title_top10 = "Top 10 Countries by CAPEX — All Years (aggregated)"
+            title_top10 = "Top Countries by CAPEX — All Years (aggregated)"
         top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
         if top10.empty:
             st.info("No CAPEX data for Top 10 with this filter.")
