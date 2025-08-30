@@ -978,7 +978,7 @@ with tab_eda:
                         df=top_growth.sort_values("growth_abs"),
                         value_col="growth_abs",
                         name_col="country",
-                        title=f"Top 10 Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]",
+                        title=f"Top Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]",
                         unit="$B",
                         height=420,
                         ascending_for_hbar=True
