@@ -295,6 +295,8 @@ def _refit_and_forecast_full(best_model: dict, full_endog_log: pd.Series,
     """
     Refit best model on full series and forecast future years.
     exog_full is the FULL standardized exog aligned on the original index.
+    Returns:
+      fitted (pd.Series), future (pd.Series) both indexed by year.
     """
     name = best_model["name"]
     exog_full_std = None
@@ -323,11 +325,14 @@ def _refit_and_forecast_full(best_model: dict, full_endog_log: pd.Series,
         fitted_log = pd.Series(final.fittedvalues, index=full_endog_log.index)
         future_log = final.forecast(steps=len(future_index), exog=future_exog)
 
-    return np.exp(fitted_log), np.exp(future_log)
+    # Ensure both outputs are Series indexed by year (so we can .loc[year])
+    fitted = pd.Series(np.exp(fitted_log).values, index=fitted_log.index, name="fitted")
+    future = pd.Series(np.exp(future_log).values, index=future_log.index, name="forecast")
+    return fitted, future
 
 def _plot_result(country: str, actual: pd.Series, fitted: pd.Series,
                  test_idx: pd.Index, test_pred: np.ndarray,
-                 future_idx: pd.Index, future_pred: np.ndarray,
+                 future_idx: pd.Index, future_pred: pd.Series,
                  best_name: str, rmse: float, order=None, seasonal=None):
 
     fig = go.Figure()
@@ -344,7 +349,7 @@ def _plot_result(country: str, actual: pd.Series, fitted: pd.Series,
                                  line=dict(color="red", dash="dash")))
     # Forecast
     if len(future_idx) > 0:
-        fig.add_trace(go.Scatter(x=future_idx, y=future_pred,
+        fig.add_trace(go.Scatter(x=future_idx, y=future_pred.values,
                                  mode="lines", name="Future Forecast",
                                  line=dict(color="orange", dash="dash")))
 
@@ -407,7 +412,6 @@ def render_forecasting_tab():
     )
 
     # -------- Year filter (All, 2026, 2027, 2028) --------
-    # Only show years present in the computed future_index
     available_future_years = [int(y) for y in prep["future_index"].tolist()]
     pickable_years = [y for y in (2026, 2027, 2028) if y in available_future_years]
     with c2:
@@ -432,22 +436,28 @@ def render_forecasting_tab():
         st.plotly_chart(fig, use_container_width=True)
 
     else:
-        # Show KPI for that selected year
-        try:
-            idx = available_future_years.index(int(sel_year))
-            val = float(future_pred[idx]) if idx < len(future_pred) else np.nan
-            st.markdown(
-                f"""
-                <div class="kpi-box">
-                  <div class="kpi-title">Forecasted CAPEX — {sel_year}</div>
-                  <div class="kpi-number">{val:,.1f}</div>
-                  <div class="kpi-sub">$B</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        except ValueError:
-            st.info(f"No forecast value available for {sel_year}. Choose 'All' to view the full chart.")
+        # Show KPI for that selected year: use label lookup (avoid KeyError)
+        year_int = int(sel_year)
+        if year_int in future_pred.index:
+            val = float(future_pred.loc[year_int])
+        else:
+            # fallback: positional if something unexpected happened
+            try:
+                pos = available_future_years.index(year_int)
+                val = float(future_pred.iloc[pos])
+            except Exception:
+                val = np.nan
+
+        st.markdown(
+            f"""
+            <div class="kpi-box">
+              <div class="kpi-title">Forecasted CAPEX — {sel_year}</div>
+              <div class="kpi-number">{(val if pd.notna(val) else 0):,.1f}</div>
+              <div class="kpi-sub">$B</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     # small summary
     left, right = st.columns(2)
