@@ -419,21 +419,29 @@ def render_forecasting_tab():
         sel_year = st.selectbox("Forecast Year", year_opts, index=0, key="forecast_year")
 
     if sel_year == "All":
-        # Show full chart
-        fig = _plot_result(
-            sel_country,
-            actual=prep["capex_actual"],
-            fitted=fitted,
-            test_idx=test_y.index,
-            test_pred=test_pred,
-            future_idx=prep["future_index"],
-            future_pred=future_pred,
-            best_name=best_name,
-            rmse=best["rmse"],
-            order=best.get("order"),
-            seasonal=best.get("seasonal")
-        )
-        st.plotly_chart(fig, use_container_width=True)
+    # Show chart with only Actual + Future Forecast
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=prep["capex_actual"].index, 
+        y=prep["capex_actual"].values,
+        mode="lines",
+        name="Actual CAPEX",
+        line=dict(color="blue")
+    ))
+    fig.add_trace(go.Scatter(
+        x=prep["future_index"], 
+        y=future_pred.values,
+        mode="lines",
+        name="Future Forecast",
+        line=dict(color="orange", dash="dash")
+    ))
+    fig.update_layout(
+        title=f"{best_name} Forecast for {sel_country} | RMSE: {best['rmse']:.2f}",
+        xaxis_title="", yaxis_title="CAPEX ($B)",
+        margin=dict(l=10, r=10, t=60, b=10), height=500, showlegend=True
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
 
     else:
         # Show KPI for that selected year: use label lookup (avoid KeyError)
