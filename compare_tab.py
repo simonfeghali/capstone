@@ -10,9 +10,10 @@ import re
 # ================= Config =================
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
-    "wb":  "world_bank_data_with_scores_and_continent.csv",
-    "cap": "capex_EDA_cleaned_filled.csv",
-    "sectors": "merged_sectors_data.csv",
+    "wb":       "world_bank_data_with_scores_and_continent.csv",
+    "wb_avg":   "world_bank_data_average_scores_and_grades.csv",  # <— NEW (used when Year = All)
+    "cap":      "capex_EDA_cleaned_filled.csv",
+    "sectors":  "merged_sectors_data.csv",
     "destinations": "merged_destinations_data.csv",
 }
 
@@ -35,7 +36,7 @@ def _find_col(cols, *cands):
                 return col
     return None
 
-# === Canonicalize country names (same mapping used elsewhere) ===
+# === Canonicalize country names (same mapping you use elsewhere) ===
 def _canon_country(name: str) -> str:
     if not isinstance(name, str):
         return ""
@@ -86,7 +87,7 @@ def load_wb():
     if "grade" not in df.columns: df["grade"] = np.nan
 
     df["year"] = pd.to_numeric(df["year"], errors="coerce").astype("Int64")
-    df["country"]   = df["country"].astype(str).str.strip()
+    df["country"]   = df["country"].astype(str).str.strip().map(_canon_country)
     df["continent"] = df["continent"].astype(str).str.strip()
 
     order = ["A+", "A", "B", "C", "D"]
@@ -94,6 +95,42 @@ def load_wb():
     df.loc[~df["grade"].isin(order), "grade"] = np.nan
     df["grade"] = pd.Categorical(df["grade"], categories=order, ordered=True)
     return df
+
+@st.cache_data(show_spinner=False)
+def load_wb_avg():
+    """Averages file used when Year = All."""
+    try:
+        df = pd.read_csv(_raw(FILES["wb_avg"]))
+    except (URLError, HTTPError, FileNotFoundError) as e:
+        st.error(f"Could not load averages file: {e}")
+        return pd.DataFrame(columns=["country","avg_score","grade"])
+
+    col_country = _find_col(df.columns, "country name", "country", "Country Name")
+    col_avg     = _find_col(df.columns, "average_score", "avg_score", "Average_Score", "score")
+    col_grade   = _find_col(df.columns, "final_grade", "grade", "Final_Grade", "letter_grade")
+
+    if col_country is None or col_avg is None:
+        st.error("Averages CSV missing required columns.")
+        return pd.DataFrame(columns=["country","avg_score","grade"])
+
+    out = df.rename(columns={
+        col_country: "country",
+        col_avg: "avg_score",
+        col_grade if col_grade else "": "grade",
+    }).copy()
+
+    if "grade" not in out.columns:
+        out["grade"] = np.nan
+
+    out["country"]   = out["country"].astype(str).str.strip().map(_canon_country)
+    out["avg_score"] = pd.to_numeric(out["avg_score"], errors="coerce")
+
+    order = ["A+", "A", "B", "C", "D"]
+    out["grade"] = out["grade"].astype(str).str.strip()
+    out.loc[~out["grade"].isin(order), "grade"] = np.nan
+    out["grade"] = pd.Categorical(out["grade"], categories=order, ordered=True)
+
+    return out[["country","avg_score","grade"]]
 
 @st.cache_data(show_spinner=False)
 def load_capex():
@@ -125,9 +162,7 @@ def load_capex():
 
     m["year"]   = pd.to_numeric(m["year"], errors="coerce").astype("Int64")
     m["capex"]  = m["capex"].map(_numify)
-    m["country"] = m["country"].astype(str).str.strip()
-    # canonicalize CAPEX country, too (be safe)
-    m["country"] = m["country"].map(_canon_country)
+    m["country"] = m["country"].astype(str).str.strip().map(_canon_country)
 
     order = ["A+", "A", "B", "C", "D"]
     m["grade"] = m["grade"].astype(str).str.strip()
@@ -163,7 +198,7 @@ def load_sectors():
     for c in ["companies","jobs_created","capex","projects"]:
         df[c] = pd.to_numeric(pd.Series(df[c]).astype(str).str.replace(",", "", regex=False)
                               .str.replace(r"[^\d\.\-]", "", regex=True), errors="coerce")
-    df["country"] = df["country"].astype(str).str.strip().map(_canon_country)  # <- canonicalize!
+    df["country"] = df["country"].astype(str).str.strip().map(_canon_country)
     df["sector"]  = df["sector"].astype(str).str.strip()
 
     df = (df.groupby(["country","sector"], as_index=False)[["companies","jobs_created","capex","projects"]]
@@ -224,7 +259,7 @@ CSS = """
 st.markdown(CSS, unsafe_allow_html=True)
 
 def _kpi(title, value, unit=""):
-    disp = "-" if value is None or (isinstance(value, float) and np.isnan(value)) else f"{float(value):,.1f}"
+    disp = "-" if value is None or (isinstance(value, float) and np.isnan(value)) else f"{float(value):,.3f}" if "Score" in title else f"{float(value):,.1f}"
     st.markdown(f"""
       <div class="kpi">
         <div class="t">{title}</div>
@@ -240,10 +275,11 @@ def _grade_pill(g: str) -> str:
 
 # ================= Public entrypoint =================
 def render_compare_tab():
-    wb  = load_wb()
-    cap = load_capex()
-    sec = load_sectors()
-    dst = load_destinations()
+    wb      = load_wb()
+    wb_avg  = load_wb_avg()      # <— NEW
+    cap     = load_capex()
+    sec     = load_sectors()
+    dst     = load_destinations()
 
     if wb.empty:
         st.info("World Bank data required.")
@@ -268,7 +304,7 @@ def render_compare_tab():
     with c3:
         b = st.selectbox("Country B", countries, index=1, key="cmp_b")
 
-    # Ensure canonicalization on selections as well (harmless if already canonical)
+    # Ensure canonicalization on selections as well
     a = _canon_country(a)
     b = _canon_country(b)
 
@@ -282,17 +318,22 @@ def render_compare_tab():
 
     # ---------------- Section 1: Score & Grade (combined) ----------------
     st.subheader("Score & Grade")
+
     def _score_grade(country):
+        # When Year = All → pull from averages CSV (score & grade)
+        if year_any == "All" and not wb_avg.empty:
+            row = wb_avg[wb_avg["country"] == country]
+            sc = float(row["avg_score"].mean()) if not row.empty else np.nan
+            gr = row["grade"].astype(str).dropna().iloc[0] if not row.empty and row["grade"].notna().any() else "-"
+            cont = wb.loc[wb["country"] == country, "continent"].dropna().iloc[0] if (wb["country"] == country).any() and wb["continent"].notna().any() else "-"
+            return sc, gr, cont
+        # Otherwise use the per-year file
         s = wb[wb["country"] == country]
         cont = s["continent"].dropna().iloc[0] if not s.empty and s["continent"].notna().any() else "-"
-        if year_any == "All":
-            score = float(s["score"].mean()) if not s.empty else np.nan
-            grade = None
-        else:
-            row = s[s["year"] == int(year_any)]
-            score = float(row["score"].mean()) if not row.empty else np.nan
-            grade = row["grade"].astype(str).dropna().iloc[0] if not row.empty and row["grade"].notna().any() else "-"
-        return score, grade, cont
+        row = s[s["year"] == int(year_any)] if year_any != "All" else s
+        sc = float(row["score"].mean()) if not row.empty else np.nan
+        gr = row["grade"].astype(str).dropna().iloc[0] if (year_any != "All" and not row.empty and row["grade"].notna().any()) else ("-" if year_any != "All" else "-")
+        return sc, gr if year_any != "All" else "-", cont
 
     left, right = st.columns(2, gap="large")
     with left:
@@ -300,13 +341,10 @@ def render_compare_tab():
         scA, gA, contA = _score_grade(a)
         c1, c2 = st.columns([1, 1])
         with c1: _kpi("Score", scA)
-        with c2:
-            if gA is None:
-                st.caption("Select a specific year to see Grade.")
-            else:
-                st.markdown(_grade_pill(gA), unsafe_allow_html=True)
+        with c2: st.markdown(_grade_pill(gA), unsafe_allow_html=True)
         st.markdown(f"**Continent:** {contA}")
         if year_any == "All":
+            # keep the trend chart (based on yearly data)
             s_tr = wb[wb["country"] == a].groupby("year", as_index=False)["score"].mean()
             if not s_tr.empty:
                 s_tr["ys"] = s_tr["year"].astype(int).astype(str)
@@ -322,11 +360,7 @@ def render_compare_tab():
         scB, gB, contB = _score_grade(b)
         c1, c2 = st.columns([1, 1])
         with c1: _kpi("Score", scB)
-        with c2:
-            if gB is None:
-                st.caption("Select a specific year to see Grade.")
-            else:
-                st.markdown(_grade_pill(gB), unsafe_allow_html=True)
+        with c2: st.markdown(_grade_pill(gB), unsafe_allow_html=True)
         st.markdown(f"**Continent:** {contB}")
         if year_any == "All":
             s_tr = wb[wb["country"] == b].groupby("year", as_index=False)["score"].mean()
