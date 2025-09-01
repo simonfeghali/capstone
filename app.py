@@ -782,7 +782,7 @@ with tab_eda:
         # Level titles (total CAPEX)
         m = re.search(r"Top Countries by CAPEX\s*—\s*(.*)", t, flags=re.IGNORECASE)
         if m:
-            tail = m.group(1).strip()  # e.g. "All Years (aggregated)" or "2024"
+            tail = m.group(1).strip()  # e.g. "All Years" or "2024"
             return f"{label} — Total CAPEX — {tail}" if tail else f"{label} — Total CAPEX"
 
         # Fallback
@@ -863,7 +863,7 @@ with tab_eda:
             map_df = capx_eda.copy(); map_title = f"CAPEX Map — {sel_year_any}"
         else:
             map_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
-            map_title = "CAPEX Map — All Years (aggregated)"
+            map_title = "CAPEX Map — All Years"
         if map_df.empty: st.info("No CAPEX data for this selection.")
         else:
             fig = px.choropleth(map_df, locations="country", locationmode="country names",
@@ -893,7 +893,7 @@ with tab_eda:
             level_df = capx_eda.copy(); title_top10 = f"Top Countries by CAPEX — {sel_year_any}"
         else:
             level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
-            title_top10 = "Top Countries by CAPEX — All Years (aggregated)"
+            title_top10 = "Top Countries by CAPEX — All Years"
         top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
         if top10.empty:
             st.info("No CAPEX data for Top 10 with this filter.")
