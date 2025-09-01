@@ -101,6 +101,7 @@ def inject_tab_icons():
         ROOT / "sectors.png",       # Sectors
         ROOT / "destinations.png",  # Destinations
         ROOT / "compare.png",       # Compare
+        ROOT / "forecast.png",      # Forecast
     ]
     css_blocks = []
     for i, icon_path in enumerate(icons_in_order, start=1):
