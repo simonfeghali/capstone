@@ -104,6 +104,22 @@ def inject_tab_icons():
         ROOT / "forecast.png",      # Forecast
     ]
     css_blocks = []
+
+    # General tab size/style override
+    css_blocks.append("""
+    .stTabs [data-baseweb="tab-list"] {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+    }
+    .stTabs [data-baseweb="tab"] {
+        flex-grow: 1;        /* stretch tabs equally */
+        text-align: center;  /* center text & icon */
+        padding: 14px 0;     /* taller tabs */
+        font-size: 1.1rem;   /* larger text */
+    }
+    """)
+
     for i, icon_path in enumerate(icons_in_order, start=1):
         b64 = _b64_png(icon_path)
         if not b64:
@@ -113,18 +129,20 @@ def inject_tab_icons():
         div[data-baseweb="tab-list"] > div[role="tab"]:nth-child({i}) p::before {{
             content: "";
             display: inline-block;
-            width: 18px;
-            height: 18px;
-            margin-right: 8px;
-            vertical-align: -3px;
+            width: 22px;   /* bigger icon */
+            height: 22px;
+            margin-right: 10px;
+            vertical-align: -4px;
             background-image: url('data:image/png;base64,{b64}');
             background-size: contain;
             background-repeat: no-repeat;
         }}
         """)
+
     st.markdown("<style>" + "\n".join(css_blocks) + "</style>", unsafe_allow_html=True)
 
 inject_tab_icons()
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Data sources (GitHub raw)
