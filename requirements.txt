@@ -4,12 +4,17 @@ pandas
 numpy
 plotly
 
-# Excel support (keep if you might read .xlsx at any point)
-openpyxl
-xlrd
-
-# (Optional but harmless) HTTP utilities used indirectly by pandas/plotly
-requests
-
 # Forecasting models
 statsmodels
+scikit-learn
+scipy  # (statsmodels depends on this; include explicitly for safety)
+
+# Plots (only needed if you switch to st.pyplot like the notebook)
+matplotlib
+
+# Excel support
+openpyxl     # for .xlsx
+# xlrd       # uncomment only if you need to read legacy .xls files
+
+# HTTP utilities used indirectly by pandas/plotly
+requests
