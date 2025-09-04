@@ -365,7 +365,7 @@ def _plot_forecast_only(country: str,
 # ── public entrypoint ────────────────────────────────────────────────────────
 
 def render_forecasting_tab():
-    st.caption("Forecasting (notebook-aligned) — shows Actual + Forecast (2025–2028) only")
+    st.caption("Forecast - 2025–2028")
 
     panel = _load_notebook_style_panel()
     if panel.empty:
