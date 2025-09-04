@@ -38,6 +38,10 @@ EXOG_DEFAULT = [
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+def _adaptive_test_horizon(n_total: int) -> int:
+    # 15% bounded to [2, 4] — matches the new notebook
+    return max(2, min(4, int(np.ceil(0.15 * n_total))))
+
 def _raw(fname: str) -> str:
     return f"{RAW_BASE}/{quote(fname)}"
 
@@ -149,76 +153,82 @@ def _load_notebook_style_panel() -> pd.DataFrame:
 
 def _prep_country_notebook(df_all: pd.DataFrame, country: str):
     """
-    Matches notebook prep:
+    Matches new notebook prep (no leakage + adaptive split):
       - endog = log(CAPEX) with CAPEX>0
-      - exog = StandardScaler fit on FULL series (pre-split)
-      - split = last 4 years for test (for model selection)
-      - future years = EXACT 2025–2028 (repeat last exog row)
+      - exog = StandardScaler fit on TRAIN ONLY
+      - split = adaptive last 15% (bounded 2–4 years)
+      - future years = EXACT 2025–2028 (repeat last TRAIN-based scaled row)
     """
     d = df_all[df_all["Country"] == country].copy().sort_values("Year")
     d["CAPEX"] = d["CAPEX"].map(_numify)
     d = d.dropna(subset=["CAPEX"])
     d = d[d["CAPEX"] > 0]
+    if d.shape[0] < 6:
+        raise ValueError("Not enough datapoints after cleaning (need ≥ 6).")
 
-    if d.shape[0] < 8:
-        raise ValueError("Not enough datapoints after cleaning (need ≥ 8 for a 4-year test).")
+    # endog on year index
+    years = d["Year"].astype(int).values
+    endog_log = pd.Series(np.log(d["CAPEX"].values), index=years, name="log_CAPEX")
 
-    # endog
-    endog_log = np.log(d["CAPEX"]).rename("log_CAPEX")
-
-    # exog columns
+    # exog columns (if present)
     exog_cols = []
     for col in EXOG_DEFAULT:
         hit = _find_col(d.columns, col)
         if hit:
             exog_cols.append(hit)
 
+    exog_raw = None
     if exog_cols:
-        exog_raw = d[exog_cols].apply(pd.to_numeric, errors="coerce")
-        if exog_raw.isna().any().any():
-            exog_raw = exog_raw.interpolate(limit_direction="both")
-        scaler = StandardScaler()
-        exog_full = pd.DataFrame(
-            scaler.fit_transform(exog_raw),  # intentional: fit on FULL series
-            columns=exog_raw.columns,
-            index=d["Year"].values
-        )
-    else:
-        exog_full = None
+        xr = d[exog_cols].apply(pd.to_numeric, errors="coerce")
+        xr = xr.interpolate(limit_direction="both")
+        exog_raw = pd.DataFrame(xr.values, index=years, columns=exog_cols)
 
-    # Split: last 4 years for test
+    # --- adaptive split (like notebook) ---
     n = len(endog_log)
-    split_years = 4
-    train_idx = d["Year"].iloc[: n - split_years].values
-    test_idx  = d["Year"].iloc[n - split_years :].values
-    train_y = pd.Series(endog_log.values[: n - split_years], index=train_idx)
-    test_y  = pd.Series(endog_log.values[n - split_years :], index=test_idx)
+    split_years = _adaptive_test_horizon(n)
+    train_idx = years[: n - split_years]
+    test_idx  = years[n - split_years :]
 
-    if exog_full is not None:
-        train_x = exog_full.loc[train_idx]
-        test_x  = exog_full.loc[test_idx]
-        last_row = exog_full.loc[[exog_full.index.max()]]
+    train_y = endog_log.loc[train_idx]
+    test_y  = endog_log.loc[test_idx]
+
+    # --- TRAIN-only scaling (no leakage) ---
+    if exog_raw is not None:
+        from sklearn.preprocessing import StandardScaler
+        scaler = StandardScaler()
+        train_x_raw = exog_raw.loc[train_idx]
+        test_x_raw  = exog_raw.loc[test_idx]
+
+        train_x = pd.DataFrame(scaler.fit_transform(train_x_raw),
+                               index=train_x_raw.index, columns=train_x_raw.columns)
+        test_x  = pd.DataFrame(scaler.transform(test_x_raw),
+                               index=test_x_raw.index, columns=test_x_raw.columns)
+        exog_full = pd.DataFrame(scaler.transform(exog_raw),
+                                 index=exog_raw.index, columns=exog_raw.columns)
+
+        # future exog: repeat last observed (already scaled with TRAIN stats)
+        last_row_scaled = exog_full.loc[[exog_full.index.max()]]
     else:
-        train_x = test_x = None
-        last_row = None
+        train_x = test_x = exog_full = None
+        last_row_scaled = None
 
-    # Future horizon: exactly 2025–2028 (only > last observed year)
-    last_year = int(d["Year"].max())
+    # --- future horizon: exactly 2025–2028 (only > last observed) ---
+    last_year = int(max(years))
     requested_years = [2025, 2026, 2027, 2028]
     future_years = [y for y in requested_years if y > last_year]
     future_index = pd.Index(future_years, name="Year")
-    if last_row is not None and len(future_years) > 0:
+
+    if last_row_scaled is not None and len(future_years) > 0:
         future_exog = pd.DataFrame(
-            np.repeat(last_row.values, repeats=len(future_years), axis=0),
-            columns=last_row.columns,
-            index=future_index
+            np.repeat(last_row_scaled.values, repeats=len(future_years), axis=0),
+            columns=last_row_scaled.columns, index=future_index
         )
     else:
         future_exog = None
 
     return {
-        "capex_actual": pd.Series(d["CAPEX"].values, index=d["Year"].values, name="CAPEX"),
-        "endog_log": pd.Series(endog_log.values, index=d["Year"].values, name="log_CAPEX"),
+        "capex_actual": pd.Series(d["CAPEX"].values, index=years, name="CAPEX"),
+        "endog_log": endog_log,
         "train_y": train_y, "test_y": test_y,
         "train_x": train_x, "test_x": test_x,
         "exog_full": exog_full,
