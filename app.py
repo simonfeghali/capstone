@@ -854,9 +854,9 @@ with tab_eda:
             else:
                 x_vals = trend["year"].astype(int).astype(str).tolist()
                 y_vals = trend["capex"].astype(float).tolist()
-                title = (f"{sel_country} CAPEX Trend" if sel_country != "All"
-                         else "Global CAPEX Trend")
-                _plotly_line_once(x_vals, y_vals, title, labels_x="", labels_y="Global CAPEX ($B)", height=360)
+                title = (f"{sel_country} CAPEX Trend ($B)" if sel_country != "All"
+                         else "Global CAPEX Trend ($B)")
+                _plotly_line_once(x_vals, y_vals, title, labels_x="", labels_y="", height=360)
 
     with e2:
         if isinstance(sel_year_any, int):
