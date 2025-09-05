@@ -978,8 +978,8 @@ with tab_eda:
                                 tg, x="year_str", y="capex", color="grade",
                                 color_discrete_map=cmap,
                                 category_orders={"grade": grade_order},
-                                labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
-                                title="CAPEX Trend by Grade"
+                                labels={"year_str": "", "capex": "", "grade": "Grade"},
+                                title="CAPEX Trend by Grade ($B)"
                             )
                             fig.update_xaxes(type="category",
                                              categoryorder="array",
