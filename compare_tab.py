@@ -349,7 +349,7 @@ def render_compare_tab():
             if not s_tr.empty:
                 s_tr["ys"] = s_tr["year"].astype(int).astype(str)
                 fig = px.line(s_tr, x="ys", y="score", markers=True,
-                              labels={"ys":"","score":"Mean score"},
+                              labels={"ys":"","score":""},
                               title=f"{a} • Viability Score Trend")
                 fig.update_xaxes(type="category", showgrid=False)
                 fig.update_yaxes(showgrid=False)
@@ -367,7 +367,7 @@ def render_compare_tab():
             if not s_tr.empty:
                 s_tr["ys"] = s_tr["year"].astype(int).astype(str)
                 fig = px.line(s_tr, x="ys", y="score", markers=True,
-                              labels={"ys":"","score":"Mean score"},
+                              labels={"ys":"","score":""},
                               title=f"{b} • Viability Score Trend")
                 fig.update_xaxes(type="category", showgrid=False)
                 fig.update_yaxes(showgrid=False)
@@ -386,8 +386,8 @@ def render_compare_tab():
             if not tr.empty:
                 tr["ys"] = tr["year"].astype(int).astype(str)
                 fig = px.line(tr, x="ys", y="capex", markers=True,
-                              labels={"ys":"","capex":"CAPEX ($B)"},
-                              title=f"{a} • CAPEX Trend")
+                              labels={"ys":"","capex":""},
+                              title=f"{a} • CAPEX Trend ($B)")
                 fig.update_xaxes(type="category", showgrid=False)
                 fig.update_yaxes(showgrid=False)
                 st.plotly_chart(fig, use_container_width=True)
@@ -401,8 +401,8 @@ def render_compare_tab():
             if not tr.empty:
                 tr["ys"] = tr["year"].astype(int).astype(str)
                 fig = px.line(tr, x="ys", y="capex", markers=True,
-                              labels={"ys":"","capex":"CAPEX ($B)"},
-                              title=f"{b} • CAPEX Trend")
+                              labels={"ys":"","capex":""},
+                              title=f"{b} • CAPEX Trend ($B)")
                 fig.update_xaxes(type="category", showgrid=False)
                 fig.update_yaxes(showgrid=False)
                 st.plotly_chart(fig, use_container_width=True)
