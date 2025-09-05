@@ -524,7 +524,7 @@ with tab_scoring:
             else:
                 yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)
                 fig_line = px.line(yoy_df, x="year_str", y="score", markers=True,
-                                   labels={"year_str": "", "score": "Mean score"}, title=title)
+                                   labels={"year_str": "", "score": ""}, title=title)
                 fig_line.update_xaxes(type="category", categoryorder="array",
                                       categoryarray=yoy_df["year_str"].tolist(), showgrid=False)
                 fig_line.update_yaxes(showgrid=False)
