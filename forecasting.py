@@ -360,8 +360,8 @@ def _plot_forecast_only(country: str,
         margin=dict(l=10, r=10, t=60, b=10),
         height=520, showlegend=True
     )
-    fig.update_xaxes(showgrid=False)
-    fig.update_yaxes(showgrid=False)
+    fig.update_xaxes(showgrid=False,zeroline=False, showline=False)
+    fig.update_yaxes(showgrid=False,zeroline=False, showline=False)
     return fig
 
 # ── public entrypoint ────────────────────────────────────────────────────────
