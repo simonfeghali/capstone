@@ -958,8 +958,8 @@ with tab_eda:
                             else:
                                 fig_single = px.line(
                                     tg, x="year_str", y="capex", color="grade",
-                                    labels={"year_str": "", "capex": "CAPEX ($B)", "grade": "Grade"},
-                                    title="CAPEX Trend by Grade"
+                                    labels={"year_str": "", "capex": "", "grade": "Grade"},
+                                    title="CAPEX Trend by Grade ($B)"
                                 )
                                 fig_single.update_xaxes(type="category",
                                                         categoryorder="array",
