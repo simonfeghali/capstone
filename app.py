@@ -737,7 +737,7 @@ with tab_eda:
             f"""
             <div class="kpi-box">
               <div class="kpi-title">{title}</div>
-              <div class="kpi-number">{value:,.1f}</div>
+              <div class="kpi-number">{value:,.2f}</div>
               <div class="kpi-sub">{unit}</div>
             </div>
             """,
