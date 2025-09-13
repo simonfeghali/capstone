@@ -476,7 +476,7 @@ with tab_scoring:
 
     st.caption("Scoring 2021-2023 • (World Bank–based)")
     where_title = sel_country_sc if sel_country_sc != "All" else (sel_cont_sc if sel_cont_sc != "All" else "Worldwide")
-    st.subheader(where_title)
+    st.markdown(f"<h3 style='text-align:center; margin:0; font-weight:800'>{where_title}</h3>", unsafe_allow_html=True)
 
     use_avg = (sel_year_sc == "All")
 
