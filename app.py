@@ -1148,6 +1148,7 @@ with tab_sectors:
                       horizontal=True, index=0, key="metric_sel")
 
     cdf = sectors_df[sectors_df["country"] == sel_sector_country].copy()
+    if metric == "Capex": cdf["capex"] = cdf["capex"] / 1000.0
 
     if not cdf.empty:
         out_cols = ["country","sector","companies","jobs_created","capex","projects"]
