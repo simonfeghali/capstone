@@ -1190,7 +1190,7 @@ with tab_sectors:
             st.plotly_chart(fig, use_container_width=True)
     else:
         val = float(cdf.loc[cdf["sector"] == sel_sector, value_col].sum()) if not cdf.empty else 0.0
-        unit = {"Companies":"", "Jobs Created":"", "Capex":" (USD m)", "Projects":""}[metric]
+        unit = {"Companies":"", "Jobs Created":"", "Capex":" (USD B)", "Projects":""}[metric]
         st.markdown(
             f"""
             <div class="kpi-box">
