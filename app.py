@@ -1361,6 +1361,8 @@ with tab_dest:
     ddf = dest_df[dest_df["source_country"] == sel_src_country].copy()
     ddf = ddf[ddf["destination_country"].astype(str).str.strip().str.lower() != "total"]
 
+    if metric_dest == "Capex": ddf["capex"] = ddf["capex"] / 1000
+
     if sel_dest_country == "All":
         bars = (ddf[["destination_country", value_col_dest]]
                     .groupby("destination_country", as_index=False)[value_col_dest]
