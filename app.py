@@ -1372,7 +1372,7 @@ with tab_dest:
 
         left, right = st.columns([1.2, 1], gap="large")
         with left:
-            title = f"{metric_dest} by Destination Country — {sel_src_country} (Top 15)"
+            title = f"Capex ($B) by Destination Country — {sel_src_country} (Top 15)" if metric_dest == "Capex" else f"{metric_dest} by Destination Country — {sel_src_country} (Top 15)"
             if bars.empty or (bars[value_col_dest].sum() == 0):
                 st.info("No data for this selection.")
             else:
