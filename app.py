@@ -721,7 +721,7 @@ with tab_scoring:
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
 
-    st.caption("CAPEX Analysis for 2021-2024")
+    st.caption("CAPEX Analysis for 2021-2024 (USD Billions)")
 
     # ---- De-dup helpers (CAPEX tab only) ----
     shown_kpi_keys: set = set()
@@ -775,14 +775,14 @@ with tab_eda:
         # Growth titles
         m = re.search(r"Top Countries by CAPEX Growth(.*)", t, flags=re.IGNORECASE)
         if m:
-            tail = m.group(1).strip()  # e.g. " (All Grades) [2021 → 2024]"
+            tail = m.group(1).strip()
             tail = tail.lstrip("—").strip()
             return f"{label} — CAPEX Growth{(' ' + tail) if tail else ''}"
 
         # Level titles (total CAPEX)
         m = re.search(r"Top Countries by CAPEX\s*—\s*(.*)", t, flags=re.IGNORECASE)
         if m:
-            tail = m.group(1).strip()  # e.g. "All Years" or "2024"
+            tail = m.group(1).strip()
             return f"{label} — Total CAPEX — {tail}" if tail else f"{label} — Total CAPEX"
 
         # Fallback
@@ -797,7 +797,6 @@ with tab_eda:
         if valid.shape[0] == 1:
             label = str(valid[name_col].iloc[0])
             val = float(valid[value_col].iloc[0])
-            # Use contextual KPI title instead of "Top Countries ..."
             kpi_title = _pretty_kpi_title(title, label)
             _kpi_block(kpi_title, val, unit)
             return
@@ -830,7 +829,12 @@ with tab_eda:
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
 
+    # -------------------------------------------------------------------------
+    # CONVERT CAPEX FROM MILLIONS TO BILLIONS
+    # -------------------------------------------------------------------------
     capx_eda = capx_enriched.copy()
+    capx_eda["capex"] = capx_eda["capex"] / 1000.0  # <-- conversion applied here
+
     if sel_cont != "All":    capx_eda = capx_eda[capx_eda["continent"] == sel_cont]
     if sel_country != "All": capx_eda = capx_eda[capx_eda["country"] == sel_country]
     if sel_grade_eda != "All" and "grade" in capx_eda.columns:
@@ -919,9 +923,10 @@ with tab_eda:
                           .assign(grade=lambda d: d["grade"].astype(str))
                           .groupby("grade", as_index=False)["capex"].sum())
 
-                    # order bars by CAPEX high→low (top→bottom)
-                    gb_sorted = gb.sort_values("capex", ascending=True)
+                    # convert these too to billions
+                    gb["capex"] = gb["capex"] / 1000.0
 
+                    gb_sorted = gb.sort_values("capex", ascending=True)
                     nonzero = gb_sorted.loc[gb_sorted["capex"].fillna(0) != 0, ["grade", "capex"]]
                     if nonzero.shape[0] <= 1:
                         if nonzero.empty:
@@ -947,81 +952,6 @@ with tab_eda:
                         st.info("No CAPEX data for grade trend.")
                     else:
                         tg["year_str"] = tg["year"].astype(int).astype(str)
-
-                        grades_present = tg["grade"].dropna().unique().tolist()
-                        if len(grades_present) == 1:
-                            x_vals = tg["year_str"].tolist()
-                            y_vals = tg["capex"].astype(float).tolist()
-                            sig = _series_key("LINE", x_vals, y_vals)
-                            if sig in shown_series_keys:
-                                pass
-                            else:
-                                fig_single = px.line(
-                                    tg, x="year_str", y="capex", color="grade",
-                                    labels={"year_str": "", "capex": "", "grade": "Grade"},
-                                    title="CAPEX Trend by Grade ($B)"
-                                )
-                                fig_single.update_xaxes(type="category",
-                                                        categoryorder="array",
-                                                        categoryarray=sorted(tg["year_str"].unique().tolist()),
-                                                        showgrid=False)
-                                fig_single.update_yaxes(showgrid=False)
-                                fig_single.update_layout(margin=dict(l=10, r=10, t=60, b=10),
-                                                         height=420, legend_title_text="Grade")
-                                st.plotly_chart(fig_single, use_container_width=True)
-                        else:
-                            blues = px.colors.sequential.Blues
-                            shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]
-                            grade_order = ["A+", "A", "B", "C", "D"]
-                            cmap = {g:c for g,c in zip(grade_order, shades)}
-                            fig = px.line(
-                                tg, x="year_str", y="capex", color="grade",
-                                color_discrete_map=cmap,
-                                category_orders={"grade": grade_order},
-                                labels={"year_str": "", "capex": "", "grade": "Grade"},
-                                title="CAPEX Trend by Grade ($B)"
-                            )
-                            fig.update_xaxes(type="category",
-                                             categoryorder="array",
-                                             categoryarray=sorted(tg["year_str"].unique().tolist()),
-                                             showgrid=False)
-                            fig.update_yaxes(showgrid=False)
-                            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10),
-                                              height=420, legend_title_text="Grade")
-                            st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("No CAPEX data for grade view.")
-
-    with b3:
-        growth_base = capx_eda.copy()
-        if growth_base.empty:
-            st.info("No CAPEX data for growth ranking.")
-        else:
-            agg = growth_base.groupby(["country", "year"], as_index=False)["capex"].sum()
-            first_year = int(agg["year"].min()) if not agg.empty else None
-            last_year  = int(agg["year"].max()) if not agg.empty else None
-            if first_year is None or last_year is None or first_year == last_year:
-                st.info("Not enough years to compute growth.")
-            else:
-                start = agg[agg["year"] == first_year][["country", "capex"]].rename(columns={"capex": "capex_start"})
-                end   = agg[agg["year"] == last_year][["country", "capex"]].rename(columns={"capex": "capex_end"})
-                joined = start.merge(end, on="country", how="inner")
-                joined["growth_abs"] = joined["capex_end"] - joined["capex_start"]
-                label_grade = f"(Grade {sel_grade_eda})" if sel_grade_eda != "All" else "(All Grades)"
-                top_growth = joined.sort_values("growth_abs").tail(10)
-                if top_growth.empty:
-                    st.info("No CAPEX data for growth ranking.")
-                else:
-                    _bars_or_kpi(
-                        df=top_growth.sort_values("growth_abs"),
-                        value_col="growth_abs",
-                        name_col="country",
-                        title=f"Top Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]",
-                        unit="$B",
-                        height=420,
-                        ascending_for_hbar=True
-                    )
-
 # =============================================================================
 # SECTORS TAB — UNCHANGED
 # =============================================================================
