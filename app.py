@@ -1277,6 +1277,15 @@ def make_top_map(source_country: str, dest_list: list[str]) -> go.Figure:
         textfont=dict(size=22),
         name="Source"
     ))
+
+    # Dummy trace for legend
+    fig.add_trace(go.Scattergeo(
+        lon=[None], lat=[None],  # not shown on map
+        mode="markers",
+        marker=dict(symbol="circle", size=12, color="#d62728"),
+        name="Source"
+    ))
+    
     if dest_list:
         fig.add_trace(go.Scattergeo(
             locationmode="country names",
@@ -1297,6 +1306,15 @@ def make_route_map(source_country: str, dest_country: str) -> go.Figure:
         textfont=dict(size=22),
         name="Source"
     ))
+
+    # Dummy trace for legend
+    fig.add_trace(go.Scattergeo(
+        lon=[None], lat=[None],  # not shown on map
+        mode="markers",
+        marker=dict(symbol="circle", size=12, color="#d62728"),
+        name="Source"
+    ))
+    
     fig.add_trace(go.Scattergeo(
         locationmode="country names",
         locations=[dest_country],
