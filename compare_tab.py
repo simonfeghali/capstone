@@ -270,7 +270,7 @@ def _kpi(title, value, unit=""):
         if ("score" in title_l) or ("capex" in title_l) or ("usd" in unit_l) or ("$" in unit):
             disp = f"{float(value):,.3f}"
         else:
-            disp = f"{float(value):,.1f}"
+            disp = f"{float(value):,.3f}"
     st.markdown(f"""
       <div class="kpi">
         <div class="t">{title}</div>
