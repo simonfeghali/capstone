@@ -737,7 +737,7 @@ with tab_eda:
             f"""
             <div class="kpi-box">
               <div class="kpi-title">{title}</div>
-              <div class="kpi-number">{value:,.2f}</div>
+              <div class="kpi-number">{value:,.3f}</div>
               <div class="kpi-sub">{unit}</div>
             </div>
             """,
@@ -1195,7 +1195,7 @@ with tab_sectors:
             f"""
             <div class="kpi-box">
               <div class="kpi-title">{sel_sector_country} — {sel_sector} • {metric}</div>
-              <div class="kpi-number">{val:,.0f}</div>
+              <div class="kpi-number">{val:,.3f}</div>
               <div class="kpi-sub">{unit}</div>
             </div>
             """,
@@ -1423,7 +1423,7 @@ with tab_dest:
                 f"""
                 <div class="kpi-box">
                   <div class="kpi-title">{sel_src_country} → {sel_dest_country} • {metric_dest}</div>
-                  <div class="kpi-number">{val:,.0f}</div>
+                  <div class="kpi-number">{val:,.3f}</div>
                   <div class="kpi-sub">{unit}</div>
                 </div>
                 """,
