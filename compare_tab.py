@@ -442,7 +442,7 @@ def render_compare_tab():
             st.caption("No sectors data available.")
         else:
             sectors_list = sorted(sec["sector"].dropna().unique().tolist())
-            c1, c2 = st.columns([1.4, 1], gap="small")
+            c1, c2 = st.columns([1, 1], gap="small")
             with c1:
                 sector_opt = st.selectbox("Sector", sectors_list, index=0, key="cmp_sector")
             with c2:
@@ -471,7 +471,7 @@ def render_compare_tab():
             destsB = sorted(dst.loc[dst["source_country"] == b, "destination_country"].dropna().unique().tolist())
             union_dests = sorted(set(destsA).union(destsB))
 
-            c1, c2 = st.columns([1.4, 1], gap="small")
+            c1, c2 = st.columns([1, 1], gap="small")
             with c1:
                 dest_country = st.selectbox("Destination country", union_dests, index=0 if union_dests else None, key="cmp_dest_country")
             with c2:
