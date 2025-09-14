@@ -1418,7 +1418,7 @@ with tab_dest:
         left, right = st.columns([0.9, 1.4], gap="large")
         with left:
             val = float(ddf.loc[ddf["destination_country"] == sel_dest_country, value_col_dest].sum()) if not ddf.empty else 0.0
-            unit = {"Companies":"", "Jobs Created":"", "Capex":" (USD m)", "Projects":""}[metric_dest]
+            unit = {"Companies":"", "Jobs Created":"", "Capex":" (USD B)", "Projects":""}[metric_dest]
             st.markdown(
                 f"""
                 <div class="kpi-box">
