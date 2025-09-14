@@ -163,6 +163,8 @@ def load_capex():
 
     m["year"]   = pd.to_numeric(m["year"], errors="coerce").astype("Int64")
     m["capex"]  = m["capex"].map(_numify)
+    # Convert CAPEX from millions to billions
+    m["capex"] = m["capex"] / 1000.0
     m["country"] = m["country"].astype(str).str.strip().map(_canon_country)
 
     order = ["A+", "A", "B", "C", "D"]
