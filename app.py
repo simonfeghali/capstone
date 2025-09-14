@@ -1283,7 +1283,7 @@ def make_top_map(source_country: str, dest_list: list[str]) -> go.Figure:
     fig.add_trace(go.Scattergeo(
         lon=[None], lat=[None],  # not shown on map
         mode="markers",
-        marker=dict(symbol="circle", size=12, color="#d62728"),
+        marker=dict(symbol="circle", size=12, color="#ff4d4d"),
         name="Source"
     ))
     
@@ -1313,7 +1313,7 @@ def make_route_map(source_country: str, dest_country: str) -> go.Figure:
     fig.add_trace(go.Scattergeo(
         lon=[None], lat=[None],  # not shown on map
         mode="markers",
-        marker=dict(symbol="circle", size=12, color="#d62728"),
+        marker=dict(symbol="circle", size=12, color="#ff4d4d"),
         name="Source"
     ))
     
