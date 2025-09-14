@@ -262,7 +262,15 @@ CSS = """
 st.markdown(CSS, unsafe_allow_html=True)
 
 def _kpi(title, value, unit=""):
-    disp = "-" if value is None or (isinstance(value, float) and np.isnan(value)) else f"{float(value):,.3f}" if "Score" in title else f"{float(value):,.1f}"
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        disp = "-"
+    else:
+        title_l = str(title).lower()
+        unit_l  = str(unit).lower()
+        if ("score" in title_l) or ("capex" in title_l) or ("usd" in unit_l) or ("$" in unit):
+            disp = f"{float(value):,.3f}"
+        else:
+            disp = f"{float(value):,.1f}"
     st.markdown(f"""
       <div class="kpi">
         <div class="t">{title}</div>
