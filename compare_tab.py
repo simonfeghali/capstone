@@ -49,6 +49,7 @@ def _canon_country(name: str) -> str:
         "u.k.": "United Kingdom",
         "south korea": "South Korea",
         "republic of korea": "South Korea",
+        "Korea, Rep.": "South Korea",
         "uae": "United Arab Emirates",
     }
     low = s.lower()
