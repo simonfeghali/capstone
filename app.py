@@ -1275,7 +1275,8 @@ def make_top_map(source_country: str, dest_list: list[str]) -> go.Figure:
         mode="text",
         text=["📍"],
         textfont=dict(size=22),
-        name="Source"
+        name="Source",
+        showlegend=False
     ))
 
     # Dummy trace for legend
@@ -1304,7 +1305,8 @@ def make_route_map(source_country: str, dest_country: str) -> go.Figure:
         mode="text",
         text=["📍"],
         textfont=dict(size=22),
-        name="Source"
+        name="Source",
+        showlegend=False
     ))
 
     # Dummy trace for legend
