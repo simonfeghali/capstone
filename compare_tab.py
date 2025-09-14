@@ -299,10 +299,34 @@ def render_compare_tab():
     if len(countries) < 2:
         st.info("Need at least two countries in data.")
         st.stop()
+    # ---- NEW BLOCK ----
+    TOP_SOURCE_COUNTRIES_10 = [
+        "United States","United Kingdom","Germany","France","China",
+        "Japan","South Korea","Canada","Netherlands","United Arab Emirates",
+    ]
+    
+    top = [c for c in TOP_SOURCE_COUNTRIES_10 if c in countries]
+    rest = [c for c in countries if c not in top]
+    
+    options = ["— Top Source Countries —"] + top + ["— Other Countries —"] + rest
+    
     with c2:
-        a = st.selectbox("Country A", countries, index=0, key="cmp_a")
+        default_a = st.session_state.get("cmp_a", countries[0])
+        idx_a = options.index(default_a) if default_a in options else (1 if top else 3)
+        a = st.selectbox("Country A", options, index=idx_a, key="cmp_a")
+        if isinstance(a, str) and a.startswith("—"):
+            a = top[0] if top else rest[0]
+            st.session_state["cmp_a"] = a
+    
     with c3:
-        b = st.selectbox("Country B", countries, index=1, key="cmp_b")
+        default_b = st.session_state.get("cmp_b", countries[1] if len(countries) > 1 else countries[0])
+        idx_b = options.index(default_b) if default_b in options else (2 if len(top) > 1 else (4 if len(options) > 4 else 1))
+        b = st.selectbox("Country B", options, index=idx_b, key="cmp_b")
+        if isinstance(b, str) and b.startswith("—"):
+            fallback = (top + rest)
+            b = next((c for c in fallback if c != a), fallback[0] if fallback else default_b)
+            st.session_state["cmp_b"] = b
+    # ---- END NEW BLOCK ----)
 
     # Ensure canonicalization on selections as well
     a = _canon_country(a)
