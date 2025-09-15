@@ -330,3 +330,74 @@ def render_overview_tab():
 
     # Auto-jump if query param or session flag is present
     _auto_jump()
+
+# ---- Aliases so one ℹ️ per tab can jump to the right section ----------------
+SECTIONS.update({
+    # one-button-per-tab keys → map to your existing anchors
+    "scoring_tab":       SECTIONS["score_trend"],
+    "capex_tab":         SECTIONS["capex_trend"],
+    "sectors_tab":       SECTIONS["sectors_bar"],
+    "destinations_tab":  SECTIONS["destinations_bar"],
+    "compare_tab":       SECTIONS["compare"],
+    "forecast_tab":      SECTIONS["forecast"],
+})
+
+# ---- Public helper: ℹ️ button you can use from any tab ----------------------
+def info_button(section_key: str, help_text: str = "What is this?"):
+    """
+    Renders a small ℹ️ button. When clicked, sets session state so the app
+    switches to the Overview tab and scrolls to the correct section.
+    """
+    if st.button("ℹ️", key=f"info_{section_key}", help=help_text):
+        st.session_state["overview_focus"] = section_key
+        st.session_state["_force_overview"] = True
+
+# ---- Public helper: JS to switch to Overview and smooth-scroll ---------------
+def emit_auto_jump_script():
+    """
+    If `_force_overview` is set, click the Overview tab and scroll to the
+    anchor for `overview_focus`.
+    """
+    if not st.session_state.get("_force_overview"):
+        return
+
+    key = st.session_state.get("overview_focus")
+    if not key or key not in SECTIONS:
+        st.session_state["_force_overview"] = False
+        return
+
+    _, anchor_id = SECTIONS[key]
+
+    from streamlit.components.v1 import html
+    html(f"""
+    <script>
+    (function() {{
+      function jump() {{
+        try {{
+          const root = window.parent.document;
+          // Click the Overview tab (match by label text)
+          const tabs = root.querySelectorAll('[role="tab"], [data-baseweb="tab"]');
+          let over = null;
+          tabs.forEach(t => {{
+            const txt = (t.innerText || '').trim().toLowerCase();
+            if (txt.includes('overview')) over = t;
+          }});
+          if (over) over.click();
+
+          // Smooth-scroll to the target anchor
+          setTimeout(() => {{
+            const el = root.getElementById("{anchor_id}");
+            if (el) el.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+          }}, 300);
+        }} catch (e) {{
+          // no-op
+        }}
+      }}
+      setTimeout(jump, 60);
+    }})();
+    </script>
+    """, height=0)
+
+    # reset the trigger so we don't keep jumping
+    st.session_state["_force_overview"] = False
+
