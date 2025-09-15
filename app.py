@@ -98,6 +98,7 @@ st.markdown(f"""
 
 def inject_tab_icons():
     icons_in_order = [
+        ROOT / "information.png",   # Overview
         ROOT / "score.png",         # Scoring
         ROOT / "capex.png",         # CAPEX
         ROOT / "sectors.png",       # Sectors
