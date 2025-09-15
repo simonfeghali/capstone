@@ -468,7 +468,7 @@ def filt_wb_scoping(df: pd.DataFrame, year_any, cont, country):
 # Tabs
 # ──────────────────────────────────────────────────────────────────────────────
 from compare_tab import render_compare_tab
-tab_scoring, tab_eda, tab_sectors, tab_dest, tab_compare, tab_forecast = st.tabs(
+tab_overview, tab_scoring, tab_eda, tab_sectors, tab_dest, tab_compare, tab_forecast = st.tabs(
     ["Overview", "Country Attractiveness", "Capital Investment", "Industry Landscape", "Target Countries", "Benchmarking", "FDI Forecasts"]
 )
 
