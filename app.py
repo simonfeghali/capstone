@@ -10,6 +10,8 @@ import re
 from urllib.parse import quote
 from urllib.error import URLError, HTTPError
 from forecasting import render_forecasting_tab
+from overview import render_overview_tab
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # App chrome / theme
@@ -466,8 +468,16 @@ def filt_wb_scoping(df: pd.DataFrame, year_any, cont, country):
 # ──────────────────────────────────────────────────────────────────────────────
 from compare_tab import render_compare_tab
 tab_scoring, tab_eda, tab_sectors, tab_dest, tab_compare, tab_forecast = st.tabs(
-    ["Country Attractiveness", "Capital Investment", "Industry Landscape", "Target Countries", "Benchmarking", "FDI Forecasts"]
+    ["Overview", "Country Attractiveness", "Capital Investment", "Industry Landscape", "Target Countries", "Benchmarking", "FDI Forecasts"]
 )
+
+# =============================================================================
+# OVERVIEW TAB 
+# =============================================================================
+
+with tab_overview:
+    render_overview_tab()
+
 # =============================================================================
 # SCORING TAB — Averages for "All", auto-sync continent, hide bottom row when country selected
 # =============================================================================
