@@ -737,9 +737,13 @@ with tab_scoring:
 # =============================================================================
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
-
-    st.caption("CAPEX Analysis for 2021-2024")
-
+    
+    cap_left, cap_right = st.columns([20, 1], gap="small")
+    with cap_left:
+        st.caption("CAPEX Analysis for 2021-2024")
+    with cap_right:
+    info_button("capex_tab")
+    
     # ---- De-dup helpers (CAPEX tab only) ----
     shown_kpi_keys: set = set()
     shown_series_keys: set = set()
@@ -1147,7 +1151,12 @@ def load_sectors_raw() -> pd.DataFrame:
 sectors_df = load_sectors_raw()
 
 with tab_sectors:
-    st.caption("Sectors Analysis for 2021-2024")
+    
+    cap_left, cap_right = st.columns([20, 1], gap="small")
+    with cap_left:
+        st.caption("Sectors Analysis for 2021-2024")
+    with cap_right:
+        info_button("sectors_tab")
 
     sc1, sc2 = st.columns([1, 2], gap="small")
     with sc1:
@@ -1344,8 +1353,11 @@ def make_route_map(source_country: str, dest_country: str) -> go.Figure:
     return _style_geo_white(fig, height=360)
 
 with tab_dest:
-    st.caption("Destinations Analysis for 2021-2024")
-
+    cap_left, cap_right = st.columns([20, 1], gap="small")
+    with cap_left:
+        st.caption("Destinations Analysis for 2021-2024")
+    with cap_right:
+        info_button("destinations_tab")
     dest_df = load_destinations_raw()
 
     src_countries = sorted(dest_df["source_country"].dropna().unique().tolist())
