@@ -110,19 +110,15 @@ def _anchor(title: str, anchor_id: str):
 
 def _weights_table():
     df = pd.DataFrame(_WEIGHTS, columns=["Indicator", "Weight (%)"])
-    st.dataframe(
-        df,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Weight (%)": st.column_config.NumberColumn(
-                "Weight (%)",
-                help="Relative weight in the composite index",
-                format="%d",
-                alignment="center"   
-            )
-        },
+    # Use Styler to center the numbers in the Weight column
+    styled = df.style.set_properties(
+        subset=["Weight (%)"], **{"text-align": "center"}
     )
+    # Also make sure the header is centered
+    styled = styled.set_table_styles(
+        [{"selector": "th.col_heading", "props": [("text-align", "center")]}]
+    )
+    st.dataframe(styled, use_container_width=True, hide_index=True)
 
 def _categories():
     for cat, bullets in _CATEGORIES.items():
