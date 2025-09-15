@@ -1456,3 +1456,5 @@ with tab_compare:
 
 with tab_forecast:
     render_forecasting_tab()
+    
+emit_auto_jump_script()
