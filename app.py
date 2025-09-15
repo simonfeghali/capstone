@@ -10,7 +10,7 @@ import re
 from urllib.parse import quote
 from urllib.error import URLError, HTTPError
 from forecasting import render_forecasting_tab
-from overview import render_overview_tab
+from overview import render_overview_tab, info_button, emit_auto_jump_script
 
 
 # ──────────────────────────────────────────────────────────────────────────────
