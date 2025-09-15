@@ -485,7 +485,13 @@ with tab_overview:
 with tab_scoring:
     sel_year_sc, sel_cont_sc, sel_country_sc = scoring_filters_block(wb)
 
-    st.caption("Scoring 2021-2023 • (World Bank–based)")
+    # Caption + info button side by side
+    col1, col2 = st.columns([20,1])
+    with col1:
+        st.caption("Scoring 2021–2023 • (World Bank–based)")
+    with col2:
+        info_button("scoring_tab")   # takes you to Overview explanation for Scoring
+        
     where_title = sel_country_sc if sel_country_sc != "All" else (sel_cont_sc if sel_cont_sc != "All" else "Worldwide")
     st.markdown(f"<h3 style='text-align:center; margin:0; font-weight:800'>{where_title}</h3>", unsafe_allow_html=True)
 
