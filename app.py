@@ -742,7 +742,7 @@ with tab_eda:
     with cap_left:
         st.caption("CAPEX Analysis for 2021-2024")
     with cap_right:
-    info_button("capex_tab")
+        info_button("capex_tab")
     
     # ---- De-dup helpers (CAPEX tab only) ----
     shown_kpi_keys: set = set()
