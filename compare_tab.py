@@ -446,14 +446,15 @@ def render_compare_tab():
             tr = scope.groupby("year", as_index=False)["capex"].sum()
             if not tr.empty:
                 tr["ys"] = tr["year"].astype(int).astype(str)
-                fig = px.line(tr, x="ys", y="capex", markers=True,
-                              labels={"ys":"","capex":""},
-                              title=f"{a} • CAPEX Trend ($B)")
-                fig.update_xaxes(type="category", showgrid=False)
-                fig.update_yaxes(showgrid=False)
+                fig = px.line(
+                    tr, x="ys", y="capex", markers=True,
+                    title=f"{a} • CAPEX Trend ($B)"
+                )
+                _style_compare_line(fig, unit="$B")  # <<<  add this
                 st.plotly_chart(fig, use_container_width=True)
         else:
-            _kpi(f"{a} CAPEX — {year_any}", scope.loc[scope["year"] == int(year_any), "capex"].sum(), "$B")
+            _kpi(f"{a} CAPEX — {year_any}",
+                 scope.loc[scope["year"] == int(year_any), "capex"].sum(), "$B")
     with right:
         st.markdown(f"**{b}**")
         scope = cap[cap["country"] == b]
@@ -461,14 +462,15 @@ def render_compare_tab():
             tr = scope.groupby("year", as_index=False)["capex"].sum()
             if not tr.empty:
                 tr["ys"] = tr["year"].astype(int).astype(str)
-                fig = px.line(tr, x="ys", y="capex", markers=True,
-                              labels={"ys":"","capex":""},
-                              title=f"{b} • CAPEX Trend ($B)")
-                fig.update_xaxes(type="category", showgrid=False)
-                fig.update_yaxes(showgrid=False)
+                fig = px.line(
+                    tr, x="ys", y="capex", markers=True,
+                    title=f"{b} • CAPEX Trend ($B)"
+                )
+                _style_compare_line(fig, unit="$B")  # <<<  add this
                 st.plotly_chart(fig, use_container_width=True)
         else:
-            _kpi(f"{b} CAPEX — {year_any}", scope.loc[scope["year"] == int(year_any), "capex"].sum(), "$B")
+            _kpi(f"{b} CAPEX — {year_any}",
+                 scope.loc[scope["year"] == int(year_any), "capex"].sum(), "$B")
 
     # ---------------- Section 3: Sectors (only for allowed pair) ----------------
     if allowed_pair:
