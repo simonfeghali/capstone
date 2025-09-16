@@ -309,25 +309,6 @@ def load_capex_long() -> pd.DataFrame:
     except Exception as e:
         raise RuntimeError(f"Could not load CAPEX from CSV or Excel: {e}")
 
-def _plotly_line_once(x_vals, y_vals, title, labels_x, labels_y, height=360, color=None):
-    sig = _series_key("LINE", x_vals, y_vals)
-    if sig in shown_series_keys:
-        return
-    shown_series_keys.add(sig)
-
-    fig = px.line(pd.DataFrame({"x": x_vals, "y": y_vals}),
-                  x="x", y="y", markers=True, title=title)
-    if color:
-        fig.update_traces(line=dict(color=color))
-
-    # <<< add this line
-    fig.update_traces(hovertemplate="Year: %{x}<br>Capex: %{y:,.0f} $B<extra></extra>")
-
-    fig.update_xaxes(title=labels_x, type="category", showgrid=False)
-    fig.update_yaxes(title=labels_y, showgrid=False)
-    fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
-    st.plotly_chart(fig, use_container_width=True)
-
 
 # Core data
 wb        = load_world_bank()
@@ -803,6 +784,8 @@ with tab_eda:
         )
         if color:
             fig.update_traces(line=dict(color=color))
+        # <<< add this line
+        fig.update_traces(hovertemplate="Year: %{x}<br>Capex: %{y:,.0f} $B<extra></extra>")
         fig.update_xaxes(title=labels_x, type="category", showgrid=False)
         fig.update_yaxes(title=labels_y, showgrid=False)
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
