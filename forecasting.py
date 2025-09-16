@@ -17,6 +17,8 @@ from sklearn.preprocessing import StandardScaler
 import plotly.graph_objects as go
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.statespace.sarimax import SARIMAX
+from overview import info_button, emit_auto_jump_script
+
 
 
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
@@ -367,7 +369,15 @@ def _plot_forecast_only(country: str,
 # ── public entrypoint ────────────────────────────────────────────────────────
 
 def render_forecasting_tab():
-    st.caption("Forecast - 2025–2028")
+    # Top bar: caption + info button (opens Overview → FDI Forecasts)
+    _f_left, _f_right = st.columns([20, 1], gap="small")
+    with _f_left:
+        st.caption("Forecasts — 2025–2028")
+    with _f_right:
+        info_button("forecast")  # scrolls to 'FDI Forecasts (2025–2028)' in Overview
+
+    # Ensure the auto-jump script is emitted (safe to call more than once)
+    emit_auto_jump_script()
 
 
     panel = _load_notebook_style_panel()
