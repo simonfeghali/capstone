@@ -6,6 +6,8 @@ import plotly.express as px
 from urllib.parse import quote
 from urllib.error import URLError, HTTPError
 import re
+from overview import info_button, emit_auto_jump_script
+
 
 # ================= Config =================
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
@@ -295,6 +297,17 @@ def render_compare_tab():
     if wb.empty:
         st.info("World Bank data required.")
         st.stop()
+        
+        # Top bar: caption + info button (opens Overview → Benchmarking)
+    _c_left, _c_right = st.columns([20, 1], gap="small")
+    with _c_left:
+        st.caption("Benchmarking — side-by-side country comparison")
+    with _c_right:
+        info_button("compare")  # scrolls to 'Benchmarking (Country vs. Country)' in Overview
+
+    # Ensure the auto-jump script is emitted (safe to call more than once)
+    emit_auto_jump_script()
+
 
     # -------- Controls: Year & Countries --------
     wb_years  = sorted(wb["year"].dropna().astype(int).unique().tolist())
