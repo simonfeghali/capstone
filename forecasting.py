@@ -18,6 +18,61 @@ import plotly.graph_objects as go
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
+# --- Info button helpers to jump to Overview ---------------------------------
+from streamlit.components.v1 import html
+
+def _fc_set_overview_focus(section_key: str):
+    """Set session flag so we can jump to the right Overview section, then rerun."""
+    st.session_state["overview_focus"] = section_key   # e.g., "forecast"
+    st.session_state["_force_overview"] = True
+    st.rerun()
+
+def _fc_emit_auto_jump_script():
+    """
+    If another tab set the flag, click the Overview tab and scroll to the
+    anchor with id="ov-forecast" (defined in overview.py).
+    """
+    if st.session_state.get("_force_overview"):
+        html(
+            """
+            <script>
+            (function() {
+              function go() {
+                try {
+                  const root = window.parent.document;
+                  // Click the "Overview" tab
+                  const tabs = root.querySelectorAll('[role="tab"], [data-baseweb="tab"]');
+                  let over = null;
+                  tabs.forEach(t => {
+                    const txt = (t.innerText || '').trim().toLowerCase();
+                    if (txt.includes('overview')) over = t;
+                  });
+                  if (over) over.click();
+                  // Then scroll to the Overview anchor
+                  setTimeout(() => {
+                    const anchor = root.getElementById('ov-forecast');
+                    if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 300);
+                } catch (e) {}
+              }
+              setTimeout(go, 60);
+            })();
+            </script>
+            """,
+            height=0,
+        )
+        st.session_state["_force_overview"] = False
+
+def _fc_info_button():
+    """Right-aligned ℹ️ button for the whole Forecast tab."""
+    _, cinfo = st.columns([0.88, 0.12])
+    with cinfo:
+        if st.button("ℹ️", key="info_forecast",
+                     help="Open Overview → FDI Forecasts (methods & how to read)"):
+            _fc_set_overview_focus("forecast")
+
+
+
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
     # Notebook-preferred files
@@ -367,6 +422,9 @@ def _plot_forecast_only(country: str,
 
 def render_forecasting_tab():
     st.caption("Forecast - 2025–2028")
+    _fc_info_button()
+    _fc_emit_auto_jump_script()
+
 
     panel = _load_notebook_style_panel()
     if panel.empty:
