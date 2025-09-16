@@ -1021,7 +1021,7 @@ with tab_eda:
                                 labels={"year_str": "", "capex": "", "grade": "Grade"},
                                 title="CAPEX Trend by Grade ($B)"
                             )
-                            fig.update_traces(mode="lines+markers",hovertemplate="Year: %{x}<br>Capex: %{y:,.0f} $B<br>Grade: %{legendgroup}<extra></extra>")
+                            fig.update_traces(mode="lines+markers",hovertemplate="Year: %{x}<br>Capex: %{y:,.0f} $B<br>Grade: %{name}<extra></extra>")
                             fig.update_xaxes(type="category",
                                              categoryorder="array",
                                              categoryarray=sorted(tg["year_str"].unique().tolist()),
