@@ -50,7 +50,7 @@ def _fc_emit_auto_jump_script():
                   if (over) over.click();
                   // Then scroll to the Overview anchor
                   setTimeout(() => {
-                    const anchor = root.getElementById('ov-forecast');
+                    const anchor = root.getElementById('FDI Forecasts (2025–2028)');
                     if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   }, 300);
                 } catch (e) {}
