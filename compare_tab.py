@@ -318,15 +318,14 @@ def render_compare_tab():
         st.info("World Bank data required.")
         st.stop()
         
-        # Top bar: caption + info button (opens Overview → Benchmarking)
-    _c_left, _c_right = st.columns([20, 1], gap="small")
-    with _c_left:
-        st.caption("Benchmarking — side-by-side country comparison")
-    with _c_right:
-        info_button("compare")  # scrolls to 'Benchmarking (Country vs. Country)' in Overview
-
-    # Ensure the auto-jump script is emitted (safe to call more than once)
+            # --- Top bar (compact) ---
+    top_l, top_r = st.columns([30, 1], gap="small")
+    with top_l:
+        st.caption("Benchmarking — side-by-side country comparison")  # small, no extra height
+    with top_r:
+        info_button("compare")  # jumps to Overview → Benchmarking
     emit_auto_jump_script()
+    
 
 
     # -------- Controls: Year & Countries --------
