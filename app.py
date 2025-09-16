@@ -834,33 +834,43 @@ with tab_eda:
 
     def _bars_or_kpi(df: pd.DataFrame, value_col: str, name_col: str, title: str,
                      unit: str, height: int = 420, ascending_for_hbar: bool = False):
-        valid = df[df[value_col].notna()].copy()
+        # 1) keep only valid numeric rows
+        valid = df.copy()
+        valid[value_col] = pd.to_numeric(valid[value_col], errors="coerce")
+        valid = valid[valid[value_col].notna()]
         if valid.empty:
             st.info("No data for this selection.")
             return
+    
+        # If only 1 row -> KPI
         if valid.shape[0] == 1:
             label = str(valid[name_col].iloc[0])
             val = float(valid[value_col].iloc[0])
-            # Use contextual KPI title instead of "Top Countries ..."
             kpi_title = _pretty_kpi_title(title, label)
             _kpi_block(kpi_title, val, unit)
             return
+    
         ordered = valid.sort_values(value_col, ascending=ascending_for_hbar)
+    
         sig = _series_key("BAR",
                           ordered[name_col].astype(str).tolist(),
                           ordered[value_col].astype(float).tolist())
         if sig in shown_series_keys:
             return
         shown_series_keys.add(sig)
+    
         fig = px.bar(
             ordered, x=value_col, y=name_col, orientation="h",
             color=value_col, color_continuous_scale="Blues",
             labels={value_col: "", name_col: ""}, title=title
         )
-        style_hover(fig, "$B")
+        # 2) explicit hover (never uses text/customdata)
+        h = f"%{{y}}: %{{x:,.0f}} {unit}<extra></extra>" if unit else "%{y}: %{x:,.0f}<extra></extra>"
+        fig.update_traces(hovertemplate=h, text=None, texttemplate=None, textposition=None)
         fig.update_coloraxes(showscale=False)
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
+
 
     # filters applied to CAPEX
     grade_options = ["All", "A+", "A", "B", "C", "D"]
