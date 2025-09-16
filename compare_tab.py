@@ -6,6 +6,52 @@ import plotly.express as px
 from urllib.parse import quote
 from urllib.error import URLError, HTTPError
 import re
+# --- Info button helpers to jump to Overview ---------------------------------
+from streamlit.components.v1 import html
+
+def _cmp_set_overview_focus(section_key: str):
+    st.session_state["overview_focus"] = section_key   # e.g., "compare"
+    st.session_state["_force_overview"] = True
+    st.rerun()
+
+def _cmp_emit_auto_jump_script():
+    # If another tab set the focus, click "Overview" and scroll to the right anchor
+    if st.session_state.get("_force_overview"):
+        target = st.session_state.get("overview_focus", "")
+        html(f"""
+        <script>
+        (function() {{
+          function go() {{
+            try {{
+              const root = window.parent.document;
+              // Click the "Overview" tab
+              const tabs = root.querySelectorAll('[role="tab"], [data-baseweb="tab"]');
+              let over = null;
+              tabs.forEach(t => {{
+                const txt = (t.innerText || '').trim().toLowerCase();
+                if (txt.includes('overview')) over = t;
+              }});
+              if (over) over.click();
+              // Scroll to #ov-compare
+              setTimeout(() => {{
+                const anchor = root.getElementById('ov-compare');
+                if (anchor) anchor.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+              }}, 300);
+            }} catch (e) {{}}
+          }}
+          setTimeout(go, 60);
+        }})();
+        </script>
+        """, height=0)
+        st.session_state["_force_overview"] = False
+
+def _cmp_info_button():
+    # Right-aligned ℹ️ button for the whole tab
+    _, cinfo = st.columns([0.88, 0.12])
+    with cinfo:
+        if st.button("ℹ️", key="info_compare", help="Open Overview → Benchmarking (what this tab means)"):
+            _cmp_set_overview_focus("compare")
+
 
 # ================= Config =================
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
@@ -353,6 +399,9 @@ def render_compare_tab():
 
     # ---------------- Section 1: Score & Grade (combined) ----------------
     st.subheader("Score & Grade")
+    _cmp_info_button()
+    _cmp_emit_auto_jump_script()
+
 
     def _score_grade(country):
         # When Year = All → pull from averages CSV (score & grade)
