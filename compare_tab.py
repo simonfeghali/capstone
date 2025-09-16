@@ -34,7 +34,7 @@ def _cmp_emit_auto_jump_script():
               if (over) over.click();
               // Scroll to #ov-compare
               setTimeout(() => {{
-                const anchor = root.getElementById('Benchmarking (Country vs. Country)');
+                const anchor = root.getElementById('ov-compare');
                 if (anchor) anchor.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
               }}, 300);
             }} catch (e) {{}}
