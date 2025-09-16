@@ -390,14 +390,12 @@ def render_compare_tab():
     st.subheader("Score & Grade")
 
     def _score_grade(country):
-        # When Year = All → pull from averages CSV (score & grade)
         if year_any == "All" and not wb_avg.empty:
             row = wb_avg[wb_avg["country"] == country]
             sc = float(row["avg_score"].mean()) if not row.empty else np.nan
             gr = row["grade"].astype(str).dropna().iloc[0] if not row.empty and row["grade"].notna().any() else "-"
             cont = wb.loc[wb["country"] == country, "continent"].dropna().iloc[0] if (wb["country"] == country).any() and wb["continent"].notna().any() else "-"
             return sc, gr, cont
-        # Otherwise use the per-year file
         s = wb[wb["country"] == country]
         cont = s["continent"].dropna().iloc[0] if not s.empty and s["continent"].notna().any() else "-"
         row = s[s["year"] == int(year_any)] if year_any != "All" else s
@@ -414,15 +412,12 @@ def render_compare_tab():
         with c2: st.markdown(_grade_pill(gA), unsafe_allow_html=True)
         st.markdown(f"**Continent:** {contA}")
         if year_any == "All":
-            # keep the trend chart (based on yearly data)
             s_tr = wb[wb["country"] == a].groupby("year", as_index=False)["score"].mean()
             if not s_tr.empty:
                 s_tr["ys"] = s_tr["year"].astype(int).astype(str)
-                fig = px.line(s_tr, x="ys", y="score", markers=True,title=f"{a} • Viability Score Trend")
-                fig.update_traces(hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>")
-                fig.update_xaxes(type="category", showgrid=False)
-                fig.update_yaxes(showgrid=False)
-                fig.update_layout(xaxis_title=None, yaxis_title=None)
+                fig = px.line(s_tr, x="ys", y="score", markers=True,
+                              title=f"{a} • Viability Score Trend")
+                _style_compare_line(fig, unit=None)      # ← unified hover + no axis titles
                 st.plotly_chart(fig, use_container_width=True)
 
     with right:
@@ -437,12 +432,10 @@ def render_compare_tab():
             if not s_tr.empty:
                 s_tr["ys"] = s_tr["year"].astype(int).astype(str)
                 fig = px.line(s_tr, x="ys", y="score", markers=True,
-                              labels={"ys":"","score":""},
                               title=f"{b} • Viability Score Trend")
-                fig.update_xaxes(type="category", showgrid=False)
-                fig.update_yaxes(showgrid=False)
+                _style_compare_line(fig, unit=None)      # ← same styling for B
                 st.plotly_chart(fig, use_container_width=True)
-
+    
     st.markdown("---")
 
     # ---------------- Section 2: CAPEX ----------------
