@@ -559,6 +559,7 @@ with tab_scoring:
                 fig_map = px.choropleth(map_df, locations="country", locationmode="country names",
                                         color="score", color_continuous_scale="Blues", title=map_title)
                 fig_map.update_coloraxes(showscale=True)
+                fig.update_traces(hovertemplate="Country: %{location}<br>Capex: %{z:,.0f} $B<extra></extra>")
                 scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
                              "North America":"north america","South America":"south america",
                              "Oceania":"world","All":"world"}
@@ -1021,6 +1022,7 @@ with tab_eda:
                                 labels={"year_str": "", "capex": "", "grade": "Grade"},
                                 title="CAPEX Trend by Grade ($B)"
                             )
+                            fig.update_traces(mode="lines+markers",hovertemplate="Year: %{x}<br>Capex: %{y:,.0f} $B<br>Grade: %{legendgroup}<extra></extra>")
                             fig.update_xaxes(type="category",
                                              categoryorder="array",
                                              categoryarray=sorted(tg["year_str"].unique().tolist()),
