@@ -346,26 +346,37 @@ def _plot_forecast_only(country: str,
                         best_name: str,
                         rmse: float):
     fig = go.Figure()
-    # Actual only
+
+    # Actual CAPEX ($B)
     fig.add_trace(go.Scatter(
-        x=actual.index, y=actual.values,
-        mode="lines", name="Actual CAPEX"
+        x=actual.index,
+        y=actual.values,
+        mode="lines",
+        name="Actual CAPEX",
+        hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>"
     ))
-    # Forecast (2025–2028)
+
+    # Forecast (2025–2028) ($B)
     if len(future_idx) > 0:
         fig.add_trace(go.Scatter(
-            x=future_idx, y=future_pred.values,
-            mode="lines", name="Future Forecast (2025–2028)",
-            line=dict(dash="dash")
+            x=future_idx,
+            y=future_pred.values,
+            mode="lines",
+            name="Forecast (2025–2028)",
+            line=dict(dash="dash"),
+            hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>"
         ))
+
     fig.update_layout(
         title=f"{best_name} Forecast for {country} | RMSE: {rmse:.2f} $B",
-        xaxis_title="", yaxis_title="",
+        xaxis_title="",
+        yaxis_title="CAPEX ($B)",
+        hovermode="x unified",   # one hover box aligned on x
         margin=dict(l=10, r=10, t=60, b=10),
         height=520
     )
-   
     return fig
+
 
 # ── public entrypoint ────────────────────────────────────────────────────────
 
