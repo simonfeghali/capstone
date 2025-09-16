@@ -23,7 +23,7 @@ from streamlit.components.v1 import html
 
 def _fc_set_overview_focus(section_key: str):
     """Set session flag so we can jump to the right Overview section, then rerun."""
-    st.session_state["overview_focus"] = "forecast"   # e.g., "forecast"
+    st.session_state["overview_focus"] = "FDI Forecasts (2025–2028)"   # e.g., "forecast"
     st.session_state["_force_overview"] = True
     st.rerun()
 
