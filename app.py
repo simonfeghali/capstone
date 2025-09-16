@@ -547,6 +547,7 @@ with tab_scoring:
                 fig_line.update_xaxes(type="category", categoryorder="array",
                                       categoryarray=yoy_df["year_str"].tolist(), showgrid=False)
                 fig_line.update_yaxes(showgrid=False)
+                fig_line.update_traces(mode="lines+markers",hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>")
                 fig_line.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=340)
                 st.plotly_chart(fig_line, use_container_width=True)
 
@@ -664,6 +665,7 @@ with tab_scoring:
                                   categoryarray=yoy_df["year_str"].tolist(), showgrid=False)
             fig_line.update_yaxes(showgrid=False)
             fig_line.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=340)
+            fig_line.update_traces(mode="lines+markers",hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>")
             st.plotly_chart(fig_line, use_container_width=True)
 
         with t2:
