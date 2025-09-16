@@ -397,8 +397,9 @@ def render_compare_tab():
             if not s_tr.empty:
                 s_tr["ys"] = s_tr["year"].astype(int).astype(str)
                 fig = px.line(s_tr, x="ys", y="score", markers=True,
-                              labels={"ys":"","score":""},
+                              labels={"ys": "Year", "score": "Viability Score"},
                               title=f"{a} • Viability Score Trend")
+                fig.update_traces(hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>")
                 fig.update_xaxes(type="category", showgrid=False)
                 fig.update_yaxes(showgrid=False)
                 st.plotly_chart(fig, use_container_width=True)
