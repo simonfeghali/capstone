@@ -50,15 +50,13 @@ def _style_compare_line(fig, unit: str | None = None):
     fig.update_traces(
         mode="lines+markers",
         hovertemplate=htmpl,
-        # make sure no stray data labels appear:
-        text=None,
-        texttemplate=None,
-        textposition=None
+        text=None, texttemplate=None, textposition=None
     )
     fig.update_xaxes(type="category", showgrid=False, title=None)
     fig.update_yaxes(showgrid=False, title=None)
-    fig.update_layout(hovermode="closest")  # no dotted unified hover line
+    fig.update_layout(hovermode="closest")  # removes dotted guideline
     return fig
+
 
 # === Canonicalize country names (same mapping you use elsewhere) ===
 def _canon_country(name: str) -> str:
