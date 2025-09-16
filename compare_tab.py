@@ -10,7 +10,7 @@ import re
 from streamlit.components.v1 import html
 
 def _cmp_set_overview_focus(section_key: str):
-    st.session_state["overview_focus"] = section_key   # e.g., "compare"
+    st.session_state["overview_focus"] = "Benchmarking (Country vs. Country)"   # e.g., "compare"
     st.session_state["_force_overview"] = True
     st.rerun()
 
@@ -34,7 +34,7 @@ def _cmp_emit_auto_jump_script():
               if (over) over.click();
               // Scroll to #ov-compare
               setTimeout(() => {{
-                const anchor = root.getElementById('ov-compare');
+                const anchor = root.getElementById('Benchmarking (Country vs. Country)');
                 if (anchor) anchor.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
               }}, 300);
             }} catch (e) {{}}
