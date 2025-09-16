@@ -230,7 +230,7 @@ def _prep_country_notebook(df_all: pd.DataFrame, country: str):
         future_exog = None
 
     return {
-        "capex_actual": pd.Series(d["CAPEX"].values, index=years, name="CAPEX"),
+        "capex_actual": pd.Series(d["CAPEX"].values / 1000.0, index=years, name="CAPEX"),  # <-- scaled to $B
         "endog_log": endog_log,
         "train_y": train_y, "test_y": test_y,
         "train_x": train_x, "test_x": test_x,
@@ -335,7 +335,7 @@ def _refit_and_forecast_full(best_model: dict, endog_log: pd.Series,
                         order=best_model["order"], seasonal_order=best_model["seasonal"]).fit(disp=False)
         future_log = final.forecast(steps=steps, exog=future_exog)
 
-    future = pd.Series(np.exp(future_log).values, index=future_index, name="forecast")
+    future = pd.Series(np.exp(future_log).values / 1000.0, index=future_index, name="forecast")  # <-- scaled to $B
     return future
 
 def _plot_forecast_only(country: str,
@@ -359,7 +359,7 @@ def _plot_forecast_only(country: str,
         ))
     fig.update_layout(
         title=f"{best_name} Forecast for {country} | RMSE: {rmse:.2f}",
-        xaxis_title="", yaxis_title="",
+        xaxis_title="", yaxis_title="CAPEX ($B)",
         margin=dict(l=10, r=10, t=60, b=10),
         height=520
     )
