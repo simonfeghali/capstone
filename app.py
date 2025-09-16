@@ -146,6 +146,18 @@ def inject_tab_icons():
 
 inject_tab_icons()
 
+# --- shared hover template for horizontal bars (y=category, x=value) ---
+def _metric_hover(fig, metric: str):
+    if metric == "Capex":
+        fig.update_traces(hovertemplate="%{y}<br>%{x:,.3f} $B<extra></extra>")
+    elif metric == "Jobs Created":
+        fig.update_traces(hovertemplate="%{y}<br>%{x:,.0f} Jobs<extra></extra>")
+    elif metric == "Companies":
+        fig.update_traces(hovertemplate="%{y}<br>%{x:,.0f} Companies<extra></extra>")
+    else:  # Projects
+        fig.update_traces(hovertemplate="%{y}<br>%{x:,.0f} Projects<extra></extra>")
+    return fig
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Data sources (GitHub raw)
@@ -1211,6 +1223,7 @@ with tab_sectors:
                 title=title, labels={value_col:"", "sector":""},
                 color=value_col, color_continuous_scale="Blues"
             )
+            _metric_hover(fig, metric)     # <-- add this line
             fig.update_coloraxes(showscale=False)
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
             st.plotly_chart(fig, use_container_width=True)
@@ -1434,6 +1447,7 @@ with tab_dest:
                     labels={value_col_dest:"", "destination_country":""},
                     color=value_col_dest, color_continuous_scale="Blues"
                 )
+                _metric_hover(fig, metric_dest)   # <-- add this line
                 fig.update_coloraxes(showscale=False)
                 fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
                 st.plotly_chart(fig, use_container_width=True)
