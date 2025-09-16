@@ -428,7 +428,7 @@ def render_forecasting_tab():
         if best.get("seasonal") is not None:
             st.markdown(f"**Seasonal:** `{best['seasonal']}`")
     with right:
-        st.markdown(f"**RMSE (test):** `{best['rmse']:.2f}`")
+        st.markdown(f"**RMSE (test):** `{best['rmse']:.2f} $B`")
         if len(prep["future_index"]) > 0:
             st.markdown(f"**Forecast horizon:** `{int(prep['future_index'][0])}–{int(prep['future_index'][-1])}`")
         else:
