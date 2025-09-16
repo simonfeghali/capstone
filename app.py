@@ -158,6 +158,17 @@ def _metric_hover(fig, metric: str):
         fig.update_traces(hovertemplate="%{y}<br>%{x:,.0f} Projects<extra></extra>")
     return fig
 
+def style_hover(fig, unit: str):
+    """
+    Apply consistent hover labels to bar/line charts.
+    unit examples: "Companies", "Jobs Created", "Projects", "$B"
+    """
+    fig.update_traces(
+        hovertemplate=f"%{{y:.3f}} {unit}" if fig.data[0].orientation == "h" 
+                      else f"%{{y:.3f}} {unit}"
+    )
+    return fig
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Data sources (GitHub raw)
@@ -891,7 +902,13 @@ with tab_eda:
                 y_vals = trend["capex"].astype(float).tolist()
                 title = (f"{sel_country} CAPEX Trend ($B)" if sel_country != "All"
                          else "Global CAPEX Trend ($B)")
-                _plotly_line_once(x_vals, y_vals, title, labels_x="", labels_y="", height=360)
+                fig = px.line(pd.DataFrame({"x": x_vals, "y": y_vals}), x="x", y="y", markers=True, title=title)
+                fig.update_xaxes(title="", type="category", showgrid=False)
+                fig.update_yaxes(title="", showgrid=False)
+                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=360)
+                style_hover(fig, "$B")
+                st.plotly_chart(fig, use_container_width=True)
+
 
     with e2:
         if isinstance(sel_year_any, int):
