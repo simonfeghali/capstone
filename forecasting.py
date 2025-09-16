@@ -353,7 +353,8 @@ def _plot_forecast_only(country: str,
         y=actual.values,
         mode="lines",
         name="Actual CAPEX",
-        hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>"
+        hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
+        showlegend=False   # hide legend box for hover
     ))
 
     # Forecast (2025–2028) ($B)
@@ -362,20 +363,27 @@ def _plot_forecast_only(country: str,
             x=future_idx,
             y=future_pred.values,
             mode="lines",
-            name="Forecast (2025–2028)",
             line=dict(dash="dash"),
-            hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>"
+            name="Forecast (2025–2028)",
+            hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
+            showlegend=False   # hide legend box for hover
         ))
 
     fig.update_layout(
         title=f"{best_name} Forecast for {country} | RMSE: {rmse:.2f} $B",
         xaxis_title="",
-        yaxis_title="CAPEX ($B)",
-        hovermode="x unified",   # one hover box aligned on x
+        yaxis_title="",
+        hovermode="x",            # removes the vertical unified line
+        hoverlabel=dict(
+            bgcolor="white",      # clean white box
+            font_size=12,
+            font_color="black"
+        ),
         margin=dict(l=10, r=10, t=60, b=10),
         height=520
     )
     return fig
+
 
 
 # ── public entrypoint ────────────────────────────────────────────────────────
