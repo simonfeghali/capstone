@@ -88,17 +88,22 @@ _GRADES = [
 ]
 
 def _toc():
-    st.markdown("### Quick Navigation")
-    cols = st.columns(2)
+    st.markdown("""
+    <style>
+      .toc-box { position: sticky; top: 80px; padding: 12px 14px; border:1px solid #eaeaea;
+                 border-radius:10px; background:#fff; }
+      .toc-box a { text-decoration:none; }
+      .toc-head { font-weight:700; margin-bottom:6px; }
+    </style>
+    """, unsafe_allow_html=True)
     items = list(SECTIONS.items())
-    left = items[:len(items)//2]
-    right = items[len(items)//2:]
-    with cols[0]:
-        for key, (title, anchor) in left:
+    left, right = st.columns([3,1], gap="large")
+    with right:
+        st.markdown('<div class="toc-box"><div class="toc-head">Quick Navigation</div>', unsafe_allow_html=True)
+        for _, (title, anchor) in items:
             st.markdown(f"- [{title}](#{anchor})")
-    with cols[1]:
-        for key, (title, anchor) in right:
-            st.markdown(f"- [{title}](#{anchor})")
+        st.markdown("</div>", unsafe_allow_html=True)
+
 
 def _anchor(title: str, anchor_id: str):
     # reserve scroll margin so headers aren't hidden under Streamlit's chrome
