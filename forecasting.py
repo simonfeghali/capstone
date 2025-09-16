@@ -360,7 +360,7 @@ def _plot_forecast_only(country: str,
         ))
     fig.update_layout(
         title=f"{best_name} Forecast for {country} | RMSE: {rmse:.2f} $B",
-        xaxis_title="", yaxis_title="CAPEX ($B)",
+        xaxis_title="Year", yaxis_title="CAPEX ($B)",
         margin=dict(l=10, r=10, t=60, b=10),
         height=520
     )
