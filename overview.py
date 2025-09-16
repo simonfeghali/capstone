@@ -89,16 +89,23 @@ _GRADES = [
 
 def _toc():
     st.markdown("### Quick Navigation")
+    seen = set()
     cols = st.columns(2)
-    items = list(SECTIONS.items())
+    items = []
+    for key, (title, anchor) in SECTIONS.items():
+        if anchor not in seen:  # avoid duplicates
+            items.append((title, anchor))
+            seen.add(anchor)
+
     left = items[:len(items)//2]
     right = items[len(items)//2:]
     with cols[0]:
-        for key, (title, anchor) in left:
+        for title, anchor in left:
             st.markdown(f"- [{title}](#{anchor})")
     with cols[1]:
-        for key, (title, anchor) in right:
+        for title, anchor in right:
             st.markdown(f"- [{title}](#{anchor})")
+
 
 def _anchor(title: str, anchor_id: str):
     # reserve scroll margin so headers aren't hidden under Streamlit's chrome
