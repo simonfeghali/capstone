@@ -857,6 +857,7 @@ with tab_eda:
             color=value_col, color_continuous_scale="Blues",
             labels={value_col: "", name_col: ""}, title=title
         )
+        style_hover(fig, "$B")
         fig.update_coloraxes(showscale=False)
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
@@ -986,6 +987,7 @@ with tab_eda:
                                      labels={"capex": "", "grade": ""},
                                      title=f"CAPEX by Grade — {sel_year_any}",
                                      color="capex", color_continuous_scale="Blues")
+                        style_hover(fig, "$B")
                         fig.update_coloraxes(showscale=False)
                         fig.update_yaxes(categoryorder="array", categoryarray=gb_sorted["grade"].tolist())
                         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
