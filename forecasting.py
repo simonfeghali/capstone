@@ -72,9 +72,10 @@ def _find_col(cols, *cands):
     return None
 
 def _rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    y_true = np.asarray(y_true, dtype=float)
-    y_pred = np.asarray(y_pred, dtype=float)
+    y_true = np.asarray(y_true, dtype=float) / 1000.0
+    y_pred = np.asarray(y_pred, dtype=float) / 1000.0
     return float(np.sqrt(np.nanmean((y_true - y_pred) ** 2)))
+
 
 # ── data loading (notebook-aligned) ──────────────────────────────────────────
 
