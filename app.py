@@ -590,6 +590,7 @@ with tab_scoring:
                                      labels={"score": "", "country": ""}, title=title_top)
                     fig_top.update_coloraxes(showscale=False)
                     fig_top.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+                    fig_top.update_traces(hovertemplate="%{y}: %{x:.3f}<extra></extra>",text=None, texttemplate=None, textposition=None)
                     st.plotly_chart(fig_top, use_container_width=True)
 
             with b2:
@@ -609,6 +610,7 @@ with tab_scoring:
                                        title="Grade Distribution — All Years",
                                        color="grade", color_discrete_map=cmap)
                     fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
+                    fig_donut.update_traces(hovertemplate="Grade: %{label}<br>Countries: %{value} (%{percent:.1%})<extra></extra>")
                     st.plotly_chart(fig_donut, use_container_width=True)
 
             with b3:
@@ -626,6 +628,7 @@ with tab_scoring:
                                       labels={"score": "", "continent": ""}, title=title_cont)
                     fig_cont.update_coloraxes(showscale=False)
                     fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+                    fig_cont.update_traces(hovertemplate="%{y}: %{x:.3f}<extra></extra>",text=None, texttemplate=None, textposition=None)
                     st.plotly_chart(fig_cont, use_container_width=True)
 
     else:
