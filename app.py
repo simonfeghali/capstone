@@ -906,8 +906,8 @@ with tab_eda:
             map_title = "CAPEX Map — All Years"
         if map_df.empty: st.info("No CAPEX data for this selection.")
         else:
-            fig = px.choropleth(map_df, locations="country", locationmode="country names",
-                                color="capex", color_continuous_scale="Blues", title=map_title)
+            fig = px.choropleth(map_df,locations="country",locationmode="country names",color="capex",color_continuous_scale="Blues",title=map_title,)
+            fig.update_traces(hovertemplate="Country: %{location}<br>Capex: %{z:,.0f} $B<extra></extra>")
             fig.update_coloraxes(showscale=True)
             scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
                          "North America":"north america","South America":"south america",
