@@ -101,31 +101,12 @@ def _toc():
             st.markdown(f"- [{title}](#{anchor})")
 
 def _anchor(title: str, anchor_id: str):
-    st.markdown(f"""<div id="{anchor_id}" style="scroll-margin-top: 80px;"></div>""",
-                unsafe_allow_html=True)
-    left, right = st.columns([0.9, 0.1])
-    with left:
-        st.subheader(title)
-    with right:
-        from streamlit.components.v1 import html
-        html(f"""
-        <button id="copy-{anchor_id}" title="Copy link" style="
-            margin-top: 10px; float:right; border:0; background:transparent; cursor:pointer;
-            font-size:18px;">🔗</button>
-        <script>
-        (function(){{
-          const btn = window.parent.document.getElementById("copy-{anchor_id}");
-          if (btn) {{
-            btn.onclick = function() {{
-              const url = new URL(window.parent.location.href);
-              url.searchParams.set("jump", "{[k for k,(t,a) in SECTIONS.items() if a==anchor_id][0]}");
-              navigator.clipboard.writeText(url.toString());
-            }};
-          }}
-        }})();
-        </script>
-        """, height=0)
-
+    # reserve scroll margin so headers aren't hidden under Streamlit's chrome
+    st.markdown(
+        f"""<div id="{anchor_id}" style="scroll-margin-top: 80px;"></div>""",
+        unsafe_allow_html=True,
+    )
+    st.subheader(title)
 
 def _weights_table():
     df = pd.DataFrame(_WEIGHTS, columns=["Indicator", "Weight (%)"])
