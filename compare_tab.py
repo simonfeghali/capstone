@@ -387,63 +387,57 @@ def render_compare_tab():
     st.markdown("---")
 
     # ---------------- Section 1: Score & Grade (combined) ----------------
-    st.subheader("Score & Grade")
+st.subheader("Score & Grade")
 
-    def _score_grade(country):
-        # When Year = All → pull from averages CSV (score & grade)
-        if year_any == "All" and not wb_avg.empty:
-            row = wb_avg[wb_avg["country"] == country]
-            sc = float(row["avg_score"].mean()) if not row.empty else np.nan
-            gr = row["grade"].astype(str).dropna().iloc[0] if not row.empty and row["grade"].notna().any() else "-"
-            cont = wb.loc[wb["country"] == country, "continent"].dropna().iloc[0] if (wb["country"] == country).any() and wb["continent"].notna().any() else "-"
-            return sc, gr, cont
-        # Otherwise use the per-year file
-        s = wb[wb["country"] == country]
-        cont = s["continent"].dropna().iloc[0] if not s.empty and s["continent"].notna().any() else "-"
-        row = s[s["year"] == int(year_any)] if year_any != "All" else s
-        sc = float(row["score"].mean()) if not row.empty else np.nan
-        gr = row["grade"].astype(str).dropna().iloc[0] if (year_any != "All" and not row.empty and row["grade"].notna().any()) else ("-" if year_any != "All" else "-")
-        return sc, gr if year_any != "All" else "-", cont
+def _score_grade(country):
+    if year_any == "All" and not wb_avg.empty:
+        row = wb_avg[wb_avg["country"] == country]
+        sc = float(row["avg_score"].mean()) if not row.empty else np.nan
+        gr = row["grade"].astype(str).dropna().iloc[0] if not row.empty and row["grade"].notna().any() else "-"
+        cont = wb.loc[wb["country"] == country, "continent"].dropna().iloc[0] if (wb["country"] == country).any() and wb["continent"].notna().any() else "-"
+        return sc, gr, cont
+    s = wb[wb["country"] == country]
+    cont = s["continent"].dropna().iloc[0] if not s.empty and s["continent"].notna().any() else "-"
+    row = s[s["year"] == int(year_any)] if year_any != "All" else s
+    sc = float(row["score"].mean()) if not row.empty else np.nan
+    gr = row["grade"].astype(str).dropna().iloc[0] if (year_any != "All" and not row.empty and row["grade"].notna().any()) else ("-" if year_any != "All" else "-")
+    return sc, gr if year_any != "All" else "-", cont
 
-    left, right = st.columns(2, gap="large")
-    with left:
-        st.markdown(f"**{a}**")
-        scA, gA, contA = _score_grade(a)
-        c1, c2 = st.columns([1, 1])
-        with c1: _kpi("Score", scA)
-        with c2: st.markdown(_grade_pill(gA), unsafe_allow_html=True)
-        st.markdown(f"**Continent:** {contA}")
-        if year_any == "All":
-            # keep the trend chart (based on yearly data)
-            s_tr = wb[wb["country"] == a].groupby("year", as_index=False)["score"].mean()
-            if not s_tr.empty:
-                s_tr["ys"] = s_tr["year"].astype(int).astype(str)
-                fig = px.line(s_tr, x="ys", y="score", markers=True,title=f"{a} • Viability Score Trend")
-                fig.update_traces(hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>")
-                fig.update_xaxes(type="category", showgrid=False)
-                fig.update_yaxes(showgrid=False)
-                fig.update_layout(xaxis_title=None, yaxis_title=None)
-                st.plotly_chart(fig, use_container_width=True)
+left, right = st.columns(2, gap="large")
 
-    with right:
-        st.markdown(f"**{b}**")
-        scB, gB, contB = _score_grade(b)
-        c1, c2 = st.columns([1, 1])
-        with c1: _kpi("Score", scB)
-        with c2: st.markdown(_grade_pill(gB), unsafe_allow_html=True)
-        st.markdown(f"**Continent:** {contB}")
-        if year_any == "All":
-            s_tr = wb[wb["country"] == b].groupby("year", as_index=False)["score"].mean()
-            if not s_tr.empty:
-                s_tr["ys"] = s_tr["year"].astype(int).astype(str)
-                fig = px.line(s_tr, x="ys", y="score", markers=True,
-                              labels={"ys":"","score":""},
-                              title=f"{b} • Viability Score Trend")
-                fig.update_xaxes(type="category", showgrid=False)
-                fig.update_yaxes(showgrid=False)
-                st.plotly_chart(fig, use_container_width=True)
+with left:
+    st.markdown(f"**{a}**")
+    scA, gA, contA = _score_grade(a)
+    c1, c2 = st.columns([1, 1])
+    with c1: _kpi("Score", scA)
+    with c2: st.markdown(_grade_pill(gA), unsafe_allow_html=True)
+    st.markdown(f"**Continent:** {contA}")
+    if year_any == "All":
+        s_tr = wb[wb["country"] == a].groupby("year", as_index=False)["score"].mean()
+        if not s_tr.empty:
+            s_tr["ys"] = s_tr["year"].astype(int).astype(str)
+            fig = px.line(s_tr, x="ys", y="score", markers=True,
+                          title=f"{a} • Viability Score Trend")
+            _style_compare_line(fig, unit=None)      # ← unified hover + no axis titles
+            st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("---")
+with right:
+    st.markdown(f"**{b}**")
+    scB, gB, contB = _score_grade(b)
+    c1, c2 = st.columns([1, 1])
+    with c1: _kpi("Score", scB)
+    with c2: st.markdown(_grade_pill(gB), unsafe_allow_html=True)
+    st.markdown(f"**Continent:** {contB}")
+    if year_any == "All":
+        s_tr = wb[wb["country"] == b].groupby("year", as_index=False)["score"].mean()
+        if not s_tr.empty:
+            s_tr["ys"] = s_tr["year"].astype(int).astype(str)
+            fig = px.line(s_tr, x="ys", y="score", markers=True,
+                          title=f"{b} • Viability Score Trend")
+            _style_compare_line(fig, unit=None)      # ← same styling for B
+            st.plotly_chart(fig, use_container_width=True)
+
+st.markdown("---")
 
     # ---------------- Section 2: CAPEX ----------------
     st.subheader("CAPEX")
