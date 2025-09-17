@@ -243,9 +243,10 @@ def render_overview_tab():
     # 1) Viability Score & Trend
     _anchor(*SECTIONS["score_trend"])
     st.markdown(
-        "- **What it is:** A normalized 0–1 composite index (higher = more attractive) of macro, governance, and infrastructure indicators for each country-year observation, computed using the weighted sum:
-Score = 0.45 Econ + 0.3 Gov + 0.25 Infra"
+    """- **What it is:** A normalized 0–1 composite index (higher = more attractive) of macro, governance, and infrastructure indicators for each country-year observation.  
+    **Weighted mix:** `Score = 0.45 Econ + 0.30 Gov + 0.25 Infra`"""
     )
+
     st.markdown("**Indicators Weights** as a share of the composite score:")
     _weights_table()
     st.markdown("**Indicators by Category**")
