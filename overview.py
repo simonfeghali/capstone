@@ -116,9 +116,15 @@ def _anchor(title: str, anchor_id: str):
 
 def _weights_table():
     df = pd.DataFrame(_WEIGHTS, columns=["Indicator", "Weight (%)"])
-    # Convert numbers to strings and center them visually
-    df["Weight (%)"] = df["Weight (%)"].astype(str).str.center(5)
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    # Center the numeric column + header via Styler
+    styled = (
+        df.style
+          .set_properties(subset=["Weight (%)"], **{"text-align": "center"})
+          .set_table_styles([{"selector": "th.col_heading", "props": [("text-align", "center")]}])
+    )
+    # Use st.table so the CSS is applied; hide the index for a clean look
+    st.table(styled.hide(axis="index"))
+
 
 def _categories():
     for cat, bullets in _CATEGORIES.items():
