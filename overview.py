@@ -115,19 +115,56 @@ def _anchor(title: str, anchor_id: str):
     st.subheader(title)
 
 def _weights_table():
-    df = pd.DataFrame(_WEIGHTS, columns=["Indicator", "Weight (%)"])
-
-    styled = (
-        df.style
-          .set_properties(subset=["Weight (%)"], **{"text-align": "center"})  # center cells
-          .set_table_styles([
-              {"selector": "th.col_heading", "props": [("text-align", "center")]},  # center header
-              {"selector": "th.row_heading", "props": [("display", "none")]},       # hide index header
-              {"selector": "tbody th", "props": [("display", "none")]},             # hide index cells
-          ])
+    # Build rows once for speed/clarity
+    rows = "\n".join(
+        f"<tr><td class='ind'>{ind}</td><td class='num'>{w}</td></tr>"
+        for ind, w in _WEIGHTS
     )
 
-    st.table(styled)
+    st.markdown(
+        f"""
+        <style>
+          /* Container table */
+          .weights-table {{
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;               /* prevents header crowding */
+          }}
+          .weights-table th, .weights-table td {{
+            border: 1px solid #e6e6e6;
+            padding: 10px 12px;
+            vertical-align: middle;
+          }}
+          .weights-table thead th {{
+            background: #f8f9fa;
+            font-weight: 600;
+            text-align: center;                /* center headers */
+          }}
+          /* Column sizing & alignment */
+          .weights-table td.ind {{ width: 75%; }}
+          .weights-table td.num {{ width: 25%; text-align: center; }}
+          /* Rounded look to match Streamlit cards */
+          .weights-wrap {{
+            border-radius: 10px; overflow: hidden; border: 1px solid #eee;
+          }}
+        </style>
+
+        <div class="weights-wrap">
+          <table class="weights-table">
+            <thead>
+              <tr>
+                <th>Indicator</th>
+                <th>Weight (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows}
+            </tbody>
+          </table>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _categories():
