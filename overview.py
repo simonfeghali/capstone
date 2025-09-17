@@ -246,12 +246,15 @@ def render_overview_tab():
 
     _business_and_technical_pairs([
         (
-            "Note:",
+            "Interpreting the score trend",
             [
                 "Track direction of change across years to spot improving or deteriorating fundamentals.",
                 "Use alongside grades to understand both *absolute level* (score) and *peer-relative position* (grade).",
-                "If viewing a single year in the app, the ‘latest’ trend point will match the selection filters in the Scoring tab.",
             ],
+            [
+                "Scores are averaged per country-year from weighted indicators; normalization ensures cross-indicator comparability.",
+                "If viewing a single year in the app, the ‘latest’ trend point will match the selection filters in the Scoring tab.",
+            ]
         ),
     ])
 
@@ -277,14 +280,14 @@ def render_overview_tab():
     _anchor(*SECTIONS["capex_trend"])
     _business_and_technical_pairs([
         (
-            "Capital Expenditure (CAPEX) trend",
+            "Using grades in decisions",
             [
-                "Signals momentum and scale of cross-border commitments; spikes often flag mega-projects.",
-                "Use trend slope + volatility to assess durability of investment pipelines.",
+                "Grades simplify communication with executives and non-technical stakeholders.",
+                "Combine grades with sector context (e.g., a ‘B’ country might still be optimal for specific industries).",
             ],
             [
-                "In the app, CAPEX is displayed in **USD billions ($B)**; raw series are melted to long format.",
-                "On the CAPEX tab, we convert (legacy millions) → billions for consistency in KPIs/maps.",
+                "Grades are computed by percentile **within each year** to avoid cross-year distortions.",
+                "Countries near threshold cut-offs can shift grades year-to-year despite small score changes.",
             ],
         ),
     ])
