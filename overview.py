@@ -241,20 +241,17 @@ def render_overview_tab():
     )
     st.markdown("**Indicator Weights** (as a share of the composite):")
     _weights_table()
-    st.markdown("**Category Guide**")
+    st.markdown("**Indicators by Category**")
     _categories()
 
     _business_and_technical_pairs([
         (
-            "Interpreting the score trend",
+            "Note:",
             [
                 "Track direction of change across years to spot improving or deteriorating fundamentals.",
                 "Use alongside grades to understand both *absolute level* (score) and *peer-relative position* (grade).",
-            ],
-            [
-                "Scores are averaged per country-year from weighted indicators; normalization ensures cross-indicator comparability.",
                 "If viewing a single year in the app, the ‘latest’ trend point will match the selection filters in the Scoring tab.",
-            ]
+            ],
         ),
     ])
 
