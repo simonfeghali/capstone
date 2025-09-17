@@ -195,8 +195,6 @@ def _business_and_technical_pairs(pairs: list[tuple[str, list[str], list[str]]])
         st.markdown("---")
 
 def _score_trend_section():
-    st.markdown("### Interpreting the score trend")
-
     st.markdown("**Why it matters:**")
     st.markdown("""
     - **Identify trajectory** — rising scores signal improving fundamentals, while declines may indicate emerging risks.
