@@ -132,6 +132,8 @@ def _weights_table():
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-family: inherit;
+            font-size: inherit;
           }}
           .weights-table th, .weights-table td {{
             border: 1px solid #e6e6e6;
