@@ -261,15 +261,15 @@ def render_overview_tab():
     _grades_section()
     _business_and_technical_pairs([
         (
-            "Using grades in decisions",
+            "Interpreting the score trend",
             [
-                "Grades simplify communication with executives and non-technical stakeholders.",
-                "Combine grades with sector context (e.g., a ‘B’ country might still be optimal for specific industries).",
+                "Track direction of change across years to spot improving or deteriorating fundamentals.",
+                "Use alongside grades to understand both *absolute level* (score) and *peer-relative position* (grade).",
             ],
             [
-                "Grades are computed by percentile **within each year** to avoid cross-year distortions.",
-                "Countries near threshold cut-offs can shift grades year-to-year despite small score changes.",
-            ],
+                "Scores are averaged per country-year from weighted indicators; normalization ensures cross-indicator comparability.",
+                "If viewing a single year in the app, the ‘latest’ trend point will match the selection filters in the Scoring tab.",
+            ]
         ),
     ])
 
