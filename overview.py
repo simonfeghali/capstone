@@ -17,6 +17,7 @@ SECTIONS = {
     "score_trend": ("Country Viability Composite Score",            "ov-score-trend"),
     "grade_map":   ("Grades & Percentile Buckets",        "ov-grade-map"),
     "capex_trend": ("CAPEX: Definition & Trends",         "ov-capex-trend"),
+    "capex_map":   ("CAPEX — Geographic View",           "ov-capex-map"),
     "sectors_bar": ("Investment Profile: Top Industries ",       "ov-sectors"),
     "destinations_bar": ("Investment Profile: Top Destinations", "ov-destinations"),
     "compare":     ("Benchmarking (Country vs. Country)", "ov-compare"),
