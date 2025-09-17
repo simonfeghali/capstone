@@ -116,14 +116,18 @@ def _anchor(title: str, anchor_id: str):
 
 def _weights_table():
     df = pd.DataFrame(_WEIGHTS, columns=["Indicator", "Weight (%)"])
-    # Center the numeric column + header via Styler
+
     styled = (
         df.style
-          .set_properties(subset=["Weight (%)"], **{"text-align": "center"})
-          .set_table_styles([{"selector": "th.col_heading", "props": [("text-align", "center")]}])
+          .set_properties(subset=["Weight (%)"], **{"text-align": "center"})  # center cells
+          .set_table_styles([
+              {"selector": "th.col_heading", "props": [("text-align", "center")]},  # center header
+              {"selector": "th.row_heading", "props": [("display", "none")]},       # hide index header
+              {"selector": "tbody th", "props": [("display", "none")]},             # hide index cells
+          ])
     )
-    # Use st.table so the CSS is applied; hide the index for a clean look
-    st.table(styled.hide(axis="index"))
+
+    st.table(styled)
 
 
 def _categories():
