@@ -13,12 +13,12 @@ import pandas as pd
 
 # Map short keys -> (section title, anchor id)
 SECTIONS = {
-    "score_trend": ("Viability Score & Trend",            "ov-score-trend"),
+    "score_trend": ("Country Viability Composite Score",            "ov-score-trend"),
     "grade_map":   ("Grades & Percentile Buckets",        "ov-grade-map"),
     "capex_trend": ("CAPEX — Definition & Trend",         "ov-capex-trend"),
     "capex_map":   ("CAPEX — Geographic View",            "ov-capex-map"),
-    "sectors_bar": ("Industry Landscape (Sectors)",       "ov-sectors"),
-    "destinations_bar": ("Target Countries (Destinations)", "ov-destinations"),
+    "sectors_bar": ("Investment Profile: Top Industries ",       "ov-sectors"),
+    "destinations_bar": ("Investment Profile: Top Destinations", "ov-destinations"),
     "compare":     ("Benchmarking (Country vs. Country)", "ov-compare"),
     "forecast":    ("FDI Forecasts (2025–2028)",          "ov-forecast"),
     # alias keys used by prior samples
