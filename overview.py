@@ -194,6 +194,16 @@ def _business_and_technical_pairs(pairs: list[tuple[str, list[str], list[str]]])
             for t in tech: st.markdown(f"- {t}")
         st.markdown("---")
 
+def _score_trend_section():
+    st.markdown("### Interpreting the score trend")
+
+    st.markdown("**Why it matters:**")
+    st.markdown("""
+    - **Identify trajectory** — rising scores signal improving fundamentals, while declines may indicate emerging risks.
+    - **Benchmark effectively** — compare your target market’s trend against peers to spot relative over- or under-performance.
+    - **Time decisions** — use trends to gauge whether now is the right moment for expansion, consolidation, or exit. 
+    """)
+
 def _auto_jump():
     """
     Support URL param ?jump=<key> or session_state['overview_focus'] to auto-scroll.
@@ -225,10 +235,6 @@ def _auto_jump():
         )
 
 def render_overview_tab():
-    st.header("Overview & Methodology")
-    st.caption(
-        "Business-oriented explanations of each plot and metric, with technical details to ensure transparent, repeatable analysis."
-    )
 
     # Table of contents / quick links
     _toc()
@@ -237,26 +243,15 @@ def render_overview_tab():
     # 1) Viability Score & Trend
     _anchor(*SECTIONS["score_trend"])
     st.markdown(
-        "- **What it is:** A normalized 0–1 composite index of macro, governance, and infrastructure indicators (higher = more attractive)."
+        "- **What it is:** A normalized 0–1 composite index (higher = more attractive) of macro, governance, and infrastructure indicators for each country-year observation, computed using the weighted sum:
+Score = 0.45 Econ + 0.3 Gov + 0.25 Infra"
     )
-    st.markdown("**Indicator Weights** (as a share of the composite):")
+    st.markdown("**Indicators Weights** as a share of the composite score:")
     _weights_table()
     st.markdown("**Indicators by Category**")
     _categories()
 
-    _business_and_technical_pairs([
-        (
-            "Interpreting the score trend",
-            [
-                "Track direction of change across years to spot improving or deteriorating fundamentals.",
-                "Use alongside grades to understand both *absolute level* (score) and *peer-relative position* (grade).",
-            ],
-            [
-                "Scores are averaged per country-year from weighted indicators; normalization ensures cross-indicator comparability.",
-                "If viewing a single year in the app, the ‘latest’ trend point will match the selection filters in the Scoring tab.",
-            ]
-        ),
-    ])
+    _score_trend_section()
 
     # 2) Grades & Percentile Buckets
     _anchor(*SECTIONS["grade_map"])
