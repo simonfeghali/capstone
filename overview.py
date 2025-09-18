@@ -18,6 +18,7 @@ SECTIONS = {
     "grade_map":   ("Grades & Percentile Buckets",       "ov-grade-map"),
     "capex_trend": ("CAPEX: Definition & Trends",        "ov-capex-trend"),
     "sectors_bar": ("Investment Profile: Top Industries & Destinations", "ov-sectors"),
+    "destinations_bar":  ("Investment Profile: Top industries and destinations", "ov-investment"),
     "compare":     ("Benchmarking (Country vs. Country)", "ov-compare"),
     "forecast":    ("FDI Forecasts (2025–2028)",          "ov-forecast"),
     # alias keys used by prior samples
@@ -194,6 +195,21 @@ def _business_and_technical_pairs(pairs: list[tuple[str, list[str], list[str]]])
                 st.markdown(f"- {t}")
         st.markdown("---")
 
+        
+def _what_why_how_block(title: str, what: list[str], why: list[str], how: list[str]):
+    st.markdown(f"**{title}**")
+    cols = st.columns(3)
+    with cols[0]:
+        st.markdown("_What it is_")
+        for b in what: st.markdown(f"- {b}")
+    with cols[1]:
+        st.markdown("_Why it matters_")
+        for b in why: st.markdown(f"- {b}")
+    with cols[2]:
+        st.markdown("_How to navigate_")
+        for b in how: st.markdown(f"- {b}")
+    st.markdown("---")
+
 def _score_trend_section():
     st.markdown("**Why it matters:**")
     st.markdown("""
@@ -287,37 +303,51 @@ def render_overview_tab():
     ])
 
 
-    # 4) Industry Landscape (Sectors)
-    _anchor(*SECTIONS["sectors_bar"])
-    _business_and_technical_pairs([
-        (
-            "Sector bars (Companies / Jobs / Projects / CAPEX)",
-            [
-                "Expose the composition of activity: e.g., high CAPEX with few projects implies larger average deal size.",
-                "Use Jobs/Companies to assess labor intensity and ecosystem depth.",
-            ],
-            [
-                "Data is grouped by (country, sector) and summed over 2021–2024 in your current build.",
-                "Sector canonicalization harmonizes labels (e.g., ‘IT’, ‘Software’) for coherent comparisons.",
-            ],
-        ),
-    ])
+    # Investment Profile — combined section
+    _anchor(*SECTIONS["sectors_bar"])  # both old keys resolve to the same anchor
+    
+    # Top industries
+    _what_why_how_block(
+        "Top industries",
+        # WHAT
+        [
+            "Sector-level view of outbound FDI by **Companies, Jobs, Projects, and CAPEX**.",
+            "Covers 16 canonized sectors for comparability across the top source countries."
+        ],
+        # WHY
+        [
+            "Reveals industry strengths vs. gaps; balance capital intensity (CAPEX) against job intensity.",
+            "Helps prioritize clusters and ecosystem development where a country is genuinely competitive."
+        ],
+        # HOW (matches the Sectors tab UI/behavior)
+        [
+            "Choose a **Source Country** and **Metric**; keep **Sector = All** to see a ranked bar chart.",
+            "Pick a **specific sector** to switch the view to a single KPI for that sector/country.",
+            "Use the **download** button to export the standardized sector table for the selected country."
+        ],
+    )
+    
+    # Top destinations
+    _what_why_how_block(
+        "Top destinations",
+        # WHAT
+        [
+            "Destination-country ranking of a source country’s outbound FDI across **Companies, Jobs, Projects, and CAPEX**.",
+            "Shows the **Top 15** destinations and a companion map (or a route view for a selected pair)."
+        ],
+        # WHY
+        [
+            "Quantifies concentration risk (a few destinations dominate) versus diversification.",
+            "Highlights white space: large investors with limited presence in certain regions."
+        ],
+        # HOW (matches the Destinations tab UI/behavior)
+        [
+            "Select a **Source Country** and **Metric**; keep **Destination = All** to see **Top 15** + map.",
+            "Choose a **specific destination** to see a KPI and a **route map** for that pair.",
+            "Use the **download** button to export all destination rows for the selected source country."
+        ],
+    )
 
-    # 5) Target Countries (Destinations)
-    _anchor(*SECTIONS["destinations_bar"])
-    _business_and_technical_pairs([
-        (
-            "Destinations ranking (for a source country)",
-            [
-                "Rank markets by Companies, Jobs, Projects, or CAPEX to gauge outbound focus and white space.",
-                "Evaluate concentration risk (few destinations dominate) versus diversification.",
-            ],
-            [
-                "Aggregations exclude ‘Total/All’ rollups; flows are summed by (source → destination).",
-                "Units: CAPEX in $B; other metrics are counts (companies/projects) or people (jobs).",
-            ],
-        ),
-    ])
 
     # 6) Benchmarking (Compare)
     _anchor(*SECTIONS["compare"])
