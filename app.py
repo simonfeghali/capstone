@@ -1382,7 +1382,7 @@ with tab_dest:
     with cap_left:
         st.caption("Destinations Analysis for 2021-2024")
     with cap_right:
-        info_button("investment_profile", "What is this?", key_suffix="sectors")
+        info_button("investment_profile", "What is this?", key_suffix="destinations")
     dest_df = load_destinations_raw()
 
     src_countries = sorted(dest_df["source_country"].dropna().unique().tolist())
