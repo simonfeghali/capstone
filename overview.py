@@ -86,23 +86,72 @@ _GRADES = [
 ]
 
 def _toc():
-    st.markdown("### Quick Navigation")
+    """Two-column Quick Navigation with chip-style buttons (no blue links)."""
+    # Collect unique (title, anchor) pairs (since multiple keys can share the same anchor)
     seen = set()
-    cols = st.columns(2)
-    items = []
-    for key, (title, anchor) in SECTIONS.items():
-        if anchor not in seen:  # avoid duplicates
+    items: list[tuple[str, str]] = []
+    for _, (title, anchor) in SECTIONS.items():
+        if anchor not in seen:
             items.append((title, anchor))
             seen.add(anchor)
 
+    # Split into two columns (left/right)
     left = items[:len(items)//2]
     right = items[len(items)//2:]
-    with cols[0]:
-        for title, anchor in left:
-            st.markdown(f"- [{title}](#{anchor})")
-    with cols[1]:
-        for title, anchor in right:
-            st.markdown(f"- [{title}](#{anchor})")
+
+    st.markdown("### Quick Navigation")
+    c1, c2 = st.columns(2)
+
+    def _render_col(col, col_items):
+        from streamlit.components.v1 import html as st_html
+        # Build the chips as buttons; clicking scrolls smoothly to the anchor
+        chips = "\n".join(
+            f"""
+            <div class="toc-chip" onclick="
+              (function(){{
+                const root = window.parent?.document || document;
+                const el = root.getElementById('{anchor}');
+                if (el) el.scrollIntoView({{behavior:'smooth', block:'start'}});
+              }})();
+            ">
+              <span class="toc-label">{title}</span>
+            </div>
+            """
+            for (title, anchor) in col_items
+        )
+        st_html(f"""
+        <style>
+          .toc-wrap {{ display: flex; flex-direction: column; gap: 10px; }}
+          .toc-chip {{
+            background: #f8f9fa;
+            border: 1px solid #e6e6e6;
+            border-radius: 10px;
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: background 120ms ease, border-color 120ms ease, transform 60ms ease;
+            user-select: none;
+            box-shadow: 0 0 0 rgba(0,0,0,0);
+          }}
+          .toc-chip:hover {{
+            background: #f3f4f6;
+            border-color: #dfe3e8;
+          }}
+          .toc-chip:active {{
+            transform: translateY(1px);
+          }}
+          .toc-label {{
+            color: #111827;           /* neutral text, not link blue */
+            font-weight: 500;
+          }}
+        </style>
+        <div class="toc-wrap">
+          {chips}
+        </div>
+        """, height=52*max(1, len(col_items)), scrolling=False)
+
+    with c1: _render_col(c1, left)
+    with c2: _render_col(c2, right)
+
 
 
 def _anchor(title: str, anchor_id: str):
