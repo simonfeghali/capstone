@@ -274,18 +274,23 @@ def render_overview_tab():
     # 3) CAPEX — Definition & Trend
     _anchor(*SECTIONS["capex_trend"])
     _business_and_technical_pairs([
-        (
-            "Using grades in decisions",
-            [
-                "Grades simplify communication with executives and non-technical stakeholders.",
-                "Combine grades with sector context (e.g., a ‘B’ country might still be optimal for specific industries).",
-            ],
-            [
-                "Grades are computed by percentile **within each year** to avoid cross-year distortions.",
-                "Countries near threshold cut-offs can shift grades year-to-year despite small score changes.",
-            ],
-        ),
-    ])
+    (
+        "CAPEX — Geographic View",
+        [
+            "The CAPEX map highlights geographic concentration of investment flows versus diversification across regions.",
+            "It provides a spatial perspective on where cross-border commitments are directed, helping to identify established hubs and emerging markets.",
+            "Layering the map with grade and sector context supports strategic decisions on market entry, expansion, or consolidation.",
+        ],
+        [
+            "Choropleth visualization is aggregated at the country level, with options to filter by year or continent.",
+            "Values are displayed in **USD billions ($B)**, harmonized with other CAPEX views in the dashboard.",
+            "Normalization ensures comparability across selected scopes (e.g., global vs. continental views).",
+            "Filters reduce distortion from large economies, enabling clearer peer comparisons.",
+            "Country names are canonicalized to align with World Bank and CAPEX datasets.",
+        ]
+    ),
+])
+
 
     # 4) CAPEX — Geographic View
     _anchor(*SECTIONS["capex_map"])
