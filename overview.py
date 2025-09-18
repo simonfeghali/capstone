@@ -12,6 +12,7 @@ import streamlit as st
 import pandas as pd
 from streamlit.components.v1 import html as st_html
 
+
 # Map short keys -> (section title, anchor id)
 SECTIONS = {
     "score_trend": ("Country Viability Composite Score", "ov-score-trend"),
@@ -220,8 +221,83 @@ def _categories():
                 st.markdown(f"- {b}")
 
 def _grades_section():
-    for line in _GRADES:
-        st.markdown(f"- {line}")
+    """Compact grade scale with badges + methodology callout."""
+    # If you already keep the long methodology sentence in _GRADES[-1],
+    # split it: first 5 entries = grade lines, last entry = methodology note.
+    grade_lines = _GRADES[:5]
+    methodology = _GRADES[5] if len(_GRADES) > 5 else (
+        "Grading is performed independently for each year, meaning that a country's grade in a year "
+        "is based on its performance relative to other countries in that same year."
+    )
+
+    # Parse "A+: text" into tuples
+    items = []
+    for line in grade_lines:
+        # Safe split on first colon
+        label, desc = line.split(":", 1)
+        items.append((label.strip(), desc.strip()))
+
+    # Minimal CSS for grid + callout. Inherits Streamlit fonts/colors.
+    st_html(f"""
+    <style>
+      .grade-grid {{
+        display: grid;
+        grid-template-columns: repeat(2, minmax(280px, 1fr));
+        gap: 14px 18px;
+        margin: 6px 0 14px 0;
+      }}
+      @media (max-width: 900px) {{
+        .grade-grid {{ grid-template-columns: 1fr; }}
+      }}
+      .grade-item {{
+        display: grid;
+        grid-template-columns: 84px 1fr;
+        gap: 12px;
+        align-items: center;
+        background: #ffffff;
+        border: 1px solid #e6e6e6;
+        border-radius: 10px;
+        padding: 12px 14px;
+      }}
+      .grade-badge {{
+        display: inline-block;
+        text-align: center;
+        font-weight: 700;
+        border-radius: 10px;
+        border: 1px solid #dfe3e8;
+        background: #f8f9fa;
+        padding: 10px 0;
+        width: 70px;
+      }}
+      .grade-desc {{
+        font-weight: 400;
+        color: #111827;
+      }}
+      .callout {{
+        border: 1px solid #e6e6e6;
+        border-left: 4px solid #2563eb; /* subtle accent */
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-top: 10px;
+      }}
+    </style>
+
+    <div class="grade-grid">
+      {"".join([
+        f"""
+        <div class='grade-item'>
+          <div class='grade-badge'>{label}</div>
+          <div class='grade-desc'>{desc}</div>
+        </div>
+        """ for (label, desc) in items
+      ])}
+    </div>
+
+    <div class="callout">
+      <strong>Methodology (peer-relative by year):</strong> {methodology}
+    </div>
+    """, height= (len(items) // 2 + len(items) % 2) * 86 + 96, scrolling=False)
 
 def _business_and_technical_pairs(pairs: list[tuple[str, list[str], list[str]]]):
     """
@@ -318,20 +394,7 @@ def render_overview_tab():
     _anchor(*SECTIONS["grade_map"])
     st.markdown("**Grading Scale (peer-relative by year)**")
     _grades_section()
-    st.markdown("Grading is performed independently for each year,meaning that a country's grade in a year is based on its performance relative to other countries **in that same year**. This ensures fairness and prevents any single year with unusually high or low global performance from skewing the grades across the entire dataset.")
-    _business_and_technical_pairs([
-        (
-            "Interpreting the score trend",
-            [
-                "Track direction of change across years to spot improving or deteriorating fundamentals.",
-                "Use alongside grades to understand both *absolute level* (score) and *peer-relative position* (grade).",
-            ],
-            [
-                "Scores are averaged per country-year from weighted indicators; normalization ensures cross-indicator comparability.",
-                "If viewing a single year in the app, the ‘latest’ trend point will match the selection filters in the Scoring tab.",
-            ],
-        ),
-    ])
+    
 
     # 3) CAPEX — Definition & Trends
     _anchor(*SECTIONS["capex_trend"])
