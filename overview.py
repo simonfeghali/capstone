@@ -1,4 +1,4 @@
-# overview.py
+# overview.py 
 # -----------------------------------------------------------------------------
 # Overview tab for the FDI & Viability dashboard.
 # - Business-first explanations for every tab / plot
@@ -14,11 +14,11 @@ from streamlit.components.v1 import html as st_html
 
 # Map short keys -> (section title, anchor id)
 SECTIONS = {
-    "score_trend": ("Country Viability Composite Score",            "ov-score-trend"),
-    "grade_map":   ("Grades & Percentile Buckets",        "ov-grade-map"),
-    "capex_trend": ("CAPEX: Definition & Trends",         "ov-capex-trend"),
+    "score_trend": ("Country Viability Composite Score", "ov-score-trend"),
+    "grade_map":   ("Grades & Percentile Buckets",       "ov-grade-map"),
+    "capex_trend": ("CAPEX: Definition & Trends",        "ov-capex-trend"),
     "capex_map":   ("CAPEX — Geographic View",           "ov-capex-map"),
-    "sectors_bar": ("Investment Profile: Top Industries ",       "ov-sectors"),
+    "sectors_bar": ("Investment Profile: Top Industries ", "ov-sectors"),
     "destinations_bar": ("Investment Profile: Top Destinations", "ov-destinations"),
     "compare":     ("Benchmarking (Country vs. Country)", "ov-compare"),
     "forecast":    ("FDI Forecasts (2025–2028)",          "ov-forecast"),
@@ -189,10 +189,12 @@ def _business_and_technical_pairs(pairs: list[tuple[str, list[str], list[str]]])
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("_Business use_")
-            for b in biz: st.markdown(f"- {b}")
+            for b in biz:
+                st.markdown(f"- {b}")
         with c2:
             st.markdown("_Technical notes_")
-            for t in tech: st.markdown(f"- {t}")
+            for t in tech:
+                st.markdown(f"- {t}")
         st.markdown("---")
 
 def _score_trend_section():
@@ -242,15 +244,13 @@ def render_overview_tab():
     # 1) Viability Score & Trend
     _anchor(*SECTIONS["score_trend"])
     st.markdown(
-    """- **What it is:** A normalized 0–1 composite index (higher = more attractive) of macro, governance, and infrastructure indicators for each country-year observation.  
-    **Weighted mix:** `Score = 0.45 Econ + 0.30 Gov + 0.25 Infra`"""
+        """- **What it is:** A normalized 0–1 composite index (higher = more attractive) of macro, governance, and infrastructure indicators for each country-year observation.  
+        **Weighted mix:** `Score = 0.45 Econ + 0.30 Gov + 0.25 Infra`"""
     )
-
-    st.markdown("**Indicators Weights** as a share of the composite score:")
+    st.markdown("**Indicator Weights** (as a share of the composite):")
     _weights_table()
     st.markdown("**Indicators by Category**")
     _categories()
-
     _score_trend_section()
 
     # 2) Grades & Percentile Buckets
@@ -267,22 +267,25 @@ def render_overview_tab():
             [
                 "Scores are averaged per country-year from weighted indicators; normalization ensures cross-indicator comparability.",
                 "If viewing a single year in the app, the ‘latest’ trend point will match the selection filters in the Scoring tab.",
-            ]
+            ],
         ),
     ])
 
-    # 3) CAPEX — Definition & Trend
+    # 3) CAPEX — Definition & Trends
     _anchor(*SECTIONS["capex_trend"])
     _business_and_technical_pairs([
         (
-            "Using grades in decisions",
+            "CAPEX — Definition & Trends",
             [
-                "Grades simplify communication with executives and non-technical stakeholders.",
-                "Combine grades with sector context (e.g., a ‘B’ country might still be optimal for specific industries).",
+                "Capital expenditure (CAPEX) represents funds allocated by governments or firms to build, acquire, or upgrade long-lived assets and infrastructure that support economic growth and public well-being.",
+                "Tracking CAPEX trends highlights momentum in cross-border investment flows and helps distinguish sustained growth from episodic spikes.",
+                "Consistent CAPEX growth indicates durable investor confidence; volatility may reflect exposure to external shocks or policy uncertainty.",
             ],
             [
-                "Grades are computed by percentile **within each year** to avoid cross-year distortions.",
-                "Countries near threshold cut-offs can shift grades year-to-year despite small score changes.",
+                "Dataset: fDi Markets, 2021–2024; values originally in USD millions and converted to **USD billions ($B)** for consistency across the dashboard.",
+                "Data cleaning removed duplicates; where no activity was recorded, missing values were imputed as zero for that country-year.",
+                "Grades were merged at the country-year level; data reshaped to long format for plotting (line and bar visualizations).",
+                "Views provided: global trend, CAPEX by grade, top source countries by absolute value and by growth.",
             ],
         ),
     ])
@@ -291,14 +294,17 @@ def render_overview_tab():
     _anchor(*SECTIONS["capex_map"])
     _business_and_technical_pairs([
         (
-            "Reading the CAPEX map",
+            "CAPEX — Geographic View",
             [
-                "Identify geographic concentration vs. diversification opportunities.",
-                "Layer sector and grade insights to prioritize where to expand or defend.",
+                "The map highlights geographic concentration versus diversification of investment flows, revealing established hubs and emerging markets.",
+                "Combining the map with grade and sector context supports decisions on market entry, expansion, or consolidation.",
+                "Year-over-year changes on the map surface countries gaining or losing momentum.",
             ],
             [
-                "Choropleth is aggregated by country (and by selected year if you filter).",
-                "Mind population/size effects; use continent/country filters to reduce bias.",
+                "Choropleth is aggregated at the country level; filter by year or continent to refine comparisons.",
+                "Values are displayed in **USD billions ($B)** and normalized within the visible scope (global vs. continent) for comparability.",
+                "Filters help mitigate size effects from very large economies and enable clearer peer comparisons.",
+                "Country names are canonicalized to align with the World Bank and CAPEX datasets.",
             ],
         ),
     ])
@@ -309,7 +315,7 @@ def render_overview_tab():
         (
             "Sector bars (Companies / Jobs / Projects / CAPEX)",
             [
-                "Expose the composition of activity: e.g., high CAPEX with few projects ⇒ larger average deal size.",
+                "Expose the composition of activity: e.g., high CAPEX with few projects implies larger average deal size.",
                 "Use Jobs/Companies to assess labor intensity and ecosystem depth.",
             ],
             [
@@ -326,7 +332,7 @@ def render_overview_tab():
             "Destinations ranking (for a source country)",
             [
                 "Rank markets by Companies, Jobs, Projects, or CAPEX to gauge outbound focus and white space.",
-                "Evaluate concentration risk (few destinations dominate) vs. diversification.",
+                "Evaluate concentration risk (few destinations dominate) versus diversification.",
             ],
             [
                 "Aggregations exclude ‘Total/All’ rollups; flows are summed by (source → destination).",
@@ -449,4 +455,3 @@ def emit_auto_jump_script():
 
     # reset the trigger so we don't keep jumping
     st.session_state["_force_overview"] = False
-
