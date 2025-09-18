@@ -356,6 +356,22 @@ def _capex_explainer_block(what: list[str], why: list[str], how: list[str]):
 
     st.markdown("---")
 
+def _benchmarking_explainer_block(what: list[str], why: list[str], how: list[str]):
+    """Stacked, boxed explainer for the Benchmarking section."""
+    def _box(title: str, bullets: list[str]):
+        st.markdown(f"#### {title}")
+        st.markdown(
+            "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
+            + "".join([f"<p>• {b}</p>" for b in bullets])
+            + "</div>",
+            unsafe_allow_html=True,
+        )
+
+    _box("What it is", what)
+    _box("Why it matters", why)
+    _box("How to navigate", how)
+
+    st.markdown("---")
 
 
 def _score_trend_section():
@@ -457,7 +473,7 @@ def render_overview_tab():
         "Top industries",
         # WHAT
         [
-            "Sector-level view of outbound FDI by **Companies, Jobs, Projects, and CAPEX**.",
+            "Sector-level view of outbound FDI, for top 10 investing countries identified, by **Companies, Jobs, Projects, and CAPEX**.",
             "Covers 16 canonized sectors for comparability across the top source countries."
         ],
         # WHY
@@ -478,7 +494,7 @@ def render_overview_tab():
         "Top destinations",
         # WHAT
         [
-            "Destination-country ranking of a source country’s outbound FDI across **Companies, Jobs, Projects, and CAPEX**.",
+            "Destination-country ranking of the top 10 source countries' outbound FDI across **Companies, Jobs, Projects, and CAPEX**.",
             "Shows the **Top 15** destinations and a companion map (or a route view for a selected pair)."
         ],
         # WHY
@@ -497,19 +513,29 @@ def render_overview_tab():
 
     # 6) Benchmarking (Compare)
     _anchor(*SECTIONS["compare"])
-    _business_and_technical_pairs([
-        (
-            "Side-by-side shortlisting",
-            [
-                "Contrast two markets on average viability score and total CAPEX to build an initial shortlist.",
-                "Use as an executive-ready snapshot; follow up with sector/destination detail where gaps emerge.",
-            ],
-            [
-                "Score = mean of the country’s available yearly scores in scope; CAPEX = summed in $B.",
-                "Selections in the Compare tab use canonicalized country names to align with the core datasets.",
-            ],
-        ),
-    ])
+    what_bench = [
+        "A head-to-head comparison of two countries on overall attractiveness (**Viability Score**) and realized investment flows (**CAPEX**).",
+        "Provides a high-level snapshot of how markets stack up against each other within the same timeframe and filters."
+    ]
+
+    why_bench = [
+        "Quickly highlight trade-offs between strong viability fundamentals and actual investor activity.",
+        "Support early-stage decision-making by identifying which market deserves deeper investigation.",
+        "Give executives an easy-to-digest summary that balances quantitative performance with real investment flows."
+    ]
+
+    how_bench = [
+        "Select two countries in the Compare tab.",
+        "Adjust filters (year, continent, grade) to control the scope of comparison.",
+        "Review the headline KPIs: **Average Viability Score** vs. **Total CAPEX ($B)** for each country.",
+        "Use insights here as a starting point, then if among the top 10 investing countries, explore the **Sectors** and **Destinations** tabs for deeper context."
+    ]
+
+    _benchmarking_explainer_block(
+        what=what_bench,
+        why=why_bench,
+        how=how_bench,
+    )
 
     # 7) FDI Forecasts (2025–2028)
     _anchor(*SECTIONS["forecast"])
