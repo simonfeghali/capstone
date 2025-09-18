@@ -382,11 +382,18 @@ def render_overview_tab():
     _categories()
     _score_trend_section()
 
+    # --- separator between Score and Grades ---
+    st.markdown("<hr style='margin: 1.5em 0; border: none; border-top: 1px solid #e6e6e6;'>", unsafe_allow_html=True)
+
+
     # 2) Grades & Percentile Buckets
     _anchor(*SECTIONS["grade_map"])
     st.markdown("**Grades Distribution**")
     _grades_section()
-    
+
+    # --- separator between Grades and Capex ---
+    st.markdown("<hr style='margin: 1.5em 0; border: none; border-top: 1px solid #e6e6e6;'>", unsafe_allow_html=True)
+
 
     # 3) CAPEX — Definition & Trends
     _anchor(*SECTIONS["capex_trend"])
