@@ -326,6 +326,38 @@ def _what_why_how_block(title: str, what: list[str], why: list[str], how: list[s
         for b in how: st.markdown(f"- {b}")
     st.markdown("---")
 
+def _capex_explainer_block(what: list[str], why: list[str], how: list[str]):
+    # What it is
+    st.markdown("#### What it is")
+    st.markdown(
+        "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
+        + "".join([f"<p>• {b}</p>" for b in what])
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Why it matters
+    st.markdown("#### Why it matters")
+    st.markdown(
+        "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
+        + "".join([f"<p>• {b}</p>" for b in why])
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # How to navigate
+    st.markdown("#### How to navigate")
+    st.markdown(
+        "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
+        + "".join([f"<p>• {b}</p>" for b in how])
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("---")
+
+
+
 def _score_trend_section():
     st.markdown("**Why it matters:**")
     st.markdown("""
@@ -397,18 +429,14 @@ def render_overview_tab():
 
     # 3) CAPEX — Definition & Trends
     _anchor(*SECTIONS["capex_trend"])
-    _what_why_how_block(
-        " ",
-        # WHAT (from your business use bullets)
+    _capex_explainer_block(
         [
             "Capital expenditure (CAPEX) represents funds allocated by governments or firms to build, acquire, or upgrade long-lived assets and infrastructure that support economic growth and public well-being.",
         ],
-        # WHY (business framing)
         [
             "Tracking CAPEX trends highlights momentum in cross-border investment flows and helps distinguish sustained growth from episodic spikes.",
             "Consistent CAPEX growth indicates durable investor confidence, while volatility may reflect exposure to external shocks or policy uncertainty.",
         ],
-        # HOW (navigation in the app.py tab)
         [
             "Views provided: global trend, CAPEX by grade, top source countries by absolute value and by growth.",
             "All CAPEX values are displayed in **billions of USD ($B)** for consistency.",
