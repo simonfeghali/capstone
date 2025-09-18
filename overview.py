@@ -398,7 +398,7 @@ def render_overview_tab():
     # 3) CAPEX — Definition & Trends
     _anchor(*SECTIONS["capex_trend"])
     _what_why_how_block(
-        
+        " ",
         # WHAT (from your business use bullets)
         [
             "Capital expenditure (CAPEX) represents funds allocated by governments or firms to build, acquire, or upgrade long-lived assets and infrastructure that support economic growth and public well-being.",
