@@ -279,7 +279,7 @@ def render_overview_tab():
             [
                 "Capital expenditure (CAPEX) represents funds allocated by governments or firms to build, acquire, or upgrade long-lived assets and infrastructure that support economic growth and public well-being.",
                 "Tracking CAPEX trends highlights momentum in cross-border investment flows and helps distinguish sustained growth from episodic spikes.",
-                "Consistent CAPEX growth indicates durable investor confidence; volatility may reflect exposure to external shocks or policy uncertainty.",
+                "Consistent CAPEX growth indicates durable investor confidence, while volatility may reflect exposure to external shocks or policy uncertainty.",
             ],
             [
                 "Dataset: fDi Markets, 2021–2024; values originally in USD millions and converted to **USD billions ($B)** for consistency across the dashboard.",
