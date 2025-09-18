@@ -17,8 +17,7 @@ SECTIONS = {
     "score_trend": ("Country Viability Composite Score", "ov-score-trend"),
     "grade_map":   ("Grades & Percentile Buckets",       "ov-grade-map"),
     "capex_trend": ("CAPEX: Definition & Trends",        "ov-capex-trend"),
-    "sectors_bar": ("Investment Profile: Top Industries & Destinations", "ov-sectors"),
-    "destinations_bar":  ("Investment Profile: Top industries and destinations", "ov-investment"),
+    "investment_profile": ("Investment Profile: Top Industries & Destinations", "ov-sectors"),
     "compare":     ("Benchmarking (Country vs. Country)", "ov-compare"),
     "forecast":    ("FDI Forecasts (2025–2028)",          "ov-forecast"),
     # alias keys used by prior samples
@@ -304,7 +303,7 @@ def render_overview_tab():
 
 
     # Investment Profile — combined section
-    _anchor(*SECTIONS["sectors_bar"])  # both old keys resolve to the same anchor
+    _anchor(*SECTIONS["investment_profile"])  # both old keys resolve to the same anchor
     
     # Top industries
     _what_why_how_block(
@@ -399,8 +398,8 @@ SECTIONS.update({
     # one-button-per-tab keys → map to your existing anchors
     "scoring_tab":       SECTIONS["score_trend"],
     "capex_tab":         SECTIONS["capex_trend"],
-    "sectors_tab":       SECTIONS["sectors_bar"],
-    "destinations_tab":  SECTIONS["destinations_bar"],
+    "sectors_tab":       SECTIONS["investment_profile"],
+    "destinations_tab":  SECTIONS["investment_profile"],
     "compare_tab":       SECTIONS["compare"],
     "forecast_tab":      SECTIONS["forecast"],
 })
