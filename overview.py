@@ -514,7 +514,7 @@ def render_overview_tab():
     # 6) Benchmarking (Compare)
     _anchor(*SECTIONS["compare"])
     what_bench = [
-        "A head-to-head comparison of two countries on overall attractiveness (**Viability Score**) and realized investment flows (**CAPEX**).",
+        "A head-to-head comparison of two countries on overall attractiveness and realized investment flows.",
         "Provides a high-level snapshot of how markets stack up against each other within the same timeframe and filters."
     ]
 
