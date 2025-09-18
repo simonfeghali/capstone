@@ -397,20 +397,28 @@ def render_overview_tab():
 
     # 3) CAPEX — Definition & Trends
     _anchor(*SECTIONS["capex_trend"])
-    _business_and_technical_pairs([
-        (
-            "CAPEX — Definition & Trends",
-            [
-                "Capital expenditure (CAPEX) represents funds allocated by governments or firms to build, acquire, or upgrade long-lived assets and infrastructure that support economic growth and public well-being.",
-                "Tracking CAPEX trends highlights momentum in cross-border investment flows and helps distinguish sustained growth from episodic spikes.",
-                "Consistent CAPEX growth indicates durable investor confidence, while volatility may reflect exposure to external shocks or policy uncertainty.",
-            ],
-            [
-                "Dataset: fDi Markets, 2021–2024; values originally in USD millions and converted to **USD billions ($B)** for consistency across the dashboard.",
-                "Views provided: global trend, CAPEX by grade, top source countries by absolute value and by growth.",
-            ],
-        ),
-    ])
+    _what_why_how_block(
+        "CAPEX — Definition & Trends",
+        # WHAT (from your business use bullets)
+        [
+            "Capital expenditure (CAPEX) represents funds allocated by governments or firms to build, acquire, or upgrade long-lived assets and infrastructure that support economic growth and public well-being.",
+        ],
+        # WHY (business framing)
+        [
+            "Tracking CAPEX trends highlights momentum in cross-border investment flows and helps distinguish sustained growth from episodic spikes.",
+            "Consistent CAPEX growth indicates durable investor confidence, while volatility may reflect exposure to external shocks or policy uncertainty.",
+        ],
+        # HOW (navigation in the app.py tab)
+        [
+            "Views provided: global trend, CAPEX by grade, top source countries by absolute value and by growth.",
+            "All CAPEX values are displayed in **billions of USD ($B)** for consistency.",
+            "Use the **year/continent/country/grade filters** at the top of the CAPEX tab to adjust scope.",
+            "View the **Global CAPEX Trend** line chart for overall momentum; switch to a single year to see KPIs.",
+            "Inspect the **CAPEX Map** (choropleth) to identify geographic concentration versus diversification.",
+            "Check **Top Countries** (bars or KPIs) for absolute levels and the **Growth Ranking** chart to spot rising sources.",
+            "Use the **CAPEX by Grade** view to compare investment flows across attractiveness grades.",
+        ],
+    )
 
 
     # Investment Profile — combined section
