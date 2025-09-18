@@ -273,35 +273,42 @@ def render_overview_tab():
 
     # 3) CAPEX — Definition & Trend
     _anchor(*SECTIONS["capex_trend"])
-    _business_and_technical_pairs([
-        (
-            "Using grades in decisions",
-            [
-                "Grades simplify communication with executives and non-technical stakeholders.",
-                "Combine grades with sector context (e.g., a ‘B’ country might still be optimal for specific industries).",
-            ],
-            [
-                "Grades are computed by percentile **within each year** to avoid cross-year distortions.",
-                "Countries near threshold cut-offs can shift grades year-to-year despite small score changes.",
-            ],
-        ),
-    ])
-
+   _business_and_technical_pairs([
+    (
+        "CAPEX — Definition & Trend",
+        [
+            "Capital expenditure (CAPEX) represents funds allocated by governments or firms to build, acquire, or upgrade long-term assets and infrastructure that support economic growth and public well-being.",
+            "Tracking CAPEX trends helps identify momentum in cross-border investment flows, highlighting periods of strong inflows or potential declines.",
+            "Consistent CAPEX growth indicates sustained investor confidence, while volatility may signal sensitivity to external shocks or policy uncertainty.",
+        ],
+        [
+            "Dataset sourced from fDi Markets, covering 2021–2024 with values originally in USD millions, converted to **USD billions ($B)** for consistency across the dashboard.",
+            "Data was cleaned to remove duplicates, with missing values imputed as zero where no FDI activity occurred.",
+            "Country-year CAPEX values were merged with country grades and reshaped into long format for visualization.",
+            "Visualizations include line charts and bar plots showing global trends, CAPEX by grade, and top source countries by both absolute value and growth.",
+        ]
+    ),
+])
     # 4) CAPEX — Geographic View
     _anchor(*SECTIONS["capex_map"])
     _business_and_technical_pairs([
-        (
-            "Reading the CAPEX map",
-            [
-                "Identify geographic concentration vs. diversification opportunities.",
-                "Layer sector and grade insights to prioritize where to expand or defend.",
-            ],
-            [
-                "Choropleth is aggregated by country (and by selected year if you filter).",
-                "Mind population/size effects; use continent/country filters to reduce bias.",
-            ],
-        ),
-    ])
+    (
+        "CAPEX — Geographic View",
+        [
+            "The CAPEX map highlights geographic concentration of investment flows versus diversification across regions.",
+            "It provides a spatial perspective on where cross-border commitments are directed, helping to identify established hubs and emerging markets.",
+            "Layering the map with grade and sector context supports strategic decisions on market entry, expansion, or consolidation.",
+        ],
+        [
+            "Choropleth visualization is aggregated at the country level, with options to filter by year or continent.",
+            "Values are displayed in **USD billions ($B)**, harmonized with other CAPEX views in the dashboard.",
+            "Normalization ensures comparability across selected scopes (e.g., global vs. continental views).",
+            "Filters reduce distortion from large economies, enabling clearer peer comparisons.",
+            "Country names are canonicalized to align with World Bank and CAPEX datasets.",
+        ]
+    ),
+])
+
 
     # 5) Industry Landscape (Sectors)
     _anchor(*SECTIONS["sectors_bar"])
