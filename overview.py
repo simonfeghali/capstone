@@ -287,7 +287,7 @@ def _grades_section():
     </div>
 
     <div class="callout">
-      <strong>Methodology (peer-relative by year):</strong> {methodology}
+      <strong>Methodology:</strong> {methodology}
     </div>
     """, height=len(items)*86 + 96, scrolling=False)
 
@@ -384,7 +384,7 @@ def render_overview_tab():
 
     # 2) Grades & Percentile Buckets
     _anchor(*SECTIONS["grade_map"])
-    st.markdown("**Grading Scale (peer-relative by year)**")
+    st.markdown("**Grades Distribution**")
     _grades_section()
     
 
