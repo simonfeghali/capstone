@@ -405,15 +405,19 @@ SECTIONS.update({
 })
 
 # ---- Public helper: ℹ️ button you can use from any tab ----------------------
-def info_button(section_key: str, help_text: str = "What is this?", key_suffix: str | None = None):
+def info_button(section_key: str,
+                help_text: str = "What is this?",
+                key_suffix: str | None = None):
     """
-    Renders a small ℹ️ button. When clicked, sets session state so the app
-    switches to the Overview tab and scrolls to the correct section.
+    Render a small ℹ️ button that jumps to `section_key` in Overview.
+    Pass a UNIQUE `key_suffix` per call (e.g., 'sectors_hdr', 'dest_hdr').
+    """
+    # Use the caller-provided suffix verbatim to avoid accidental collisions.
+    if not key_suffix:
+        # Absolute fallback to keep the app running, but you SHOULD pass a suffix.
+        key_suffix = f"default_{section_key}"
 
-    `key_suffix` makes the widget key unique when the same section_key
-    is used in multiple places (e.g., sectors & destinations tabs).
-    """
-    unique_key = f"info_{section_key}" if not key_suffix else f"info_{section_key}_{key_suffix}"
+    unique_key = f"info_{key_suffix}"
     if st.button("ℹ️", key=unique_key, help=help_text):
         st.session_state["overview_focus"] = section_key
         st.session_state["_force_overview"] = True
