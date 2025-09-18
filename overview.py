@@ -17,8 +17,7 @@ SECTIONS = {
     "score_trend": ("Country Viability Composite Score", "ov-score-trend"),
     "grade_map":   ("Grades & Percentile Buckets",       "ov-grade-map"),
     "capex_trend": ("CAPEX: Definition & Trends",        "ov-capex-trend"),
-    "sectors_bar": ("Investment Profile: Top Industries ", "ov-sectors"),
-    "destinations_bar": ("Investment Profile: Top Destinations", "ov-destinations"),
+    "sectors_bar": ("Investment Profile: Top Industries & Destinations", "ov-sectors"),
     "compare":     ("Benchmarking (Country vs. Country)", "ov-compare"),
     "forecast":    ("FDI Forecasts (2025–2028)",          "ov-forecast"),
     # alias keys used by prior samples
@@ -83,8 +82,7 @@ _GRADES = [
     "A: 75th–90th percentile — strong performers with favorable fundamentals but minor constraints.",
     "B: 50th–75th percentile — moderate performers; viable under specific conditions or with reforms.",
     "C: 25th–50th percentile — countries with significant challenges; requiring high-risk tolerance.",
-    "D: Bottom 25% — least attractive destinations for near-term investment.",
-    "Grading is performed independently for each year,meaning that a country's grade in a year is based on its performance relative to other countries **in that same year**. This ensures fairness and prevents any single year with unusually high or low global performance from skewing the grades across the entire dataset.",
+    "D: Bottom 25% — least attractive destinations for near-term investment."
 ]
 
 def _toc():
@@ -256,6 +254,7 @@ def render_overview_tab():
     _anchor(*SECTIONS["grade_map"])
     st.markdown("**Grading Scale (peer-relative by year)**")
     _grades_section()
+    st.markdown("Grading is performed independently for each year,meaning that a country's grade in a year is based on its performance relative to other countries **in that same year**. This ensures fairness and prevents any single year with unusually high or low global performance from skewing the grades across the entire dataset.")
     _business_and_technical_pairs([
         (
             "Interpreting the score trend",
