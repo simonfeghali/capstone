@@ -405,14 +405,19 @@ SECTIONS.update({
 })
 
 # ---- Public helper: ℹ️ button you can use from any tab ----------------------
-def info_button(section_key: str, help_text: str = "What is this?"):
+def info_button(section_key: str, help_text: str = "What is this?", key_suffix: str | None = None):
     """
     Renders a small ℹ️ button. When clicked, sets session state so the app
     switches to the Overview tab and scrolls to the correct section.
+
+    `key_suffix` makes the widget key unique when the same section_key
+    is used in multiple places (e.g., sectors & destinations tabs).
     """
-    if st.button("ℹ️", key=f"info_{section_key}", help=help_text):
+    unique_key = f"info_{section_key}" if not key_suffix else f"info_{section_key}_{key_suffix}"
+    if st.button("ℹ️", key=unique_key, help=help_text):
         st.session_state["overview_focus"] = section_key
         st.session_state["_force_overview"] = True
+
 
 # ---- Public helper: JS to switch to Overview and smooth-scroll ---------------
 def emit_auto_jump_script():
