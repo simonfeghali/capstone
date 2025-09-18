@@ -221,33 +221,25 @@ def _categories():
                 st.markdown(f"- {b}")
 
 def _grades_section():
-    """Compact grade scale with badges + methodology callout."""
-    # If you already keep the long methodology sentence in _GRADES[-1],
-    # split it: first 5 entries = grade lines, last entry = methodology note.
+    """Single-column grade scale with badges + methodology callout."""
     grade_lines = _GRADES[:5]
     methodology = _GRADES[5] if len(_GRADES) > 5 else (
         "Grading is performed independently for each year, meaning that a country's grade in a year "
         "is based on its performance relative to other countries in that same year."
     )
 
-    # Parse "A+: text" into tuples
     items = []
     for line in grade_lines:
-        # Safe split on first colon
         label, desc = line.split(":", 1)
         items.append((label.strip(), desc.strip()))
 
-    # Minimal CSS for grid + callout. Inherits Streamlit fonts/colors.
     st_html(f"""
     <style>
       .grade-grid {{
         display: grid;
-        grid-template-columns: repeat(2, minmax(280px, 1fr));
-        gap: 14px 18px;
+        grid-template-columns: 1fr;
+        gap: 14px;
         margin: 6px 0 14px 0;
-      }}
-      @media (max-width: 900px) {{
-        .grade-grid {{ grid-template-columns: 1fr; }}
       }}
       .grade-item {{
         display: grid;
@@ -275,7 +267,7 @@ def _grades_section():
       }}
       .callout {{
         border: 1px solid #e6e6e6;
-        border-left: 4px solid #2563eb; /* subtle accent */
+        border-left: 4px solid #2563eb;
         background: #f8fafc;
         border-radius: 8px;
         padding: 12px 14px;
@@ -297,7 +289,7 @@ def _grades_section():
     <div class="callout">
       <strong>Methodology (peer-relative by year):</strong> {methodology}
     </div>
-    """, height= (len(items) // 2 + len(items) % 2) * 86 + 96, scrolling=False)
+    """, height=len(items)*86 + 96, scrolling=False)
 
 def _business_and_technical_pairs(pairs: list[tuple[str, list[str], list[str]]]):
     """
