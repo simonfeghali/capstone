@@ -17,7 +17,6 @@ SECTIONS = {
     "score_trend": ("Country Viability Composite Score", "ov-score-trend"),
     "grade_map":   ("Grades & Percentile Buckets",       "ov-grade-map"),
     "capex_trend": ("CAPEX: Definition & Trends",        "ov-capex-trend"),
-    "capex_map":   ("CAPEX — Geographic View",           "ov-capex-map"),
     "sectors_bar": ("Investment Profile: Top Industries ", "ov-sectors"),
     "destinations_bar": ("Investment Profile: Top Destinations", "ov-destinations"),
     "compare":     ("Benchmarking (Country vs. Country)", "ov-compare"),
@@ -283,33 +282,13 @@ def render_overview_tab():
             ],
             [
                 "Dataset: fDi Markets, 2021–2024; values originally in USD millions and converted to **USD billions ($B)** for consistency across the dashboard.",
-                "Data cleaning removed duplicates; where no activity was recorded, missing values were imputed as zero for that country-year.",
-                "Grades were merged at the country-year level; data reshaped to long format for plotting (line and bar visualizations).",
                 "Views provided: global trend, CAPEX by grade, top source countries by absolute value and by growth.",
             ],
         ),
     ])
 
-    # 4) CAPEX — Geographic View
-    _anchor(*SECTIONS["capex_map"])
-    _business_and_technical_pairs([
-        (
-            "CAPEX — Geographic View",
-            [
-                "The map highlights geographic concentration versus diversification of investment flows, revealing established hubs and emerging markets.",
-                "Combining the map with grade and sector context supports decisions on market entry, expansion, or consolidation.",
-                "Year-over-year changes on the map surface countries gaining or losing momentum.",
-            ],
-            [
-                "Choropleth is aggregated at the country level; filter by year or continent to refine comparisons.",
-                "Values are displayed in **USD billions ($B)** and normalized within the visible scope (global vs. continent) for comparability.",
-                "Filters help mitigate size effects from very large economies and enable clearer peer comparisons.",
-                "Country names are canonicalized to align with the World Bank and CAPEX datasets.",
-            ],
-        ),
-    ])
 
-    # 5) Industry Landscape (Sectors)
+    # 4) Industry Landscape (Sectors)
     _anchor(*SECTIONS["sectors_bar"])
     _business_and_technical_pairs([
         (
@@ -325,7 +304,7 @@ def render_overview_tab():
         ),
     ])
 
-    # 6) Target Countries (Destinations)
+    # 5) Target Countries (Destinations)
     _anchor(*SECTIONS["destinations_bar"])
     _business_and_technical_pairs([
         (
@@ -341,7 +320,7 @@ def render_overview_tab():
         ),
     ])
 
-    # 7) Benchmarking (Compare)
+    # 6) Benchmarking (Compare)
     _anchor(*SECTIONS["compare"])
     _business_and_technical_pairs([
         (
@@ -357,7 +336,7 @@ def render_overview_tab():
         ),
     ])
 
-    # 8) FDI Forecasts (2025–2028)
+    # 7) FDI Forecasts (2025–2028)
     _anchor(*SECTIONS["forecast"])
     st.markdown(
         "The **Forecast** tab projects CAPEX for **2025–2028**. Treat forecasts as *directional scenarios*, not point guarantees."
