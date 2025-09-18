@@ -527,8 +527,8 @@ def render_overview_tab():
     how_bench = [
         "Select two countries in the Compare tab.",
         "Adjust filters (year, continent, grade) to control the scope of comparison.",
-        "Review the headline KPIs: **Average Viability Score** vs. **Total CAPEX ($B)** for each country.",
-        "Use insights here as a starting point, then if among the top 10 investing countries, explore the **Sectors** and **Destinations** tabs for deeper context."
+        "Review the headline KPIs: Average Viability Score vs. Total CAPEX ($B) for each country.",
+        "Use insights here as a starting point, then if among the top 10 investing countries, explore the Industry Landscape and Target Countries tabs for deeper context."
     ]
 
     _benchmarking_explainer_block(
