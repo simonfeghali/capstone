@@ -537,7 +537,7 @@ def render_overview_tab():
         how=how_bench,
     )
 
-   # 8) FDI Forecasts (2025–2028)
+   # 7) FDI Forecasts (2025–2028)
     _anchor(*SECTIONS["forecast"])
     
     what_forecast = [
@@ -553,10 +553,10 @@ def render_overview_tab():
 
     how_forecast = [
     "Each forecast is generated using ARIMA-type models:",
-    "• ARIMA: based only on past CAPEX values.",
-    "• ARIMAX: ARIMA extended with extra economic/governance indicators.",
-    "• SARIMA: adds seasonal or cyclical patterns.",
-    "• SARIMAX: combines seasonality with exogenous indicators.",
+    "ARIMA: based only on past CAPEX values.",
+    "ARIMAX: ARIMA extended with extra economic/governance indicators.",
+    "SARIMA: adds seasonal or cyclical patterns.",
+    "SARIMAX: combines seasonality with exogenous indicators.",
     "",
     "The Order (p,d,q) shown under the chart explains how the model:",
     "looks back at past values (p),",
@@ -568,8 +568,11 @@ def render_overview_tab():
     ]
 
 
-    # Auto-jump if query param or session flag is present
-    _auto_jump()
+    _benchmarking_explainer_block(
+        what=what_forecast,
+        why=why_forecast,
+        how=how_forecast,
+    )
 
 # ---- Aliases so one ℹ️ per tab can jump to the right section ----------------
 SECTIONS.update({
