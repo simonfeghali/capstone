@@ -373,7 +373,36 @@ def _benchmarking_explainer_block(what: list[str], why: list[str], how: list[str
 
     st.markdown("---")
 
+def _forecasting_explainer_block(what: list[str], why: list[str], how: list[str]):
+    # What it is
+    st.markdown("#### What it is")
+    st.markdown(
+        "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
+        + "".join([f"<p>• {b}</p>" for b in what])
+        + "</div>",
+        unsafe_allow_html=True,
+    )
 
+    # Why it matters
+    st.markdown("#### Why it matters")
+    st.markdown(
+        "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
+        + "".join([f"<p>• {b}</p>" for b in why])
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # How forecasts are generated (renamed title)
+    st.markdown("#### How the forecasts are generated")
+    st.markdown(
+        "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
+        + "".join([f"<p>• {b}</p>" for b in how])
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("---")
+    
 def _score_trend_section():
     st.markdown("**Why it matters:**")
     st.markdown("""
@@ -564,11 +593,12 @@ def render_overview_tab():
     "Dashed lines are forecasts for 2025–2028; solid lines are historical CAPEX ($B)."
     ]
 
-    _benchmarking_explainer_block(
+    _forecasting_explainer_block(
     what=what_forecast,
     why=why_forecast,
     how=how_forecast,
-    )
+)
+
 
 
 # ---- Aliases so one ℹ️ per tab can jump to the right section ----------------
