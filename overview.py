@@ -495,7 +495,7 @@ def render_overview_tab():
     # 6) Forecasts
     _anchor(*SECTIONS["forecast"])
     what_forecast = [
-        "Forward-looking projection of country-level FDI CAPEX for **2025–2028**.",
+        "Forward-looking projection of country-level FDI CAPEX for 2025–2028.",
         "Built using ARIMA-family time-series models trained on historical CAPEX data.",
     ]
     why_forecast = [
