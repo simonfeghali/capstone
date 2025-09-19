@@ -431,7 +431,7 @@ def render_overview_tab():
             "Use the year / continent / country / grade filters at the top of the CAPEX tab to adjust scope.",
             "View the Global CAPEX Trend line chart for overall momentum; switch to a single year to see KPIs.",
             "Inspect the CAPEX Map (choropleth) to identify geographic concentration versus diversification.",
-            "Check Top Countries (bars or KPIs) for absolute levels and the *Growth Ranking* chart to spot rising sources.",
+            "Check Top Countries (bars or KPIs) for absolute levels and the Growth Ranking chart to spot rising sources.",
             "Use the CAPEX by Grade view to compare investment flows across attractiveness grades.",
         ],
     )
@@ -476,7 +476,7 @@ def render_overview_tab():
     # 5) Benchmarking (Compare)
     _anchor(*SECTIONS["compare"])
     what_bench = [
-        "A head-to-head comparison of two countries on overall attractiveness (**Viability Score**) and realized investment flows (**CAPEX**).",
+        "A head-to-head comparison of two countries on overall attractiveness (Viability Score) and realized investment flows (CAPEX).",
         "Provides a high-level snapshot of how markets stack up within the same timeframe and filters.",
     ]
     why_bench = [
@@ -487,8 +487,8 @@ def render_overview_tab():
     how_bench = [
         "Select two countries in the Compare tab.",
         "Adjust filters (year, continent, grade) to control the scope of comparison.",
-        "Review the headline KPIs: **Average Viability Score** vs. **Total CAPEX ($B)** for each country.",
-        "Use insights here as a starting point; if a country is a top investor, dive into **Industry Landscape** and **Target Countries** for detail.",
+        "Review the headline KPIs: Average Viability Score vs. Total CAPEX ($B)for each country.",
+        "Use insights here as a starting point; if a country is a top investor, dive into Industry Landscape and Target Countries for detail.",
     ]
     _benchmarking_explainer_block(what_bench, why_bench, how_bench)
 
