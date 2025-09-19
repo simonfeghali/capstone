@@ -1,32 +1,33 @@
-# overview.py 
+# overview.py
 # -----------------------------------------------------------------------------
 # Overview tab for the FDI & Viability dashboard.
 # - Business-first explanations for every tab / plot
 # - Deep technical notes (weights, methodology, forecasting details)
-# - In-page anchors so other tabs (or external links) can jump here:
-#     e.g. add '?jump=score_trend' to the URL to auto-scroll to that section.
+# - In-page anchors so other tabs (or external links) can jump here
 # -----------------------------------------------------------------------------
 
 from __future__ import annotations
 import streamlit as st
-import pandas as pd
 from streamlit.components.v1 import html as st_html
 
-
-# Map short keys -> (section title, anchor id)
+# ─────────────────────────────────────────────────────────────────────────────
+# Section map: title + anchor id
+# ─────────────────────────────────────────────────────────────────────────────
 SECTIONS = {
-    "score_trend": ("Country Viability Composite Score", "ov-score-trend"),
-    "grade_map":   ("Grades & Percentile Buckets",       "ov-grade-map"),
-    "capex_trend": ("CAPEX: Definition & Trends",        "ov-capex-trend"),
-    "investment_profile": ("Investment Profile: Top Industries & Destinations", "ov-sectors"),
-    "compare":     ("Benchmarking (Country vs. Country)", "ov-compare"),
-    "forecast":    ("FDI Forecasts (2025–2028)",          "ov-forecast"),
-    # alias keys used by prior samples
-    "compare_scores": ("Benchmarking (Country vs. Country)", "ov-compare"),
-    "forecast_line":  ("FDI Forecasts (2025–2028)",          "ov-forecast"),
+    "score_trend":       ("Country Viability Composite Score", "ov-score-trend"),
+    "grade_map":         ("Grades & Percentile Buckets",       "ov-grade-map"),
+    "capex_trend":       ("CAPEX: Definition & Trends",        "ov-capex-trend"),
+    "investment_profile":("Investment Profile: Top Industries & Destinations", "ov-sectors"),
+    "compare":           ("Benchmarking (Country vs. Country)", "ov-compare"),
+    "forecast":          ("FDI Forecasts (2025–2028)",          "ov-forecast"),
+    # legacy alias keys used elsewhere
+    "compare_scores":    ("Benchmarking (Country vs. Country)", "ov-compare"),
+    "forecast_line":     ("FDI Forecasts (2025–2028)",          "ov-forecast"),
 }
 
-# Indicator weights table (exact values provided by you)
+# ─────────────────────────────────────────────────────────────────────────────
+# Indicator weights (provided)
+# ─────────────────────────────────────────────────────────────────────────────
 _WEIGHTS = [
     ("GDP growth (annual %)", 10),
     ("GDP per capita, PPP (current international $)", 8),
@@ -43,7 +44,9 @@ _WEIGHTS = [
     ("Total reserves in months of imports", 8),
 ]
 
-# Category explanations you provided (business language)
+# ─────────────────────────────────────────────────────────────────────────────
+# Category explanations
+# ─────────────────────────────────────────────────────────────────────────────
 _CATEGORIES = {
     "Economic Performance": [
         "GDP growth: Measures the pace of economic expansion year over year.",
@@ -77,7 +80,9 @@ _CATEGORIES = {
     ],
 }
 
-# Grade methodology text (exact business framing you requested)
+# ─────────────────────────────────────────────────────────────────────────────
+# Grades copy
+# ─────────────────────────────────────────────────────────────────────────────
 _GRADES = [
     "A+: 90th percentile and above — leading destinations with consistently high attractiveness scores.",
     "A: 75th–90th percentile — strong performers with favorable fundamentals but minor constraints.",
@@ -86,9 +91,11 @@ _GRADES = [
     "D: Bottom 25% — least attractive destinations for near-term investment."
 ]
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
 def _toc():
-    """Two-column Quick Navigation with chip-style buttons (no blue links)."""
-    # Collect unique (title, anchor) pairs (since multiple keys can share the same anchor)
+    """Two-column Quick Navigation rendered as neutral 'chips' (no blue links)."""
     seen = set()
     items: list[tuple[str, str]] = []
     for _, (title, anchor) in SECTIONS.items():
@@ -96,16 +103,13 @@ def _toc():
             items.append((title, anchor))
             seen.add(anchor)
 
-    # Split into two columns (left/right)
-    left = items[:len(items)//2]
-    right = items[len(items)//2:]
+    left = items[: len(items) // 2]
+    right = items[len(items) // 2 :]
 
     st.markdown("### Quick Navigation")
     c1, c2 = st.columns(2)
 
-    def _render_col(col, col_items):
-        from streamlit.components.v1 import html as st_html
-        # Build the chips as buttons; clicking scrolls smoothly to the anchor
+    def _render(col_items):
         chips = "\n".join(
             f"""
             <div class="toc-chip" onclick="
@@ -120,57 +124,44 @@ def _toc():
             """
             for (title, anchor) in col_items
         )
-        st_html(f"""
-        <style>
-          .toc-wrap {{ display: flex; flex-direction: column; gap: 10px; }}
-          .toc-chip {{
-            background: #f8f9fa;
-            border: 1px solid #e6e6e6;
-            border-radius: 10px;
-            padding: 12px 14px;
-            cursor: pointer;
-            transition: background 120ms ease, border-color 120ms ease, transform 60ms ease;
-            user-select: none;
-            box-shadow: 0 0 0 rgba(0,0,0,0);
-          }}
-          .toc-chip:hover {{
-            background: #f3f4f6;
-            border-color: #dfe3e8;
-          }}
-          .toc-chip:active {{
-            transform: translateY(1px);
-          }}
-          .toc-label {{
-            color: #111827;           /* neutral text, not link blue */
-            font-weight: 500;
-          }}
-        </style>
-        <div class="toc-wrap">
-          {chips}
-        </div>
-        """, height=52*max(1, len(col_items)), scrolling=False)
+        st_html(
+            f"""
+            <style>
+              .toc-wrap {{ display: flex; flex-direction: column; gap: 10px; }}
+              .toc-chip {{
+                background: #f8f9fa;
+                border: 1px solid #e6e6e6;
+                border-radius: 10px;
+                padding: 12px 14px;
+                cursor: pointer;
+                transition: background 120ms ease, border-color 120ms ease, transform 60ms ease;
+                user-select: none;
+              }}
+              .toc-chip:hover {{ background: #f3f4f6; border-color: #dfe3e8; }}
+              .toc-chip:active {{ transform: translateY(1px); }}
+              .toc-label {{ color: #111827; font-weight: 500; }}
+            </style>
+            <div class="toc-wrap">{chips}</div>
+            """,
+            height=52 * max(1, len(col_items)),
+            scrolling=False,
+        )
 
-    with c1: _render_col(c1, left)
-    with c2: _render_col(c2, right)
-
+    with c1:
+        _render(left)
+    with c2:
+        _render(right)
 
 
 def _anchor(title: str, anchor_id: str):
-    # reserve scroll margin so headers aren't hidden under Streamlit's chrome
-    st.markdown(
-        f"""<div id="{anchor_id}" style="scroll-margin-top: 80px;"></div>""",
-        unsafe_allow_html=True,
-    )
+    st.markdown(f"""<div id="{anchor_id}" style="scroll-margin-top: 80px;"></div>""", unsafe_allow_html=True)
     st.subheader(title)
 
-def _weights_table():
-    # Build rows
-    rows = "\n".join(
-        f"<tr><td class='ind'>{ind}</td><td class='num'>{w}</td></tr>"
-        for ind, w in _WEIGHTS
-    )
 
-    # Dynamic height so no scrollbars
+def _weights_table():
+    rows = "\n".join(
+        f"<tr><td class='ind'>{ind}</td><td class='num'>{w}</td></tr>" for ind, w in _WEIGHTS
+    )
     height = min(700, 120 + 36 * len(_WEIGHTS))
 
     st_html(
@@ -197,15 +188,10 @@ def _weights_table():
           .weights-table td.num {{ width: 25%; text-align: center; }}
           .weights-wrap {{ border-radius: 10px; overflow: hidden; border: 1px solid #eee; }}
         </style>
-
         <div class="weights-wrap">
           <table class="weights-table">
-            <thead>
-              <tr><th>Indicator</th><th>Weight (%)</th></tr>
-            </thead>
-            <tbody>
-              {rows}
-            </tbody>
+            <thead><tr><th>Indicator</th><th>Weight (%)</th></tr></thead>
+            <tbody>{rows}</tbody>
           </table>
         </div>
         """,
@@ -220,144 +206,69 @@ def _categories():
             for b in bullets:
                 st.markdown(f"- {b}")
 
+
 def _grades_section():
     """Single-column grade scale with badges + methodology callout."""
-    grade_lines = _GRADES[:5]
-    methodology = _GRADES[5] if len(_GRADES) > 5 else (
-        "Grading is performed independently for each year, meaning that a country's grade in a year "
-        "is based on its performance relative to other countries in that same year."
-    )
-
     items = []
-    for line in grade_lines:
+    for line in _GRADES:
         label, desc = line.split(":", 1)
         items.append((label.strip(), desc.strip()))
 
-    st_html(f"""
-    <style>
-      .grade-grid {{
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 14px;
-        margin: 6px 0 14px 0;
-      }}
-      .grade-item {{
-        display: grid;
-        grid-template-columns: 84px 1fr;
-        gap: 12px;
-        align-items: center;
-        background: #ffffff;
-        border: 1px solid #e6e6e6;
-        border-radius: 10px;
-        padding: 12px 14px;
-      }}
-      .grade-badge {{
-        display: inline-block;
-        text-align: center;
-        font-weight: 700;
-        border-radius: 10px;
-        border: 1px solid #dfe3e8;
-        background: #f8f9fa;
-        padding: 10px 0;
-        width: 70px;
-      }}
-      .grade-desc {{
-        font-weight: 400;
-        color: #111827;
-      }}
-      .callout {{
-        border: 1px solid #e6e6e6;
-        border-left: 4px solid #2563eb;
-        background: #f8fafc;
-        border-radius: 8px;
-        padding: 12px 14px;
-        margin-top: 10px;
-      }}
-    </style>
-
-    <div class="grade-grid">
-      {"".join([
+    st_html(
         f"""
-        <div class='grade-item'>
-          <div class='grade-badge'>{label}</div>
-          <div class='grade-desc'>{desc}</div>
+        <style>
+          .grade-grid {{
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+            margin: 6px 0 14px 0;
+          }}
+          .grade-item {{
+            display: grid;
+            grid-template-columns: 84px 1fr;
+            gap: 12px;
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid #e6e6e6;
+            border-radius: 10px;
+            padding: 12px 14px;
+          }}
+          .grade-badge {{
+            text-align: center;
+            font-weight: 700;
+            border-radius: 10px;
+            border: 1px solid #dfe3e8;
+            background: #f8f9fa;
+            padding: 10px 0;
+            width: 70px;
+          }}
+          .grade-desc {{ color: #111827; }}
+          .callout {{
+            border: 1px solid #e6e6e6;
+            border-left: 4px solid #2563eb;
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-top: 10px;
+          }}
+        </style>
+        <div class="grade-grid">
+          {"".join([
+            f"<div class='grade-item'><div class='grade-badge'>{label}</div><div class='grade-desc'>{desc}</div></div>"
+            for (label, desc) in items
+          ])}
         </div>
-        """ for (label, desc) in items
-      ])}
-    </div>
+        <div class="callout">
+          <strong>Methodology:</strong> Grading is performed independently for each year, based on a country's
+          performance relative to other countries in that same year.
+        </div>
+        """,
+        height=len(items) * 86 + 96,
+        scrolling=False,
+    )
 
-    <div class="callout">
-      <strong>Methodology:</strong> {methodology}
-    </div>
-    """, height=len(items)*86 + 96, scrolling=False)
-
-def _business_and_technical_pairs(pairs: list[tuple[str, list[str], list[str]]]):
-    """
-    Render sections with two sub-blocks:
-    - Business Use (what to interpret / how to use)
-    - Technical Notes (data/units/method)
-    Each pair: (title, business_bullets[], technical_bullets[])
-    """
-    for title, biz, tech in pairs:
-        st.markdown(f"**{title}**")
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("_Business use_")
-            for b in biz:
-                st.markdown(f"- {b}")
-        with c2:
-            st.markdown("_Technical notes_")
-            for t in tech:
-                st.markdown(f"- {t}")
-        st.markdown("---")
-
-        
-def _what_why_how_block(title: str, what: list[str], why: list[str], how: list[str]):
-    st.markdown(f"**{title}**")
-    cols = st.columns(3)
-    with cols[0]:
-        st.markdown("_What it is_")
-        for b in what: st.markdown(f"- {b}")
-    with cols[1]:
-        st.markdown("_Why it matters_")
-        for b in why: st.markdown(f"- {b}")
-    with cols[2]:
-        st.markdown("_How to navigate_")
-        for b in how: st.markdown(f"- {b}")
-    st.markdown("---")
 
 def _capex_explainer_block(what: list[str], why: list[str], how: list[str]):
-    # What it is
-    st.markdown("#### What it is")
-    st.markdown(
-        "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
-        + "".join([f"<p>• {b}</p>" for b in what])
-        + "</div>",
-        unsafe_allow_html=True,
-    )
-
-    # Why it matters
-    st.markdown("#### Why it matters")
-    st.markdown(
-        "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
-        + "".join([f"<p>• {b}</p>" for b in why])
-        + "</div>",
-        unsafe_allow_html=True,
-    )
-
-    # How to navigate
-    st.markdown("#### How to navigate")
-    st.markdown(
-        "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
-        + "".join([f"<p>• {b}</p>" for b in how])
-        + "</div>",
-        unsafe_allow_html=True,
-    )
-
-    st.markdown("---")
-
-def _benchmarking_explainer_block(what: list[str], why: list[str], how: list[str]):
-    """Stacked, boxed explainer for the Benchmarking section."""
     def _box(title: str, bullets: list[str]):
         st.markdown(f"#### {title}")
         st.markdown(
@@ -366,18 +277,52 @@ def _benchmarking_explainer_block(what: list[str], why: list[str], how: list[str
             + "</div>",
             unsafe_allow_html=True,
         )
-
     _box("What it is", what)
     _box("Why it matters", why)
     _box("How to navigate", how)
-
     st.markdown("---")
 
+
+def _what_why_how_block(title: str, what: list[str], why: list[str], how: list[str]):
+    st.markdown(f"**{title}**")
+    cols = st.columns(3)
+    with cols[0]:
+        st.markdown("_What it is_")
+        for b in what:
+            st.markdown(f"- {b}")
+    with cols[1]:
+        st.markdown("_Why it matters_")
+        for b in why:
+            st.markdown(f"- {b}")
+    with cols[2]:
+        st.markdown("_How to navigate_")
+        for b in how:
+            st.markdown(f"- {b}")
+    st.markdown("---")
+
+
+def _benchmarking_explainer_block(what: list[str], why: list[str], how: list[str]):
+    def _box(title: str, bullets: list[str]):
+        st.markdown(f"#### {title}")
+        st.markdown(
+            "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
+            + "".join([f"<p>• {b}</p>" for b in bullets])
+            + "</div>",
+            unsafe_allow_html=True,
+        )
+    _box("What it is", what)
+    _box("Why it matters", why)
+    _box("How to navigate", how)
+    st.markdown("---")
+
+
 def _forecasting_explainer_block(what: list[str], why: list[str], how: list[object]):
-    """Stacked cards for Forecasting, with custom nested list support."""
+    """
+    Stacked cards for Forecasting, with nested list support (so we can
+    show ARIMA/ARIMAX/SARIMA/SARIMAX under one bullet without blank dots).
+    """
     def _box(title: str, bullets: list[object]):
-        # Build HTML list that supports nested lists (list elements can be str or list[str])
-        def render_items(items):
+        def render_items(items: list[object]) -> str:
             html = "<ul class='fx-list'>"
             for it in items:
                 if isinstance(it, list):
@@ -394,13 +339,11 @@ def _forecasting_explainer_block(what: list[str], why: list[str], how: list[obje
         st.markdown(
             """
             <style>
-              .fx-card {
-                padding: 10px; border: 1px solid #e6e6e6; border-radius: 6px; background-color: #fafafa;
-              }
-              .fx-list { margin: 0; padding-left: 1.1rem; }
-              .fx-list > li { margin: 4px 0; }
-              .fx-sublist { margin: 4px 0 6px 1.1rem; padding-left: 1.1rem; }
-              .fx-sublist > li { margin: 2px 0; }
+              .fx-card     { padding:10px; border:1px solid #e6e6e6; border-radius:6px; background:#fafafa; }
+              .fx-list     { margin:0; padding-left:1.1rem; }
+              .fx-list>li  { margin:4px 0; }
+              .fx-sublist  { margin:4px 0 6px 1.1rem; padding-left:1.1rem; }
+              .fx-sublist>li { margin:2px 0; }
             </style>
             """,
             unsafe_allow_html=True,
@@ -412,20 +355,9 @@ def _forecasting_explainer_block(what: list[str], why: list[str], how: list[obje
     _box("How the forecasts are generated", how)
     st.markdown("---")
 
-    
-def _score_trend_section():
-    st.markdown("**Why it matters:**")
-    st.markdown("""
-    - **Identify trajectory** — rising scores signal improving fundamentals, while declines may indicate emerging risks.
-    - **Benchmark effectively** — compare your target market’s trend against peers to spot relative over- or under-performance.
-    - **Time decisions** — use trends to gauge whether now is the right moment for expansion, consolidation, or exit. 
-    """)
 
 def _auto_jump():
-    """
-    Support URL param ?jump=<key> or session_state['overview_focus'] to auto-scroll.
-    External files can set st.session_state['overview_focus'] and rerun to trigger.
-    """
+    """Support URL param ?jump=<key> or session_state['overview_focus'] to auto-scroll."""
     params = st.query_params
     jump_key = None
     if "jump" in params:
@@ -436,53 +368,47 @@ def _auto_jump():
     key = str(jump_key) if jump_key is not None else None
     if key and key in SECTIONS:
         _, anchor = SECTIONS[key]
-        from streamlit.components.v1 import html
-        html(
+        st_html(
             f"""
             <script>
               setTimeout(function() {{
                 var el = window.parent.document.getElementById("{anchor}");
-                if (el) {{
-                  el.scrollIntoView({{ behavior: "smooth", block: "start" }});
-                }}
+                if (el) el.scrollIntoView({{ behavior: "smooth", block: "start" }});
               }}, 300);
             </script>
             """,
             height=0,
         )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Main renderer
+# ─────────────────────────────────────────────────────────────────────────────
 def render_overview_tab():
-
-    # Table of contents / quick links
     _toc()
     st.markdown("---")
 
-    # 1) Viability Score & Trend
+    # 1) Score & indicators
     _anchor(*SECTIONS["score_trend"])
     st.markdown(
-        """**What it is:** A normalized 0–1 composite index (higher = more attractive) of macro, governance, and infrastructure indicators for each country-year observation.  
+        """**What it is:** A normalized 0–1 composite index (higher = more attractive) of macro, governance,
+        and infrastructure indicators for each country-year observation.  
         **Weighted mix:** `Score = 0.45 Econ + 0.30 Gov + 0.25 Infra`"""
     )
     st.markdown("**Indicator Weights** (as a share of the composite):")
     _weights_table()
     st.markdown("**Indicators by Category**")
     _categories()
-    _score_trend_section()
 
-    # --- separator between Score and Grades ---
     st.markdown("<hr style='margin: 1.5em 0; border: none; border-top: 1px solid #e6e6e6;'>", unsafe_allow_html=True)
 
-
-    # 2) Grades & Percentile Buckets
+    # 2) Grades
     _anchor(*SECTIONS["grade_map"])
     st.markdown("**Grades Distribution**")
     _grades_section()
 
-    # --- separator between Grades and Capex ---
     st.markdown("<hr style='margin: 1.5em 0; border: none; border-top: 1px solid #e6e6e6;'>", unsafe_allow_html=True)
 
-
-    # 3) CAPEX — Definition & Trends
+    # 3) CAPEX
     _anchor(*SECTIONS["capex_trend"])
     _capex_explainer_block(
         [
@@ -495,7 +421,7 @@ def render_overview_tab():
         [
             "Views provided: global trend, CAPEX by grade, top source countries by absolute value and by growth.",
             "All CAPEX values are displayed in **billions of USD ($B)** for consistency.",
-            "Use the **year/continent/country/grade filters** at the top of the CAPEX tab to adjust scope.",
+            "Use the **year / continent / country / grade** filters at the top of the CAPEX tab to adjust scope.",
             "View the **Global CAPEX Trend** line chart for overall momentum; switch to a single year to see KPIs.",
             "Inspect the **CAPEX Map** (choropleth) to identify geographic concentration versus diversification.",
             "Check **Top Countries** (bars or KPIs) for absolute levels and the **Growth Ranking** chart to spot rising sources.",
@@ -503,152 +429,121 @@ def render_overview_tab():
         ],
     )
 
+    # 4) Investment Profile (Combined)
+    _anchor(*SECTIONS["investment_profile"])
 
-    # Investment Profile — combined section
-    _anchor(*SECTIONS["investment_profile"])  # both old keys resolve to the same anchor
-    
-    # Top industries
     _what_why_how_block(
         "Top industries",
-        # WHAT
         [
-            "Sector-level view of outbound FDI, for top 10 investing countries identified, by **Companies, Jobs, Projects, and CAPEX**.",
-            "Covers 16 canonized sectors for comparability across the top source countries."
+            "Sector-level view of outbound FDI, for the top 10 investing countries, by **Companies, Jobs, Projects, and CAPEX**.",
+            "Covers 16 harmonized sectors for comparability across countries.",
         ],
-        # WHY
         [
             "Reveals industry strengths vs. gaps; balance capital intensity (CAPEX) against job intensity.",
-            "Helps prioritize clusters and ecosystem development where a country is genuinely competitive."
+            "Helps prioritize clusters and ecosystem development where a country is genuinely competitive.",
         ],
-        # HOW (matches the Sectors tab UI/behavior)
         [
             "Choose a **Source Country** and **Metric**; keep **Sector = All** to see a ranked bar chart.",
             "Pick a **specific sector** to switch the view to a single KPI for that sector/country.",
-            "Use the **download** button to export the standardized sector table for the selected country."
+            "Use the **download** button to export the standardized sector table for the selected country.",
         ],
     )
-    
-    # Top destinations
+
     _what_why_how_block(
         "Top destinations",
-        # WHAT
         [
-            "Destination-country ranking of the top 10 source countries' outbound FDI across **Companies, Jobs, Projects, and CAPEX**.",
-            "Shows the **Top 15** destinations and a companion map (or a route view for a selected pair)."
+            "Destination ranking of the top 10 source countries’ outbound FDI across **Companies, Jobs, Projects, and CAPEX**.",
+            "Shows the **Top 15** destinations and a companion map (or a route view for a selected pair).",
         ],
-        # WHY
         [
             "Quantifies concentration risk (a few destinations dominate) versus diversification.",
-            "Highlights white space: large investors with limited presence in certain regions."
+            "Highlights white space: large investors with limited presence in certain regions.",
         ],
-        # HOW (matches the Destinations tab UI/behavior)
         [
             "Select a **Source Country** and **Metric**; keep **Destination = All** to see **Top 15** + map.",
             "Choose a **specific destination** to see a KPI and a **route map** for that pair.",
-            "Use the **download** button to export all destination rows for the selected source country."
+            "Use the **download** button to export all destination rows for the selected source country.",
         ],
     )
 
-
-    # 6) Benchmarking (Compare)
+    # 5) Benchmarking (Compare)
     _anchor(*SECTIONS["compare"])
     what_bench = [
-        "A head-to-head comparison of two countries on overall attractiveness and realized investment flows.",
-        "Provides a high-level snapshot of how markets stack up against each other within the same timeframe and filters."
+        "A head-to-head comparison of two countries on overall attractiveness (**Viability Score**) and realized investment flows (**CAPEX**).",
+        "Provides a high-level snapshot of how markets stack up within the same timeframe and filters.",
     ]
-
     why_bench = [
         "Quickly highlight trade-offs between strong viability fundamentals and actual investor activity.",
         "Support early-stage decision-making by identifying which market deserves deeper investigation.",
-        "Give executives an easy-to-digest summary that balances quantitative performance with real investment flows."
+        "Give executives an easy-to-digest summary that balances quantitative performance with real investment flows.",
     ]
-
     how_bench = [
         "Select two countries in the Compare tab.",
         "Adjust filters (year, continent, grade) to control the scope of comparison.",
-        "Review the headline KPIs: Average Viability Score vs. Total CAPEX ($B) for each country.",
-        "Use insights here as a starting point, then if among the top 10 investing countries, explore the Industry Landscape and Target Countries tabs for deeper context."
+        "Review the headline KPIs: **Average Viability Score** vs. **Total CAPEX ($B)** for each country.",
+        "Use insights here as a starting point; if a country is a top investor, dive into **Industry Landscape** and **Target Countries** for detail.",
     ]
+    _benchmarking_explainer_block(what_bench, why_bench, how_bench)
 
-    _benchmarking_explainer_block(
-        what=what_bench,
-        why=why_bench,
-        how=how_bench,
-    )
-
-    # 7) FDI Forecasts (2025–2028)
+    # 6) Forecasts
     _anchor(*SECTIONS["forecast"])
     what_forecast = [
-    "Forward-looking projection of country-level FDI CAPEX for 2025–2028.",
-    "Built using ARIMA-family time-series models trained on historical CAPEX data."
+        "Forward-looking projection of country-level FDI CAPEX for **2025–2028**.",
+        "Built using ARIMA-family time-series models trained on historical CAPEX data.",
     ]
     why_forecast = [
-    "Provides insight into whether countries are likely to gain or lose momentum in attracting investment.",
-    "Supports prioritization by comparing future trajectories across peer countries, not just current levels.",
-    "Adds a predictive layer to complement the composite score and past CAPEX analysis."
+        "Shows whether countries are likely to gain or lose momentum in attracting investment.",
+        "Supports prioritization by comparing future trajectories across peer countries, not just current levels.",
+        "Adds a predictive layer to complement the composite score and past CAPEX analysis.",
     ]
-   how_forecast = [
-    "Each forecast is generated using ARIMA-family models:",
-    [
-        "ARIMA: based only on past CAPEX values.",
-        "ARIMAX: ARIMA extended with exogenous (economic/governance) indicators.",
-        "SARIMA: adds seasonal/cyclical patterns.",
-        "SARIMAX: seasonality with exogenous (economic/governance) indicators.",
-    ],
-    "The order (p,d,q) shown under the chart means the model:",
-    [
-        "looks back at <em>p</em> past values,",
-        "differences the series <em>d</em> times to remove trends,",
-        "and models <em>q</em> past shocks/noise.",
-    ],
-    "RMSE (Root Mean Squared Error) measures forecast accuracy on the test window — lower means better fit.",
-    "Dashed lines are forecasts for 2025–2028; solid lines are historical CAPEX ($B)."
-]
+    how_forecast = [
+        "Each forecast is generated using ARIMA-family models:",
+        [
+            "ARIMA: based only on past CAPEX values.",
+            "ARIMAX: ARIMA extended with exogenous (economic/governance) indicators.",
+            "SARIMA: adds seasonal/cyclical patterns.",
+            "SARIMAX: seasonality + exogenous (economic/governance) indicators.",
+        ],
+        "The order (<em>p,d,q</em>) shown under the chart means the model:",
+        [
+            "looks back at <em>p</em> past values,",
+            "differences the series <em>d</em> times to remove trends,",
+            "and models <em>q</em> past shocks/noise.",
+        ],
+        "RMSE (Root Mean Squared Error) measures forecast accuracy on the test window — lower means better fit.",
+        "Dashed lines are forecasts for 2025–2028; solid lines are historical CAPEX ($B).",
+    ]
+    _forecasting_explainer_block(what_forecast, why_forecast, how_forecast)
 
-    _forecasting_explainer_block(
-    what=what_forecast,
-    why=why_forecast,
-    how=how_forecast,
-)
+    _auto_jump()
 
-
-
-# ---- Aliases so one ℹ️ per tab can jump to the right section ----------------
+# ─────────────────────────────────────────────────────────────────────────────
+# Public helpers used by other tabs
+# ─────────────────────────────────────────────────────────────────────────────
 SECTIONS.update({
-    # one-button-per-tab keys → map to your existing anchors
-    "scoring_tab":       SECTIONS["score_trend"],
-    "capex_tab":         SECTIONS["capex_trend"],
-    "sectors_tab":       SECTIONS["investment_profile"],
-    "destinations_tab":  SECTIONS["investment_profile"],
-    "compare_tab":       SECTIONS["compare"],
-    "forecast_tab":      SECTIONS["forecast"],
+    "scoring_tab":      SECTIONS["score_trend"],
+    "capex_tab":        SECTIONS["capex_trend"],
+    "sectors_tab":      SECTIONS["investment_profile"],
+    "destinations_tab": SECTIONS["investment_profile"],
+    "compare_tab":      SECTIONS["compare"],
+    "forecast_tab":     SECTIONS["forecast"],
 })
 
-# ---- Public helper: ℹ️ button you can use from any tab ----------------------
-def info_button(section_key: str,
-                help_text: str = "What is this?",
-                key_suffix: str | None = None):
+def info_button(section_key: str, help_text: str = "What is this?", key_suffix: str | None = None):
     """
-    Render a small ℹ️ button that jumps to `section_key` in Overview.
-    Pass a UNIQUE `key_suffix` per call (e.g., 'sectors_hdr', 'dest_hdr').
+    Render a small ℹ️ button that jumps to `section_key` on the Overview tab.
+    Pass a UNIQUE `key_suffix` per call (e.g., 'sectors_hdr', 'dest_hdr') to avoid key collisions.
     """
-    # Use the caller-provided suffix verbatim to avoid accidental collisions.
     if not key_suffix:
-        # Absolute fallback to keep the app running, but you SHOULD pass a suffix.
         key_suffix = f"default_{section_key}"
-
     unique_key = f"info_{key_suffix}"
     if st.button("ℹ️", key=unique_key, help=help_text):
         st.session_state["overview_focus"] = section_key
         st.session_state["_force_overview"] = True
 
 
-# ---- Public helper: JS to switch to Overview and smooth-scroll ---------------
 def emit_auto_jump_script():
-    """
-    If `_force_overview` is set, click the Overview tab and scroll to the
-    anchor for `overview_focus`.
-    """
+    """If `_force_overview` is set, switch to Overview and smooth-scroll to the target anchor."""
     if not st.session_state.get("_force_overview"):
         return
 
@@ -658,36 +553,30 @@ def emit_auto_jump_script():
         return
 
     _, anchor_id = SECTIONS[key]
-
-    from streamlit.components.v1 import html
-    html(f"""
-    <script>
-    (function() {{
-      function jump() {{
-        try {{
-          const root = window.parent.document;
-          // Click the Overview tab (match by label text)
-          const tabs = root.querySelectorAll('[role="tab"], [data-baseweb="tab"]');
-          let over = null;
-          tabs.forEach(t => {{
-            const txt = (t.innerText || '').trim().toLowerCase();
-            if (txt.includes('overview')) over = t;
-          }});
-          if (over) over.click();
-
-          // Smooth-scroll to the target anchor
-          setTimeout(() => {{
-            const el = root.getElementById("{anchor_id}");
-            if (el) el.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
-          }}, 300);
-        }} catch (e) {{
-          // no-op
-        }}
-      }}
-      setTimeout(jump, 60);
-    }})();
-    </script>
-    """, height=0)
-
-    # reset the trigger so we don't keep jumping
+    st_html(
+        f"""
+        <script>
+        (function() {{
+          function jump() {{
+            try {{
+              const root = window.parent.document;
+              const tabs = root.querySelectorAll('[role="tab"], [data-baseweb="tab"]');
+              let over = null;
+              tabs.forEach(t => {{
+                const txt = (t.innerText || '').trim().toLowerCase();
+                if (txt.includes('overview')) over = t;
+              }});
+              if (over) over.click();
+              setTimeout(() => {{
+                const el = root.getElementById("{anchor_id}");
+                if (el) el.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+              }}, 300);
+            }} catch (e) {{}}
+          }}
+          setTimeout(jump, 60);
+        }})();
+        </script>
+        """,
+        height=0,
+    )
     st.session_state["_force_overview"] = False
