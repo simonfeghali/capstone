@@ -552,10 +552,10 @@ def render_overview_tab():
     ]
 
     how_forecast = [
-    "Each forecast is generated using ARIMA-type models:,
-    ARIMA: based only on past CAPEX values.,
-    ARIMAX: ARIMA extended with extra economic/governance indicators.,
-    SARIMA: adds seasonal or cyclical patterns.,
+    "Each forecast is generated using ARIMA-type models:
+    ARIMA: based only on past CAPEX values.
+    ARIMAX: ARIMA extended with extra economic/governance indicators.
+    SARIMA: adds seasonal or cyclical patterns.
     SARIMAX: combines seasonality with exogenous indicators.",
     "",
     "The Order (p,d,q) shown under the chart explains how the model:",
