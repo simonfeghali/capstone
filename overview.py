@@ -357,30 +357,21 @@ def _capex_explainer_block(what: list[str], why: list[str], how: list[str]):
     st.markdown("---")
 
 def _benchmarking_explainer_block(what: list[str], why: list[str], how: list[str]):
-    """Stacked, boxed explainer for Overview sections."""
+    """Stacked, boxed explainer for the Benchmarking section."""
     def _box(title: str, bullets: list[str]):
         st.markdown(f"#### {title}")
-
-        # Build content allowing raw HTML blocks (e.g., <ul> lists)
-        parts = []
-        for b in bullets:
-            if isinstance(b, str) and b.lstrip().startswith("<"):
-                parts.append(b)  # render as-is
-            else:
-                parts.append(f"<p>• {b}</p>")
-
         st.markdown(
             "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
-            + "".join(parts) +
-            "</div>",
+            + "".join([f"<p>• {b}</p>" for b in bullets])
+            + "</div>",
             unsafe_allow_html=True,
         )
 
     _box("What it is", what)
     _box("Why it matters", why)
     _box("How to navigate", how)
-    st.markdown("---")
 
+    st.markdown("---")
 
 
 def _score_trend_section():
@@ -546,43 +537,34 @@ def render_overview_tab():
         how=how_bench,
     )
 
-   # 7) FDI Forecasts (2025–2028)
+    # 7) FDI Forecasts (2025–2028)
     _anchor(*SECTIONS["forecast"])
-    
-    what_forecast = [
-        "Forward-looking projection of country-level FDI CAPEX for 2025–2028.",
-        "Built using ARIMA-family time-series models trained on historical CAPEX data."
-    ]
-    
-    why_forecast = [
-    "Provides insight into whether countries are likely to gain or lose momentum in attracting investment.",
-    "Supports prioritization by comparing future trajectories across peer countries, not just current levels.",
-    "Adds a predictive layer to complement the composite score and past CAPEX analysis."
-    ]
-
-    how_forecast = [
-    "Each forecast is generated using ARIMA-type models:",
-    "ARIMA: based only on past CAPEX values.",
-    "ARIMAX: ARIMA extended with extra economic/governance indicators.",
-    "SARIMA: adds seasonal or cyclical patterns.",
-    "SARIMAX: combines seasonality with economic/governance indicators.",
-    "",
-    "The Order (p,d,q) shown under the chart explains how the model:",
-    "looks back at past values (p),",
-    "differences the series to remove trends (d),",
-    "and accounts for past shocks/noise (q).",
-    "",
-    "RMSE (Root Mean Squared Error) measures forecast accuracy on the test window — lower means better fit.",
-    "Dashed lines are forecasts for 2025–2028, where solid lines are historical CAPEX ($B)."
-]
-
-
-
-    _benchmarking_explainer_block(
-        what=what_forecast,
-        why=why_forecast,
-        how=how_forecast,
+    st.markdown(
+        "The **Forecast** tab projects CAPEX for **2025–2028**. Treat forecasts as *directional scenarios*, not point guarantees."
     )
+    # Technical details aligned to forecasting.py
+    st.markdown("**Model selection & training (matches `forecasting.py`)**")
+    st.markdown(
+        """
+- Split: last **15%** of the series (bounded to **2–4 years**) used as a test window for RMSE selection.  
+- Candidates: **ARIMA**, **ARIMAX**, **SARIMA**, **SARIMAX** with small order grids.  
+- Exogenous variables (when present): standardized with **StandardScaler fit on TRAIN only** (no leakage).  
+- Selection: model with lowest **RMSE** on the held-out test years.  
+- Refit: best model is refit on the **full** log-CAPEX series; future exog is the **last scaled row repeated**.  
+- Horizon: **exactly 2025–2028** (only years beyond the last observed).  
+- Plot: shows **Actual CAPEX** (history) and **Forecast** (2025–2028 dashed).  
+        """
+    )
+    st.markdown("**Business guidance**")
+    st.markdown(
+        """
+- Use forecasts to compare *relative* momentum across countries; validate with pipeline intelligence.  
+- Stress-test with alternative exogenous sets and scenario bounds; treat large residual volatility with caution.  
+        """
+    )
+
+    # Auto-jump if query param or session flag is present
+    _auto_jump()
 
 # ---- Aliases so one ℹ️ per tab can jump to the right section ----------------
 SECTIONS.update({
