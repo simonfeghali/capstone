@@ -561,20 +561,30 @@ def render_overview_tab():
     ]
 
     how_forecast = [
-    "Each forecast is generated using ARIMA-type models:",
-    "ARIMA: based only on past CAPEX values.",
-    "ARIMAX: ARIMA extended with extra economic/governance indicators.",
-    "SARIMA: adds seasonal or cyclical patterns.",
-    "SARIMAX: combines seasonality with exogenous indicators.",
-    "",
-    "The Order (p,d,q) shown under the chart explains how the model:",
-    "looks back at past values (p),",
-    "differences the series to remove trends (d),",
-    "and accounts for past shocks/noise (q).",
-    "",
-    "RMSE (Root Mean Squared Error) measures forecast accuracy on the test window — lower means better fit.",
-    "Dashed lines are the forecasts for 2025–2028, where solid lines are historical CAPEX ($B)."
+    (
+        "<p>Each forecast is generated using ARIMA-family models:</p>"
+        "<ul style='margin-top:6px'>"
+        "<li><strong>ARIMA</strong>: based only on past CAPEX values.</li>"
+        "<li><strong>ARIMAX</strong>: ARIMA extended with exogenous (economic/governance) indicators.</li>"
+        "<li><strong>SARIMA</strong>: adds seasonal/cyclical patterns.</li>"
+        "<li><strong>SARIMAX</strong>: seasonality + exogenous indicators.</li>"
+        "</ul>"
+    ),
+    (
+        "<p>The <em>order</em> <code>(p,d,q)</code> shown under the chart means the model:</p>"
+        "<ul style='margin-top:6px'>"
+        "<li>looks back at <em>p</em> past values (autoregressive part),</li>"
+        "<li>differences the series <em>d</em> times to remove trends,</li>"
+        "<li>and models <em>q</em> past shocks/noise (moving-average part).</li>"
+        "</ul>"
+    ),
+    (
+        "<p><strong>RMSE</strong> (Root Mean Squared Error) is the test-window error; "
+        "lower is better.</p>"
+        "<p>Dashed lines = forecasts for 2025–2028; solid lines = historical CAPEX ($B).</p>"
+    ),
     ]
+
 
 
     _benchmarking_explainer_block(
