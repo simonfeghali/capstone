@@ -567,7 +567,7 @@ def render_overview_tab():
         "<li><strong>ARIMA</strong>: based only on past CAPEX values.</li>"
         "<li><strong>ARIMAX</strong>: ARIMA extended with exogenous (economic/governance) indicators.</li>"
         "<li><strong>SARIMA</strong>: adds seasonal/cyclical patterns.</li>"
-        "<li><strong>SARIMAX</strong>: seasonality + exogenous (economic/governance) indicators.</li>"
+        "<li><strong>SARIMAX</strong>: seasonality with exogenous (economic/governance) indicators.</li>"
         "</ul>"
     ),
     (
