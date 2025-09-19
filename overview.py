@@ -373,35 +373,45 @@ def _benchmarking_explainer_block(what: list[str], why: list[str], how: list[str
 
     st.markdown("---")
 
-def _forecasting_explainer_block(what: list[str], why: list[str], how: list[str]):
-    # What it is
-    st.markdown("#### What it is")
-    st.markdown(
-        "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
-        + "".join([f"<p>• {b}</p>" for b in what])
-        + "</div>",
-        unsafe_allow_html=True,
-    )
+def _forecasting_explainer_block(what: list[str], why: list[str], how: list[object]):
+    """Stacked cards for Forecasting, with custom nested list support."""
+    def _box(title: str, bullets: list[object]):
+        # Build HTML list that supports nested lists (list elements can be str or list[str])
+        def render_items(items):
+            html = "<ul class='fx-list'>"
+            for it in items:
+                if isinstance(it, list):
+                    html += "<ul class='fx-sublist'>"
+                    for sub in it:
+                        html += f"<li>{sub}</li>"
+                    html += "</ul>"
+                else:
+                    html += f"<li>{it}</li>"
+            html += "</ul>"
+            return html
 
-    # Why it matters
-    st.markdown("#### Why it matters")
-    st.markdown(
-        "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
-        + "".join([f"<p>• {b}</p>" for b in why])
-        + "</div>",
-        unsafe_allow_html=True,
-    )
+        st.markdown(f"#### {title}")
+        st.markdown(
+            """
+            <style>
+              .fx-card {
+                padding: 10px; border: 1px solid #e6e6e6; border-radius: 6px; background-color: #fafafa;
+              }
+              .fx-list { margin: 0; padding-left: 1.1rem; }
+              .fx-list > li { margin: 4px 0; }
+              .fx-sublist { margin: 4px 0 6px 1.1rem; padding-left: 1.1rem; }
+              .fx-sublist > li { margin: 2px 0; }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown(f"<div class='fx-card'>{render_items(bullets)}</div>", unsafe_allow_html=True)
 
-    # How forecasts are generated (renamed title)
-    st.markdown("#### How the forecasts are generated")
-    st.markdown(
-        "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
-        + "".join([f"<p>• {b}</p>" for b in how])
-        + "</div>",
-        unsafe_allow_html=True,
-    )
-
+    _box("What it is", what)
+    _box("Why it matters", why)
+    _box("How the forecasts are generated", how)
     st.markdown("---")
+
     
 def _score_trend_section():
     st.markdown("**Why it matters:**")
@@ -577,21 +587,23 @@ def render_overview_tab():
     "Supports prioritization by comparing future trajectories across peer countries, not just current levels.",
     "Adds a predictive layer to complement the composite score and past CAPEX analysis."
     ]
-    how_forecast = [
-    "Each forecast is generated using ARIMA-type models:",
-    "ARIMA: based only on past CAPEX values.",
-    "ARIMAX: ARIMA extended with extra economic/governance indicators.",
-    "SARIMA: adds seasonal or cyclical patterns.",
-    "SARIMAX: combines seasonality with economic/governance indicators.",
-    "",
-    "The Order (p,d,q) shown under the chart explains how the model:",
-    "looks back at past values (p),",
-    "differences the series to remove trends (d),",
-    "and accounts for past shocks/noise (q).",
-    "",
+   how_forecast = [
+    "Each forecast is generated using ARIMA-family models:",
+    [
+        "ARIMA: based only on past CAPEX values.",
+        "ARIMAX: ARIMA extended with exogenous (economic/governance) indicators.",
+        "SARIMA: adds seasonal/cyclical patterns.",
+        "SARIMAX: seasonality with exogenous (economic/governance) indicators.",
+    ],
+    "The order (p,d,q) shown under the chart means the model:",
+    [
+        "looks back at <em>p</em> past values,",
+        "differences the series <em>d</em> times to remove trends,",
+        "and models <em>q</em> past shocks/noise.",
+    ],
     "RMSE (Root Mean Squared Error) measures forecast accuracy on the test window — lower means better fit.",
     "Dashed lines are forecasts for 2025–2028; solid lines are historical CAPEX ($B)."
-    ]
+]
 
     _forecasting_explainer_block(
     what=what_forecast,
