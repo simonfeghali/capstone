@@ -427,12 +427,12 @@ def render_overview_tab():
         ],
         [
             "Views provided: global trend, CAPEX by grade, top source countries by absolute value and by growth.",
-            "All CAPEX values are displayed in **billions of USD ($B)** for consistency.",
-            "Use the **year / continent / country / grade** filters at the top of the CAPEX tab to adjust scope.",
-            "View the **Global CAPEX Trend** line chart for overall momentum; switch to a single year to see KPIs.",
-            "Inspect the **CAPEX Map** (choropleth) to identify geographic concentration versus diversification.",
-            "Check **Top Countries** (bars or KPIs) for absolute levels and the **Growth Ranking** chart to spot rising sources.",
-            "Use the **CAPEX by Grade** view to compare investment flows across attractiveness grades.",
+            "All CAPEX values are displayed in billions of USD ($B) for consistency.",
+            "Use the year / continent / country / grade filters at the top of the CAPEX tab to adjust scope.",
+            "View the Global CAPEX Trend line chart for overall momentum; switch to a single year to see KPIs.",
+            "Inspect the CAPEX Map (choropleth) to identify geographic concentration versus diversification.",
+            "Check Top Countries (bars or KPIs) for absolute levels and the *Growth Ranking* chart to spot rising sources.",
+            "Use the CAPEX by Grade view to compare investment flows across attractiveness grades.",
         ],
     )
 
