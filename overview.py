@@ -511,31 +511,42 @@ def render_overview_tab():
     )
 
 
-    # 6) Benchmarking (Compare)
-    _anchor(*SECTIONS["compare"])
-    what_bench = [
-        "A head-to-head comparison of two countries on overall attractiveness and realized investment flows.",
-        "Provides a high-level snapshot of how markets stack up against each other within the same timeframe and filters."
-    ]
+    # 8) FDI Forecasts (2025–2028)
+_anchor(*SECTIONS["forecast"])
 
-    why_bench = [
-        "Quickly highlight trade-offs between strong viability fundamentals and actual investor activity.",
-        "Support early-stage decision-making by identifying which market deserves deeper investigation.",
-        "Give executives an easy-to-digest summary that balances quantitative performance with real investment flows."
-    ]
+what_forecast = [
+    "Forward-looking projection of country-level FDI CAPEX for 2025–2028.",
+    "Built using ARIMA-family time-series models trained on historical CAPEX data."
+]
 
-    how_bench = [
-        "Select two countries in the Compare tab.",
-        "Adjust filters (year, continent, grade) to control the scope of comparison.",
-        "Review the headline KPIs: Average Viability Score vs. Total CAPEX ($B) for each country.",
-        "Use insights here as a starting point, then if among the top 10 investing countries, explore the Industry Landscape and Target Countries tabs for deeper context."
-    ]
+why_forecast = [
+    "Provides insight into whether countries are likely to gain or lose momentum in attracting investment.",
+    "Supports prioritization by comparing future trajectories across peer countries, not just current levels.",
+    "Adds a predictive layer to complement the composite score and past CAPEX analysis."
+]
 
-    _benchmarking_explainer_block(
-        what=what_bench,
-        why=why_bench,
-        how=how_bench,
-    )
+how_forecast = [
+    "Each forecast is generated using ARIMA-type models:",
+    "• ARIMA: based only on past CAPEX values.",
+    "• ARIMAX: ARIMA extended with extra economic/governance indicators.",
+    "• SARIMA: adds seasonal or cyclical patterns.",
+    "• SARIMAX: combines seasonality with exogenous indicators.",
+    "",
+    "The Order (p,d,q) shown under the chart explains how the model:",
+    "• looks back at past values (p),",
+    "• differences the series to remove trends (d),",
+    "• and accounts for past shocks/noise (q).",
+    "",
+    "RMSE (Root Mean Squared Error) measures forecast accuracy on the test window — lower means better fit.",
+    "Dashed lines = forecasts for 2025–2028; solid lines = historical CAPEX ($B)."
+]
+
+_triple_explainer_block(
+    what=what_forecast,
+    why=why_forecast,
+    how=how_forecast,
+)
+
 
     # 7) FDI Forecasts (2025–2028)
     _anchor(*SECTIONS["forecast"])
