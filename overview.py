@@ -493,7 +493,6 @@ def render_overview_tab():
     ]
     why_forecast = [
         "Shows whether countries are likely to gain or lose momentum in attracting investment.",
-        "Supports prioritization by comparing future trajectories across peer countries, not just current levels.",
         "Adds a predictive layer to complement the composite score and past CAPEX analysis.",
     ]
     how_forecast = [
