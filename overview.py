@@ -568,24 +568,28 @@ def render_overview_tab():
         "<li><strong>ARIMA</strong>: based only on past CAPEX values.</li>"
         "<li><strong>ARIMAX</strong>: ARIMA with exogenous economic/governance indicators.</li>"
         "<li><strong>SARIMA</strong>: adds seasonal/cyclical patterns.</li>"
-        "<li><strong>SARIMAX</strong>: combines seasonality and exogenous indicators.</li>"
+        "<li><strong>SARIMAX</strong>: combines seasonality and exogenous economic/governance indicators.</li>"
         "</ul>"
         "</div>"
     ),
     (
-        "<p>The <em>order</em> <code>(p,d,q)</code> shown under the chart means the model:</p>"
+        "<div style='margin:0; padding:0'>"
+        "<div><em>The order (p,d,q) shown under the chart means the model:</em></div>"
         "<ul style='margin:0; padding-left:20px'>"
-        "<li>looks back at <em>p</em> past values,</li>"
-        "<li>differences the series <em>d</em> times to remove trends,</li>"
-        "<li>and models <em>q</em> past shocks/noise.</li>"
+        "<li>p = lag depth (autoregression)</li>"
+        "<li>d = differencing to remove trends</li>"
+        "<li>q = moving average of past shocks</li>"
         "</ul>"
+        "</div>"
     ),
     (
-        "<p><strong>RMSE</strong> (Root Mean Squared Error) is the test-window error; "
-        "lower is better.</p>"
-        "<p>Dashed lines are forecasts for 2025–2028, where solid lines are historical CAPEX ($B).</p>"
+        "<div style='margin:0; padding:0'>"
+        "<div><strong>RMSE</strong> (Root Mean Squared Error) is the test-window error; lower is better.</div>"
+        "<div>Dashed lines are forecasts for 2025–2028, where solid lines are historical CAPEX ($B).</div>"
+        "</div>"
     ),
-    ]
+]
+
 
 
 
