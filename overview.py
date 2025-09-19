@@ -357,21 +357,30 @@ def _capex_explainer_block(what: list[str], why: list[str], how: list[str]):
     st.markdown("---")
 
 def _benchmarking_explainer_block(what: list[str], why: list[str], how: list[str]):
-    """Stacked, boxed explainer for the Benchmarking section."""
+    """Stacked, boxed explainer for Overview sections."""
     def _box(title: str, bullets: list[str]):
         st.markdown(f"#### {title}")
+
+        # Build content allowing raw HTML blocks (e.g., <ul> lists)
+        parts = []
+        for b in bullets:
+            if isinstance(b, str) and b.lstrip().startswith("<"):
+                parts.append(b)  # render as-is
+            else:
+                parts.append(f"<p>• {b}</p>")
+
         st.markdown(
             "<div style='padding:10px; border:1px solid #e6e6e6; border-radius:6px; background-color:#fafafa;'>"
-            + "".join([f"<p>• {b}</p>" for b in bullets])
-            + "</div>",
+            + "".join(parts) +
+            "</div>",
             unsafe_allow_html=True,
         )
 
     _box("What it is", what)
     _box("Why it matters", why)
     _box("How to navigate", how)
-
     st.markdown("---")
+
 
 
 def _score_trend_section():
