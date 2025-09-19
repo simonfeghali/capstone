@@ -567,21 +567,21 @@ def render_overview_tab():
         "<li><strong>ARIMA</strong>: based only on past CAPEX values.</li>"
         "<li><strong>ARIMAX</strong>: ARIMA extended with exogenous (economic/governance) indicators.</li>"
         "<li><strong>SARIMA</strong>: adds seasonal/cyclical patterns.</li>"
-        "<li><strong>SARIMAX</strong>: seasonality + exogenous indicators.</li>"
+        "<li><strong>SARIMAX</strong>: seasonality + exogenous (economic/governance) indicators.</li>"
         "</ul>"
     ),
     (
         "<p>The <em>order</em> <code>(p,d,q)</code> shown under the chart means the model:</p>"
         "<ul style='margin-top:6px'>"
-        "<li>looks back at <em>p</em> past values (autoregressive part),</li>"
+        "<li>looks back at <em>p</em> past values,</li>"
         "<li>differences the series <em>d</em> times to remove trends,</li>"
-        "<li>and models <em>q</em> past shocks/noise (moving-average part).</li>"
+        "<li>and models <em>q</em> past shocks/noise.</li>"
         "</ul>"
     ),
     (
         "<p><strong>RMSE</strong> (Root Mean Squared Error) is the test-window error; "
         "lower is better.</p>"
-        "<p>Dashed lines = forecasts for 2025–2028; solid lines = historical CAPEX ($B).</p>"
+        "<p>Dashed lines are forecasts for 2025–2028, where solid lines are historical CAPEX ($B).</p>"
     ),
     ]
 
