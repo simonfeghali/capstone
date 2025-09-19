@@ -537,31 +537,36 @@ def render_overview_tab():
         how=how_bench,
     )
 
-    # 7) FDI Forecasts (2025–2028)
+   # 8) FDI Forecasts (2025–2028)
     _anchor(*SECTIONS["forecast"])
-    st.markdown(
-        "The **Forecast** tab projects CAPEX for **2025–2028**. Treat forecasts as *directional scenarios*, not point guarantees."
-    )
-    # Technical details aligned to forecasting.py
-    st.markdown("**Model selection & training (matches `forecasting.py`)**")
-    st.markdown(
-        """
-- Split: last **15%** of the series (bounded to **2–4 years**) used as a test window for RMSE selection.  
-- Candidates: **ARIMA**, **ARIMAX**, **SARIMA**, **SARIMAX** with small order grids.  
-- Exogenous variables (when present): standardized with **StandardScaler fit on TRAIN only** (no leakage).  
-- Selection: model with lowest **RMSE** on the held-out test years.  
-- Refit: best model is refit on the **full** log-CAPEX series; future exog is the **last scaled row repeated**.  
-- Horizon: **exactly 2025–2028** (only years beyond the last observed).  
-- Plot: shows **Actual CAPEX** (history) and **Forecast** (2025–2028 dashed).  
-        """
-    )
-    st.markdown("**Business guidance**")
-    st.markdown(
-        """
-- Use forecasts to compare *relative* momentum across countries; validate with pipeline intelligence.  
-- Stress-test with alternative exogenous sets and scenario bounds; treat large residual volatility with caution.  
-        """
-    )
+    
+    what_forecast = [
+        "Forward-looking projection of country-level FDI CAPEX for 2025–2028.",
+        "Built using ARIMA-family time-series models trained on historical CAPEX data."
+    ]
+    
+    why_forecast = [
+    "Provides insight into whether countries are likely to gain or lose momentum in attracting investment.",
+    "Supports prioritization by comparing future trajectories across peer countries, not just current levels.",
+    "Adds a predictive layer to complement the composite score and past CAPEX analysis."
+    ]
+
+    how_forecast = [
+    "Each forecast is generated using ARIMA-type models:",
+    "• ARIMA: based only on past CAPEX values.",
+    "• ARIMAX: ARIMA extended with extra economic/governance indicators.",
+    "• SARIMA: adds seasonal or cyclical patterns.",
+    "• SARIMAX: combines seasonality with exogenous indicators.",
+    "",
+    "The Order (p,d,q) shown under the chart explains how the model:",
+    "looks back at past values (p),",
+    "differences the series to remove trends (d),",
+    "and accounts for past shocks/noise (q).",
+    "",
+    "RMSE (Root Mean Squared Error) measures forecast accuracy on the test window — lower means better fit.",
+    "Dashed lines are the forecasts for 2025–2028, where solid lines are historical CAPEX ($B)."
+    ]
+
 
     # Auto-jump if query param or session flag is present
     _auto_jump()
