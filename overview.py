@@ -127,7 +127,12 @@ def _toc():
         st_html(
             f"""
             <style>
-              .toc-wrap {{ display: flex; flex-direction: column; gap: 10px; }}
+              .toc-wrap {{ 
+                display: flex; 
+                flex-direction: column; 
+                gap: 10px; 
+                padding-bottom: 10px;   /* NEW: avoids clipping */
+              }}
               .toc-chip {{
                 background: #f8f9fa;
                 border: 1px solid #e6e6e6;
@@ -141,9 +146,11 @@ def _toc():
               .toc-chip:active {{ transform: translateY(1px); }}
               .toc-label {{ color: #111827; font-weight: 500; }}
             </style>
-            <div class="toc-wrap">{chips}</div>
+            <div class="toc-wrap">
+              {chips}
+            </div>
             """,
-            height=52 * max(1, len(col_items)),
+            height=60 * max(1, len(col_items)) + 12,  # NEW: a bit taller than the content
             scrolling=False,
         )
 
