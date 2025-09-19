@@ -563,7 +563,7 @@ def render_overview_tab():
     how_forecast = [
     (
         "<p>Each forecast is generated using ARIMA-family models:</p>"
-         "<ul style='margin:0; padding-left:20px'>"
+         "<ul style='margin:0'>"
         "<li><strong>ARIMA</strong>: based only on past CAPEX values.</li>"
         "<li><strong>ARIMAX</strong>: ARIMA extended with exogenous (economic/governance) indicators.</li>"
         "<li><strong>SARIMA</strong>: adds seasonal/cyclical patterns.</li>"
