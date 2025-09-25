@@ -83,7 +83,7 @@ st.markdown(f"""
   width: 42px; height: 42px;
 }}
 .header-logo {{
-  height: 60px;   /* was ~36–48px, now bigger */
+  height: 100px;   /* was ~36–48px, now bigger */
   width: auto;
 }}
 </style>
