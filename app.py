@@ -18,12 +18,6 @@ from overview import render_overview_tab, info_button, emit_auto_jump_script
 # ──────────────────────────────────────────────────────────────────────────────
 st.set_page_config(layout="wide")
 
-# ---- Color scales ----
-# Scores are 0–1 → diverging red→yellow→green makes high=green, low=red
-SCORE_SCALE = "RdYlGn"
-# Money isn’t bounded, but you asked for two colors; this diverging scale gives strong contrast
-CAPEX_SCALE = "Portland"
-
 st.markdown(
     """
     <style>
@@ -563,7 +557,7 @@ with tab_scoring:
             else:
                 map_df = avg_scope.rename(columns={"avg_score": "score"})[["country", "score"]].copy()
                 map_title = "Global Performance Map — All Years"
-                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale=SCORE_SCALE,range_color=(0, 1),title=map_title,)
+                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale="Blues",title=map_title,)
 
                 # pretty hover
                 fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{z:.3f}<extra></extra>")
