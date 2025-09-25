@@ -17,6 +17,9 @@ from overview import render_overview_tab, info_button, emit_auto_jump_script
 # App chrome / theme
 # ──────────────────────────────────────────────────────────────────────────────
 st.set_page_config(layout="wide")
+# ---- Color scales (two-color style) ----
+SCORE_SCALE = "RdYlGn"     # low=red, high=green (use "RdYlGn_r" to flip)
+CAPEX_SCALE = "Portland"   # strong two-color contrast for $ values
 
 st.markdown(
     """
@@ -556,8 +559,9 @@ with tab_scoring:
                 st.info("No data for this selection.")
             else:
                 map_df = avg_scope.rename(columns={"avg_score": "score"})[["country", "score"]].copy()
+                vmin, vmax = float(map_df["score"].min()), float(map_df["score"].max())
                 map_title = "Global Performance Map — All Years"
-                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale="Blues",title=map_title,)
+                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale=SCORE_SCALE,range_color=(vmin, vmax) ,title=map_title,)
 
                 # pretty hover
                 fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{z:.3f}<extra></extra>")
