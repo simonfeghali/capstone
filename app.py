@@ -1167,7 +1167,7 @@ def load_sectors_raw() -> pd.DataFrame:
     df["sector"]  = df["sector_raw"].astype(str).map(_canon_sector)
 
     df = df[df["sector"].isin(SECTORS_CANON)]
-    df = df[df["country"].isin(SECTOR_COUNTRIES_10)]
+    
 
     df = (df.groupby(["country", "sector"], as_index=False)[["companies","jobs_created","capex","projects"]]
             .sum(min_count=1))
@@ -1189,7 +1189,7 @@ with tab_sectors:
 
         sel_sector = st.selectbox("Sector", sector_opt, index=0, key="sector_sel")
     with sc2:
-        countries = SECTOR_COUNTRIES_10
+        countries = sorted(sectors_df["country"].dropna().unique().tolist())
         default_c = st.session_state.get("sector_country", countries[0])
         if default_c not in countries: default_c = countries[0]
         sel_sector_country = st.selectbox("Source Country", countries,
