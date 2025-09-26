@@ -18,13 +18,12 @@ from overview import render_overview_tab, info_button, emit_auto_jump_script
 # ──────────────────────────────────────────────────────────────────────────────
 st.set_page_config(layout="wide")
 # ---- Color scales (two-color style) ----
-SCORE_SCALE = "RdYlGn"     # low=red, high=green (use "RdYlGn_r" to flip)
-CAPEX_SCALE = "Portland"   # strong two-color contrast for $ values
-# Custom blue → burgundy scale
-BLUE_BURGUNDY = [
-    [0.0, "#1f77b4"],   # deep blue
-    [1.0, "#800020"],   # burgundy
+# Custom dark-to-light blue scale
+DARKLIGHT_BLUE = [
+    [0.0, "#001f4d"],   # very dark navy blue
+    [1.0, "#a6c8ff"],   # very light blue
 ]
+CAPEX_SCALE = "Portland"   # strong two-color contrast for $ values
 st.markdown(
     """
     <style>
@@ -565,7 +564,7 @@ with tab_scoring:
                 map_df = avg_scope.rename(columns={"avg_score": "score"})[["country", "score"]].copy()
                 vmin, vmax = float(map_df["score"].min()), float(map_df["score"].max())
                 map_title = "Global Performance Map — All Years"
-                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale=BLUE_BURGUNDY,range_color=(vmin, vmax) ,title=map_title,)
+                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale=DARKLIGHT_BLUE,range_color=(vmin, vmax) ,title=map_title,)
 
                 # pretty hover
                 fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{z:.3f}<extra></extra>")
