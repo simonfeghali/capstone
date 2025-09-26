@@ -1163,7 +1163,7 @@ def load_sectors_raw() -> pd.DataFrame:
     for c in ["companies", "jobs_created", "capex", "projects"]:
         df[c] = df[c].map(_numify_generic)
 
-    df["country"] = df["country_raw"].astype(str).map(_canon_country)
+    sectors_df["country"] = sectors_df["country"].map(_canon_country)
     df["sector"]  = df["sector_raw"].astype(str).map(_canon_sector)
 
     df = df[df["sector"].isin(SECTORS_CANON)]
