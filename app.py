@@ -18,12 +18,10 @@ from overview import render_overview_tab, info_button, emit_auto_jump_script
 # ──────────────────────────────────────────────────────────────────────────────
 st.set_page_config(layout="wide")
 # ---- Color scales (two-color style) ----
-# Custom dark-to-light blue scale
-# Light → Dark Blue (low → high)
-LIGHT_TO_DARK_BLUE = [
-    [0.0, "#a6c8ff"],  # very light blue (low values)
-    [1.0, "#001f4d"],  # very dark navy (high values)
-]
+
+BLUES_5 = ["#e8f0ff", "#bcd3ff", "#7ba2ff", "#3e6cc9", "#0f2a59"]  # light → dark
+LABELS_5 = ["Very Low", "Low", "Medium", "High", "Very High"]
+
 CAPEX_SCALE = "Portland"   # strong two-color contrast for $ values
 st.markdown(
     """
@@ -563,12 +561,17 @@ with tab_scoring:
                 st.info("No data for this selection.")
             else:
                 map_df = avg_scope.rename(columns={"avg_score": "score"})[["country", "score"]].copy()
-                vmin, vmax = float(map_df["score"].min()), float(map_df["score"].max())
+                vals = map_df["score"].astype(float)
                 map_title = "Global Performance Map — All Years"
-                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale=LIGHT_TO_DARK_BLUE ,range_color=(vmin, vmax) ,title=map_title,)
+                # quantile edges (unique handles ties/outliers)
+                q = np.unique(vals.quantile([0, .2, .4, .6, .8, 1.0]).values)
+                labels = LABELS_5[:len(q)-1]
+                map_df["bucket"] = pd.cut(vals, bins=q, labels=labels, include_lowest=True)
+                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="bucket",category_orders={"bucket": labels},color_discrete_map={lab: col for lab, col in zip(labels, BLUES_5)},title="Global Performance Map — All Years",)
 
                 # pretty hover
-                fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{z:.3f}<extra></extra>")
+                fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{customdata:.3f}<extra></extra>",
+                      customdata=map_df["score"])
                 fig_map.update_coloraxes(showscale=True)
                 scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
                              "North America":"north america","South America":"south america",
