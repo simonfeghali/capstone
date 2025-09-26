@@ -17,12 +17,7 @@ from overview import render_overview_tab, info_button, emit_auto_jump_script
 # App chrome / theme
 # ──────────────────────────────────────────────────────────────────────────────
 st.set_page_config(layout="wide")
-# ---- Color scales (two-color style) ----
 
-BLUES_5 = ["#e8f0ff", "#bcd3ff", "#7ba2ff", "#3e6cc9", "#0f2a59"]  # light → dark
-LABELS_5 = ["Very Low", "Low", "Medium", "High", "Very High"]
-
-CAPEX_SCALE = "Portland"   # strong two-color contrast for $ values
 st.markdown(
     """
     <style>
@@ -561,18 +556,11 @@ with tab_scoring:
                 st.info("No data for this selection.")
             else:
                 map_df = avg_scope.rename(columns={"avg_score": "score"})[["country", "score"]].copy()
-                vals = map_df["score"].astype(float)
                 map_title = "Global Performance Map — All Years"
-                # quantile edges (unique handles ties/outliers)
-                q = np.unique(vals.quantile([0, .2, .4, .6, .8, 1.0]).values)
-                # Build labels with ranges (rounded to 2 decimals)
-                labels = [f"{q[i]:.2f} – {q[i+1]:.2f}" for i in range(len(q)-1)]
-                map_df["bucket"] = pd.cut(vals, bins=q, labels=labels, include_lowest=True)
-                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="bucket",category_orders={"bucket": labels},color_discrete_map={lab: col for lab, col in zip(labels, BLUES_5)},title="Global Performance Map — All Years",)
+                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale="Blues",title=map_title,)
 
                 # pretty hover
-                fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{customdata:.3f}<extra></extra>",
-                      customdata=map_df["score"])
+                fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{z:.3f}<extra></extra>")
                 fig_map.update_coloraxes(showscale=True)
                 scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
                              "North America":"north america","South America":"south america",
