@@ -19,9 +19,10 @@ from overview import render_overview_tab, info_button, emit_auto_jump_script
 st.set_page_config(layout="wide")
 # ---- Color scales (two-color style) ----
 # Custom dark-to-light blue scale
-DARKLIGHT_BLUE = [
-    [0.0, "#001f4d"],   # very dark navy blue
-    [1.0, "#a6c8ff"],   # very light blue
+# Light → Dark Blue (low → high)
+LIGHT_TO_DARK_BLUE = [
+    [0.0, "#a6c8ff"],  # very light blue (low values)
+    [1.0, "#001f4d"],  # very dark navy (high values)
 ]
 CAPEX_SCALE = "Portland"   # strong two-color contrast for $ values
 st.markdown(
@@ -564,7 +565,7 @@ with tab_scoring:
                 map_df = avg_scope.rename(columns={"avg_score": "score"})[["country", "score"]].copy()
                 vmin, vmax = float(map_df["score"].min()), float(map_df["score"].max())
                 map_title = "Global Performance Map — All Years"
-                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale=DARKLIGHT_BLUE,range_color=(vmin, vmax) ,title=map_title,)
+                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale=LIGHT_TO_DARK_BLUE ,range_color=(vmin, vmax) ,title=map_title,)
 
                 # pretty hover
                 fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{z:.3f}<extra></extra>")
