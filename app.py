@@ -565,7 +565,8 @@ with tab_scoring:
                 map_title = "Global Performance Map — All Years"
                 # quantile edges (unique handles ties/outliers)
                 q = np.unique(vals.quantile([0, .2, .4, .6, .8, 1.0]).values)
-                labels = LABELS_5[:len(q)-1]
+                # Build labels with ranges (rounded to 2 decimals)
+                labels = [f"{q[i]:.2f} – {q[i+1]:.2f}" for i in range(len(q)-1)]
                 map_df["bucket"] = pd.cut(vals, bins=q, labels=labels, include_lowest=True)
                 fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="bucket",category_orders={"bucket": labels},color_discrete_map={lab: col for lab, col in zip(labels, BLUES_5)},title="Global Performance Map — All Years",)
 
