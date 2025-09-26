@@ -20,7 +20,11 @@ st.set_page_config(layout="wide")
 # ---- Color scales (two-color style) ----
 SCORE_SCALE = "RdYlGn"     # low=red, high=green (use "RdYlGn_r" to flip)
 CAPEX_SCALE = "Portland"   # strong two-color contrast for $ values
-
+# Custom blue → burgundy scale
+BLUE_BURGUNDY = [
+    [0.0, "#1f77b4"],   # deep blue
+    [1.0, "#800020"],   # burgundy
+]
 st.markdown(
     """
     <style>
@@ -561,7 +565,7 @@ with tab_scoring:
                 map_df = avg_scope.rename(columns={"avg_score": "score"})[["country", "score"]].copy()
                 vmin, vmax = float(map_df["score"].min()), float(map_df["score"].max())
                 map_title = "Global Performance Map — All Years"
-                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale=SCORE_SCALE,range_color=(vmin, vmax) ,title=map_title,)
+                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale=BLUE_BURGUNDY,range_color=(vmin, vmax) ,title=map_title,)
 
                 # pretty hover
                 fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{z:.3f}<extra></extra>")
