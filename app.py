@@ -1106,7 +1106,7 @@ SECTORS_CANON = [
 
 SECTOR_COUNTRIES_10 = [
     "United States","United Kingdom","Germany","France","China",
-    "Japan","South Korea","Canada","Netherlands","United Arab Emirates", "Bahrain", "Kuwait", "Qatar", "Oman", "Saudi Arabia",
+    "Japan","South Korea","Canada","Netherlands","United Arab Emirates", "Bahrain", "Kuwait", "Qatar", "Oman", "Saudi Arabia", "GCC"
 ]
 
 def _canon_country(name: str) -> str:
