@@ -542,26 +542,13 @@ with tab_scoring:
                 st.info("No data for this selection.")
             else:
                 yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)
-                # after yoy_df is built and year_str added
-                y = yoy_df["score"].astype(float)                      # for labels + padding
-                pad = max((y.max() - y.min()) * 0.12, 0.002)           # small headroom for labels
-
                 fig_line = px.line(yoy_df, x="year_str", y="score", markers=True,
-                   labels={"year_str": "", "score": ""}, title=title)
+                                   labels={"year_str": "", "score": ""}, title=title)
                 fig_line.update_xaxes(type="category", categoryorder="array",
                                       categoryarray=yoy_df["year_str"].tolist(), showgrid=False)
                 fig_line.update_yaxes(showgrid=False)
-                # always-visible labels above points
-                fig_line.update_traces(
-                    mode="lines+markers+text",
-                    text=[f"{v:.3f}" for v in y],
-                    textposition="top center",
-                    hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
-                )
+                fig_line.update_traces(mode="lines+markers",hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>")
                 fig_line.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=340)
-                # hide y-axis completely (+ keep x as categories, if you like)
-                fig_line.update_yaxes(visible=False, range=[y.min() - pad, y.max() + pad])
-                fig_line.update_xaxes(type="category", showgrid=False)
                 st.plotly_chart(fig_line, use_container_width=True)
 
         with t2:
