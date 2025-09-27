@@ -556,8 +556,31 @@ with tab_scoring:
                 st.info("No data for this selection.")
             else:
                 map_df = avg_scope.rename(columns={"avg_score": "score"})[["country", "score"]].copy()
+
+                edges = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+                labels = ["0.00–0.20", "0.20–0.40", "0.40–0.60", "0.60–0.80", "0.80–1.00"]
+                
+                map_df["score_bin"] = pd.cut(
+                    map_df["score"],
+                    bins=edges,
+                    labels=labels,
+                    include_lowest=True,
+                    right=False,   # [0.18,0.30), [0.30,0.40), ... [0.70,0.80]
+                )
+
+                blue_shades = [
+                    "#dbe9f6",  # very light
+                    "#b9d3ea",
+                    "#90b7db",
+                    "#5f97c6",
+                    "#2f6fab",
+                    "#0b3f82",  # darkest
+                ]
+                
+                cmap = {label: color for label, color in zip(labels, blue_shades)}
+                
                 map_title = "Global Performance Map — All Years"
-                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale=["darkred", "white", "darkblue"],title=map_title,)
+                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score_bin", category_orders={"score_bin": labels}, color_discrete_map=cmap,title=map_title,)
 
                 # pretty hover
                 fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{z:.3f}<extra></extra>")
@@ -678,7 +701,7 @@ with tab_scoring:
                 st.info("No data for this selection.")
             else:
                 fig_map = px.choropleth(map_df, locations="country", locationmode="country names",
-                                        color="score", color_continuous_scale=["darkred", "white", "darkblue"], title=map_title)
+                                        color="score_bin", category_orders={"score_bin": labels}, color_discrete_map=cmap,title=map_title,)
                 fig_map.update_coloraxes(showscale=True)
                 scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
                              "North America":"north america","South America":"south america",
