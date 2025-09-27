@@ -565,16 +565,16 @@ with tab_scoring:
                     bins=edges,
                     labels=labels,
                     include_lowest=True,
-                    right=False,   # [0.18,0.30), [0.30,0.40), ... [0.70,0.80]
+                    right=True,
                 )
 
                 blue_shades = [
-                    "#dbe9f6",  # very light
-                    "#b9d3ea",
-                    "#90b7db",
-                    "#5f97c6",
-                    "#2f6fab",
-                    "#0b3f82",  # darkest
+                    "#89CFF0",  # very light
+                    "#0096FF",
+                    "#6495ED",
+                    "#4169E1",
+                    "#0047AB",
+                    "#00008B",  # darkest
                 ]
                 
                 cmap = {label: color for label, color in zip(labels, blue_shades)}
