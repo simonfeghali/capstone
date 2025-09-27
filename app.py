@@ -558,8 +558,13 @@ with tab_scoring:
                     textposition="top center",
                     hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
                 )
-                # force y-axis from 0 to 1 but keep it hidden
-                fig_line.update_yaxes(visible=False, range=[0, 1])
+                # Show only 0 and 1 on the y-axis
+                fig_line.update_yaxes(
+                    range=[0, 1],
+                    tickvals=[0, 1],
+                    ticktext=["0", "1"],
+                    showgrid=False
+                )
                 fig_line.update_xaxes(type="category", showgrid=False)
 
                 fig_line.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=340)
