@@ -1116,7 +1116,7 @@ def _canon_country(name: str) -> str:
         "usa":"United States","us":"United States","u.s.":"United States",
         "uk":"United Kingdom","u.k.":"United Kingdom",
         "south korea":"South Korea","republic of korea":"South Korea",
-        "uae":"United Arab Emirates", "saudiarabia":"Saudi Arabia",
+        "uae":"United Arab Emirates", "saudiarabia":"Saudi Arabia", "Gcc":"GCC", "gcc":"GCC",
     }
     low = s.lower()
     if low in swap: return swap[low]
