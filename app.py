@@ -557,7 +557,7 @@ with tab_scoring:
             else:
                 map_df = avg_scope.rename(columns={"avg_score": "score"})[["country", "score"]].copy()
                 map_title = "Global Performance Map — All Years"
-                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale="Blues",title=map_title,)
+                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale=["darkred", "white", "darkblue"],title=map_title,)
 
                 # pretty hover
                 fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{z:.3f}<extra></extra>")
@@ -678,7 +678,7 @@ with tab_scoring:
                 st.info("No data for this selection.")
             else:
                 fig_map = px.choropleth(map_df, locations="country", locationmode="country names",
-                                        color="score", color_continuous_scale="Blues", title=map_title)
+                                        color="score", color_continuous_scale=["darkred", "white", "darkblue"], title=map_title)
                 fig_map.update_coloraxes(showscale=True)
                 scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
                              "North America":"north america","South America":"south america",
