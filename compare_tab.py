@@ -386,20 +386,24 @@ def render_compare_tab():
     # ---------------- Section 1: Score & Grade (combined) ----------------
     st.subheader("Score & Grade")
 
-    def _score_grade(country):
-        if year_any == "All" and not wb_avg.empty:
-            row = wb_avg[wb_avg["country"] == country]
-            sc = float(row["avg_score"].mean()) if not row.empty else np.nan
-            gr = row["grade"].astype(str).dropna().iloc[0] if not row.empty and row["grade"].notna().any() else "-"
-            cont = wb.loc[wb["country"] == country, "continent"].dropna().iloc[0] if (wb["country"] == country).any() and wb["continent"].notna().any() else "-"
-            return sc, gr, cont
-        s = wb[wb["country"] == country]
-        cont = s["continent"].dropna().iloc[0] if not s.empty and s["continent"].notna().any() else "-"
-        row = s[s["year"] == int(year_any)] if year_any != "All" else s
-        sc = float(row["score"].mean()) if not row.empty else np.nan
-        gr = row["grade"].astype(str).dropna().iloc[0] if (year_any != "All" and not row.empty and row["grade"].notna().any()) else ("-" if year_any != "All" else "-")
-        return sc, gr if year_any != "All" else "-", cont
+    left, right = st.columns(2, gap="large")
 
+    def _render_score_kpi(country: str):
+        sc, gr, cont = _score_grade(country)
+        st.markdown(f"**{country}**")
+        c1, c2 = st.columns([1, 6])
+        with c1:
+            st.write("Score")
+            st.write(f"{sc:.3f}" if pd.notna(sc) else "–")
+        with c2:
+            st.write(gr)
+            st.write(f"**Continent:** {cont}")
+    
+    with left:
+        _render_score_kpi(a)
+    with right:
+        _render_score_kpi(b)
+        
     if year_any == "All":
         sA = wb[wb["country"] == a].groupby("year", as_index=False)["score"].mean()
         sB = wb[wb["country"] == b].groupby("year", as_index=False)["score"].mean()
