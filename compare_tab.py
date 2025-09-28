@@ -400,76 +400,70 @@ def render_compare_tab():
         gr = row["grade"].astype(str).dropna().iloc[0] if (year_any != "All" and not row.empty and row["grade"].notna().any()) else ("-" if year_any != "All" else "-")
         return sc, gr if year_any != "All" else "-", cont
 
-    left, right = st.columns(2, gap="large")
-    with left:
-        st.markdown(f"**{a}**")
-        scA, gA, contA = _score_grade(a)
-        c1, c2 = st.columns([1, 1])
-        with c1: _kpi("Score", scA)
-        with c2: st.markdown(_grade_pill(gA), unsafe_allow_html=True)
-        st.markdown(f"**Continent:** {contA}")
-        if year_any == "All":
-            s_tr = wb[wb["country"] == a].groupby("year", as_index=False)["score"].mean()
-            if not s_tr.empty:
-                s_tr["ys"] = s_tr["year"].astype(int).astype(str)
-                fig = px.line(s_tr, x="ys", y="score", markers=True,
-                              title=f"{a} • Viability Score Trend")
-                _style_compare_line(fig, unit=None)      # ← unified hover + no axis titles
-                st.plotly_chart(fig, use_container_width=True)
+    if year_any == "All":
+    sA = wb[wb["country"] == a].groupby("year", as_index=False)["score"].mean()
+    sB = wb[wb["country"] == b].groupby("year", as_index=False)["score"].mean()
+    sA["country"] = a
+    sB["country"] = b
+    s_tr = pd.concat([sA, sB], ignore_index=True)
 
-    with right:
-        st.markdown(f"**{b}**")
-        scB, gB, contB = _score_grade(b)
-        c1, c2 = st.columns([1, 1])
-        with c1: _kpi("Score", scB)
-        with c2: st.markdown(_grade_pill(gB), unsafe_allow_html=True)
-        st.markdown(f"**Continent:** {contB}")
-        if year_any == "All":
-            s_tr = wb[wb["country"] == b].groupby("year", as_index=False)["score"].mean()
-            if not s_tr.empty:
-                s_tr["ys"] = s_tr["year"].astype(int).astype(str)
-                fig = px.line(s_tr, x="ys", y="score", markers=True,
-                              title=f"{b} • Viability Score Trend")
-                _style_compare_line(fig, unit=None)      # ← same styling for B
-                st.plotly_chart(fig, use_container_width=True)
+    if not s_tr.empty:
+        s_tr["ys"] = s_tr["year"].astype(int).astype(str)
+        s_tr["txt"] = s_tr["score"].map(lambda v: f"{float(v):.3f}")
+
+        fig_score = px.line(
+            s_tr, x="ys", y="score", color="country", markers=True,
+            title="Viability Score Trend", text="txt"
+        )
+
+        # X: categorical years, clean
+        fig_score.update_xaxes(type="category", showgrid=False, title=None)
+
+        # Hide Y completely to avoid visual manipulation; keep headroom for labels
+        yvals = s_tr["score"].astype(float)
+        pad = max((yvals.max() - yvals.min()) * 0.12, 0.002)
+        fig_score.update_yaxes(visible=False, range=[float(yvals.min()-pad), float(yvals.max()+pad)])
+
+        # Labels on points + tidy hover
+        fig_score.update_traces(
+            mode="lines+markers+text",
+            textposition="top center",
+            cliponaxis=False,
+            hovertemplate="Country: %{legendgroup}<br>Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
+        )
+
+        fig_score.update_layout(margin=dict(l=10, r=10, t=60, b=30),
+                                height=360, legend_title_text=None)
+        st.plotly_chart(fig_score, use_container_width=True)
     
     st.markdown("---")
 
     # ---------------- Section 2: CAPEX ----------------
     st.subheader("CAPEX")
-    left, right = st.columns(2, gap="large")
-    with left:
-        st.markdown(f"**{a}**")
-        scope = cap[cap["country"] == a]
-        if year_any == "All":
-            tr = scope.groupby("year", as_index=False)["capex"].sum()
-            if not tr.empty:
-                tr["ys"] = tr["year"].astype(int).astype(str)
-                fig = px.line(
-                    tr, x="ys", y="capex", markers=True,
-                    title=f"{a} • CAPEX Trend ($B)"
-                )
-                _style_compare_line(fig, unit="$B")  # <<<  add this
-                st.plotly_chart(fig, use_container_width=True)
-        else:
-            _kpi(f"{a} CAPEX — {year_any}",
-                 scope.loc[scope["year"] == int(year_any), "capex"].sum(), "$B")
-    with right:
-        st.markdown(f"**{b}**")
-        scope = cap[cap["country"] == b]
-        if year_any == "All":
-            tr = scope.groupby("year", as_index=False)["capex"].sum()
-            if not tr.empty:
-                tr["ys"] = tr["year"].astype(int).astype(str)
-                fig = px.line(
-                    tr, x="ys", y="capex", markers=True,
-                    title=f"{b} • CAPEX Trend ($B)"
-                )
-                _style_compare_line(fig, unit="$B")  # <<<  add this
-                st.plotly_chart(fig, use_container_width=True)
-        else:
-            _kpi(f"{b} CAPEX — {year_any}",
-                 scope.loc[scope["year"] == int(year_any), "capex"].sum(), "$B")
+    if year_any == "All":
+    tA = cap[cap["country"] == a].groupby("year", as_index=False)["capex"].sum()
+    tB = cap[cap["country"] == b].groupby("year", as_index=False)["capex"].sum()
+    tA["country"] = a
+    tB["country"] = b
+    tr = pd.concat([tA, tB], ignore_index=True)
+
+    if not tr.empty:
+        tr["ys"] = tr["year"].astype(int).astype(str)
+
+        fig_capex = px.line(
+            tr, x="ys", y="capex", color="country", markers=True,
+            title="CAPEX Trend ($B)"
+        )
+        # Consistent hover/axes styling
+        fig_capex.update_traces(
+            hovertemplate="Country: %{legendgroup}<br>Year: %{x}<br>CAPEX: %{y:,.0f} $B<extra></extra>"
+        )
+        fig_capex.update_xaxes(type="category", showgrid=False, title=None)
+        fig_capex.update_yaxes(showgrid=False, title=None)
+
+        fig_capex.update_layout(margin=dict(l=10, r=10, t=60, b=30),
+                                height=360, legend_title_text=None)
+        st.plotly_chart(fig_capex, use_container_width=True)
 
     # ---------------- Section 3: Sectors (only for allowed pair) ----------------
     if allowed_pair:
