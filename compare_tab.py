@@ -254,8 +254,13 @@ def load_destinations():
         col_capex:"capex", col_proj:"projects"
     })
     for c in ["companies","jobs_created","capex","projects"]:
-        df[c] = pd.to_numeric(pd.Series(df[c]).astype str().str.replace(",", "", regex=False)
-                              .str.replace(r"[^\d\.\-]", "", regex=True), errors="coerce")
+        df[c] = pd.to_numeric(
+            pd.Series(df[c]).astype(str)
+            .str.replace(",", "", regex=False)
+            .str.replace(r"[^\d\.\-]", "", regex=True),
+            errors="coerce"
+        )
+
 
     # canonicalize both source and destination country names
     df["source_country"]      = df["source_raw"].astype(str).str.strip().map(_canon_country)
