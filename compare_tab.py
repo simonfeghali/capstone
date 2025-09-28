@@ -386,8 +386,24 @@ def render_compare_tab():
     # ---------------- Section 1: Score & Grade (combined) ----------------
     st.subheader("Score & Grade")
 
-    left, right = st.columns(2, gap="large")
-
+    # 1) helper that returns (score, grade, continent)
+    def _score_grade(country: str):
+        if year_any == "All" and not wb_avg.empty:
+            row = wb_avg[wb_avg["country"] == country]
+            sc = float(row["avg_score"].mean()) if not row.empty else np.nan
+            gr = row["grade"].astype(str).dropna().iloc[0] if (not row.empty and row["grade"].notna().any()) else "-"
+            cont = wb.loc[wb["country"] == country, "continent"].dropna().iloc[0] \
+                   if (wb["country"] == country).any() and wb["continent"].notna().any() else "-"
+            return sc, gr, cont
+    
+        s = wb[wb["country"] == country]
+        cont = s["continent"].dropna().iloc[0] if (not s.empty and s["continent"].notna().any()) else "-"
+        row = s[s["year"] == int(year_any)] if year_any != "All" else s
+        sc = float(row["score"].mean()) if not row.empty else np.nan
+        gr = row["grade"].astype(str).dropna().iloc[0] if (year_any != "All" and not row.empty and row["grade"].notna().any()) else "-"
+        return sc, (gr if year_any != "All" else "-"), cont   # <-- fixed parentheses
+    
+    # 2) small KPI renderer that uses the helper above
     def _render_score_kpi(country: str):
         sc, gr, cont = _score_grade(country)
         st.markdown(f"**{country}**")
@@ -399,6 +415,8 @@ def render_compare_tab():
             st.write(gr)
             st.write(f"**Continent:** {cont}")
     
+    # 3) show the two KPI blocks (A and B) side-by-side
+    left, right = st.columns(2, gap="large")
     with left:
         _render_score_kpi(a)
     with right:
