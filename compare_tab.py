@@ -475,6 +475,21 @@ def render_compare_tab():
 
     # ---------------- Section 2: CAPEX ----------------
     st.subheader("CAPEX")
+    def _render_capex_kpi(country: str):
+        # Filter CAPEX data for this country
+        if year_any == "All":
+            rows = cap[cap["country"] == country]
+        else:
+            rows = cap[(cap["country"] == country) & (cap["year"] == int(year_any))]
+    
+        cap_val = float(rows["capex"].sum()) if not rows.empty else float("nan")
+        cont = wb.loc[wb["country"] == country, "continent"].dropna().iloc[0] \
+               if (wb["country"] == country).any() and wb["continent"].notna().any() else "-"
+    
+        st.markdown(f"**{country}**")
+        st.markdown(f"**CAPEX ($B):** {cap_val:,.2f}" if pd.notna(cap_val) else "**CAPEX ($B):** –")
+        st.markdown(f"**Continent:** {cont}")
+
     if year_any == "All":
         tA = cap[cap["country"] == a].groupby("year", as_index=False)["capex"].sum()
         tB = cap[cap["country"] == b].groupby("year", as_index=False)["capex"].sum()
@@ -498,7 +513,26 @@ def render_compare_tab():
     
             fig_capex.update_layout(margin=dict(l=10, r=10, t=60, b=30),
                                     height=360, legend_title_text=None)
-            st.plotly_chart(fig_capex, use_container_width=True)
+            # Place legend outside right, just like score chart
+            fig_capex.update_layout(
+                legend=dict(
+                    orientation="v",
+                    yanchor="top", y=1.0,
+                    xanchor="left", x=1.02
+                ),
+                margin=dict(l=10, r=180, t=60, b=30),  # give room for legend + KPI column
+                height=360,
+                legend_title_text=None
+            )
+            # Two-column layout: chart + vertical KPIs
+            plot_col, kpi_col = st.columns([5, 1.5], gap="large")
+            with plot_col:
+                st.plotly_chart(fig_capex, use_container_width=True)
+            
+            with kpi_col:
+                _render_capex_kpi(a)
+                st.markdown("<hr style='margin:8px 0; opacity:.25'>", unsafe_allow_html=True)
+                _render_capex_kpi(b)
 
     # ---------------- Section 3: Sectors (only for allowed pair) ----------------
     if allowed_pair:
