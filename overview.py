@@ -10,6 +10,17 @@ from __future__ import annotations
 import streamlit as st
 from streamlit.components.v1 import html as st_html
 
+FONT_CSS = """
+<style>
+  /* Load Streamlit's default font inside component iframes */
+  @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap');
+  :root, html, body, #root, .root, .container, * {
+    font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                 Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+  }
+</style>
+"""
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Section map: title + anchor id
 # ─────────────────────────────────────────────────────────────────────────────
@@ -126,6 +137,7 @@ def _toc():
         )
         st_html(
             f"""
+            {FONT_CSS}
             <style>
               .toc-wrap {{ 
                 display: flex; 
@@ -173,6 +185,7 @@ def _weights_table():
 
     st_html(
         f"""
+        {FONT_CSS}
         <style>
           .weights-table {{
             width: 100%;
@@ -223,6 +236,7 @@ def _grades_section():
 
     st_html(
         f"""
+        {FONT_CSS}
         <style>
           .grade-grid {{
             display: grid;
