@@ -457,11 +457,22 @@ def render_compare_tab():
                 )
                 fig_hm.update_layout(
                     title="Score & Grade (Heatmap)",
-                    xaxis_title="Year",
-                    yaxis_title="Country",
                     margin=dict(l=10, r=10, t=60, b=10),
-                    height=140 + 40 * len(sel_countries)
+                    height=140 + 40 * len(sel_countries),
+                    xaxis=dict(
+                        side="top",        # move years to top
+                        showgrid=False,
+                        title=None
+                    ),
+                    yaxis=dict(
+                        showgrid=False,
+                        title=None
+                    ),
+                    coloraxis_colorbar=dict(
+                        title=""           # remove colorbar title
+                    )
                 )
+
                 fig_hm.update_xaxes(showgrid=False, type="category")
                 fig_hm.update_yaxes(showgrid=False)
                 st.plotly_chart(fig_hm, use_container_width=True)
