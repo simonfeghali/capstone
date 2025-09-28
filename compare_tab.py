@@ -406,14 +406,13 @@ def render_compare_tab():
     # 2) small KPI renderer that uses the helper above
     def _render_score_kpi(country: str):
         sc, gr, cont = _score_grade(country)
+        # Title
         st.markdown(f"**{country}**")
-        c1, c2 = st.columns([1, 6])
-        with c1:
-            st.write("Score")
-            st.write(f"{sc:.3f}" if pd.notna(sc) else "–")
-        with c2:
-            st.write(gr)
-            st.write(f"**Continent:** {cont}")
+        # One-line KPIs (no inner columns → no wrapping)
+        score_txt = f"{sc:.3f}" if pd.notna(sc) else "–"
+        st.markdown(f"**Score:** {score_txt} &nbsp;&nbsp;&nbsp; **Grade:** {gr}")
+        st.markdown(f"**Continent:** {cont}")
+
 
         
     if year_any == "All":
@@ -462,7 +461,8 @@ def render_compare_tab():
             )
 
                 # Chart on the left, KPIs stacked vertically on the right
-            plot_col, kpi_col = st.columns([4, 1], gap="large")
+            plot_col, kpi_col = st.columns([5, 1.5], gap="large")  # a touch wider KPI pane
+
             with plot_col:
                 st.plotly_chart(fig_score, use_container_width=True)
     
