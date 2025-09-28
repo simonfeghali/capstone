@@ -345,43 +345,98 @@ def _plot_forecast_only(country: str,
                         future_pred: pd.Series,
                         best_name: str,
                         rmse: float):
+    import plotly.graph_objects as go
+
+    # ---- settings ----
+    focus_start = 2018           # year where we stop fading
+    forecast_color = "rgba(33, 150, 243, 0.85)"
+    hist_dark     = "rgba(33, 33, 33, 0.9)"      # 2018+ actuals
+    hist_faded    = "rgba(33, 33, 33, 0.30)"     # <2018 actuals (de-emphasized)
+
+    # Ensure integer years
+    actual_years = list(map(int, actual.index.tolist()))
+    all_years    = actual_years + (list(map(int, future_idx.tolist())) if len(future_idx) else [])
+    min_year     = min(all_years)
+    max_year     = max(all_years)
+
+    # Split actuals into faded (<2018) vs recent (>=2018)
+    pre_mask  = [y < focus_start for y in actual_years]
+    post_mask = [y >= focus_start for y in actual_years]
+
     fig = go.Figure()
 
-    # Actual CAPEX ($B)
-    fig.add_trace(go.Scatter(
-        x=actual.index,
-        y=actual.values,
-        mode="lines",
-        name="Actual CAPEX",
-        hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
-        showlegend=False   # hide legend box for hover
-    ))
+    # Historical (faded) - before 2018
+    if any(pre_mask):
+        fig.add_trace(go.Scatter(
+            x=[y for y, m in zip(actual_years, pre_mask) if m],
+            y=[v for v, m in zip(actual.values, pre_mask) if m],
+            mode="lines",
+            line=dict(color=hist_faded, width=2),
+            name="Actual CAPEX (pre-2018)",
+            hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
+            showlegend=False
+        ))
 
-    # Forecast (2025–2028) ($B)
+    # Historical (emphasized) - 2018 to last actual
+    if any(post_mask):
+        fig.add_trace(go.Scatter(
+            x=[y for y, m in zip(actual_years, post_mask) if m],
+            y=[v for v, m in zip(actual.values, post_mask) if m],
+            mode="lines",
+            line=dict(color=hist_dark, width=3),
+            name="Actual CAPEX",
+            hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
+            showlegend=False
+        ))
+
+    # Forecast (dashed)
     if len(future_idx) > 0:
         fig.add_trace(go.Scatter(
             x=future_idx,
             y=future_pred.values,
             mode="lines",
-            line=dict(dash="dash"),
+            line=dict(dash="dash", color=forecast_color, width=3),
             name="Forecast (2025–2028)",
             hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
-            showlegend=False   # hide legend box for hover
+            showlegend=False
         ))
+
+        # Highlight forecast years
+        first_fc = int(future_idx[0])
+        last_fc  = int(future_idx[-1])
+        fig.add_vrect(
+            x0=first_fc, x1=last_fc,
+            fillcolor="rgba(33, 150, 243, 0.10)",
+            line_width=0, layer="below"
+        )
+
+    # ---- ticks: sparse before 2018, yearly from 2018 onward ----
+    ticks_before = list(range(min_year, min(focus_start, max_year+1), 5))  # every 5 years before 2018
+    ticks_after  = list(range(max(focus_start, min_year), max_year + 1))   # yearly from 2018 to max
+    tickvals     = sorted(set(ticks_before + ticks_after))
+
+    fig.update_xaxes(
+        range=[min_year, max_year],
+        tickmode="array",
+        tickvals=tickvals,
+        ticktext=[str(t) for t in tickvals],
+        showgrid=False,
+        title=""  # no x-axis title
+    )
+
+    fig.update_yaxes(
+        title="",   # no y-axis title
+        showgrid=True
+    )
 
     fig.update_layout(
         title=f"{best_name} Forecast for {country} | RMSE: {rmse:.2f} $B",
-        xaxis_title="",
-        yaxis_title="",
-        hovermode="x",            # removes the vertical unified line
-        hoverlabel=dict(
-            bgcolor="white",      # clean white box
-            font_size=12,
-            font_color="black"
-        ),
+        hovermode="x",
+        hoverlabel=dict(bgcolor="white", font_size=12, font_color="black"),
         margin=dict(l=10, r=10, t=60, b=10),
         height=520
     )
+
     return fig
 
 
