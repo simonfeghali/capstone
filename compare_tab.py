@@ -318,7 +318,7 @@ def render_compare_tab():
         st.info("World Bank data required.")
         st.stop()
         
-            # --- Top bar (compact) ---
+    # --- Top bar (compact) ---
     top_l, top_r = st.columns([30, 1], gap="small")
     with top_l:
         st.caption("Benchmarking — side-by-side country comparison")  # small, no extra height
@@ -401,69 +401,69 @@ def render_compare_tab():
         return sc, gr if year_any != "All" else "-", cont
 
     if year_any == "All":
-    sA = wb[wb["country"] == a].groupby("year", as_index=False)["score"].mean()
-    sB = wb[wb["country"] == b].groupby("year", as_index=False)["score"].mean()
-    sA["country"] = a
-    sB["country"] = b
-    s_tr = pd.concat([sA, sB], ignore_index=True)
-
-    if not s_tr.empty:
-        s_tr["ys"] = s_tr["year"].astype(int).astype(str)
-        s_tr["txt"] = s_tr["score"].map(lambda v: f"{float(v):.3f}")
-
-        fig_score = px.line(
-            s_tr, x="ys", y="score", color="country", markers=True,
-            title="Viability Score Trend", text="txt"
-        )
-
-        # X: categorical years, clean
-        fig_score.update_xaxes(type="category", showgrid=False, title=None)
-
-        # Hide Y completely to avoid visual manipulation; keep headroom for labels
-        yvals = s_tr["score"].astype(float)
-        pad = max((yvals.max() - yvals.min()) * 0.12, 0.002)
-        fig_score.update_yaxes(visible=False, range=[float(yvals.min()-pad), float(yvals.max()+pad)])
-
-        # Labels on points + tidy hover
-        fig_score.update_traces(
-            mode="lines+markers+text",
-            textposition="top center",
-            cliponaxis=False,
-            hovertemplate="Country: %{legendgroup}<br>Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
-        )
-
-        fig_score.update_layout(margin=dict(l=10, r=10, t=60, b=30),
-                                height=360, legend_title_text=None)
-        st.plotly_chart(fig_score, use_container_width=True)
+        sA = wb[wb["country"] == a].groupby("year", as_index=False)["score"].mean()
+        sB = wb[wb["country"] == b].groupby("year", as_index=False)["score"].mean()
+        sA["country"] = a
+        sB["country"] = b
+        s_tr = pd.concat([sA, sB], ignore_index=True)
     
+        if not s_tr.empty:
+            s_tr["ys"] = s_tr["year"].astype(int).astype(str)
+            s_tr["txt"] = s_tr["score"].map(lambda v: f"{float(v):.3f}")
+    
+            fig_score = px.line(
+                s_tr, x="ys", y="score", color="country", markers=True,
+                title="Viability Score Trend", text="txt"
+            )
+    
+            # X: categorical years, clean
+            fig_score.update_xaxes(type="category", showgrid=False, title=None)
+    
+            # Hide Y completely to avoid visual manipulation; keep headroom for labels
+            yvals = s_tr["score"].astype(float)
+            pad = max((yvals.max() - yvals.min()) * 0.12, 0.002)
+            fig_score.update_yaxes(visible=False, range=[float(yvals.min()-pad), float(yvals.max()+pad)])
+    
+            # Labels on points + tidy hover
+            fig_score.update_traces(
+                mode="lines+markers+text",
+                textposition="top center",
+                cliponaxis=False,
+                hovertemplate="Country: %{legendgroup}<br>Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
+            )
+    
+            fig_score.update_layout(margin=dict(l=10, r=10, t=60, b=30),
+                                    height=360, legend_title_text=None)
+            st.plotly_chart(fig_score, use_container_width=True)
+        
     st.markdown("---")
 
     # ---------------- Section 2: CAPEX ----------------
     st.subheader("CAPEX")
-    if year_any == "All":
-    tA = cap[cap["country"] == a].groupby("year", as_index=False)["capex"].sum()
-    tB = cap[cap["country"] == b].groupby("year", as_index=False)["capex"].sum()
-    tA["country"] = a
-    tB["country"] = b
-    tr = pd.concat([tA, tB], ignore_index=True)
-
-    if not tr.empty:
-        tr["ys"] = tr["year"].astype(int).astype(str)
-
-        fig_capex = px.line(
-            tr, x="ys", y="capex", color="country", markers=True,
-            title="CAPEX Trend ($B)"
-        )
-        # Consistent hover/axes styling
-        fig_capex.update_traces(
-            hovertemplate="Country: %{legendgroup}<br>Year: %{x}<br>CAPEX: %{y:,.0f} $B<extra></extra>"
-        )
-        fig_capex.update_xaxes(type="category", showgrid=False, title=None)
-        fig_capex.update_yaxes(showgrid=False, title=None)
-
-        fig_capex.update_layout(margin=dict(l=10, r=10, t=60, b=30),
-                                height=360, legend_title_text=None)
-        st.plotly_chart(fig_capex, use_container_width=True)
+        if year_any == "All":
+        tA = cap[cap["country"] == a].groupby("year", as_index=False)["capex"].sum()
+        tB = cap[cap["country"] == b].groupby("year", as_index=False)["capex"].sum()
+        tA["country"] = a
+        tB["country"] = b
+        tr = pd.concat([tA, tB], ignore_index=True)
+    
+        if not tr.empty:
+            tr["ys"] = tr["year"].astype(int).astype(str)
+    
+            fig_capex = px.line(
+                tr, x="ys", y="capex", color="country", markers=True,
+                title="CAPEX Trend ($B)"
+            )
+            # Consistent hover/axes styling
+            fig_capex.update_traces(
+                hovertemplate="Country: %{legendgroup}<br>Year: %{x}<br>CAPEX: %{y:,.0f} $B<extra></extra>"
+            )
+            fig_capex.update_xaxes(type="category", showgrid=False, title=None)
+            fig_capex.update_yaxes(showgrid=False, title=None)
+    
+            fig_capex.update_layout(margin=dict(l=10, r=10, t=60, b=30),
+                                    height=360, legend_title_text=None)
+            st.plotly_chart(fig_capex, use_container_width=True)
 
     # ---------------- Section 3: Sectors (only for allowed pair) ----------------
     if allowed_pair:
