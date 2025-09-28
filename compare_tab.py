@@ -444,7 +444,7 @@ def render_compare_tab():
                 mode="lines+markers+text",
                 textposition="top center",
                 cliponaxis=False,
-                hovertemplate="Country: %{legendgroup}<br>Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
+                hovertemplate="Country: %{fullData.name}<br>Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
             )
 
     
