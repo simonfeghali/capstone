@@ -506,7 +506,7 @@ def render_compare_tab():
             )
             # Consistent hover/axes styling
             fig_capex.update_traces(
-                hovertemplate="Country: %{legendgroup}<br>Year: %{x}<br>CAPEX: %{y:,.0f} $B<extra></extra>"
+                hovertemplate="Country: %{fullData.name}<br>Year: %{x}<br>CAPEX: %{y:,.3f} $B<extra></extr
             )
             fig_capex.update_xaxes(type="category", showgrid=False, title=None)
             fig_capex.update_yaxes(showgrid=False, title=None)
