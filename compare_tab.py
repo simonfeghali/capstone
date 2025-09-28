@@ -220,7 +220,8 @@ def load_sectors():
     }).copy()
 
     for c in ["companies","jobs_created","capex","projects"]:
-        df[c] = pd.to_numeric(pd.Series(df[c]).astype(str).str.replace(",", "", regex=False)
+        df[c] = pd.to_numeric(pd.Series(df[c]).astype(str)
+                              .str.replace(",", "", regex=False)
                               .str.replace(r"[^\d\.\-]", "", regex=True), errors="coerce")
     df["country"] = df["country"].astype(str).str.strip().map(_canon_country)
     df["sector"]  = df["sector"].astype(str).str.strip()
@@ -260,7 +261,6 @@ def load_destinations():
             .str.replace(r"[^\d\.\-]", "", regex=True),
             errors="coerce"
         )
-
 
     # canonicalize both source and destination country names
     df["source_country"]      = df["source_raw"].astype(str).str.strip().map(_canon_country)
@@ -361,7 +361,8 @@ def render_compare_tab():
     # View options
     col_vm, col_lb = st.columns([1,1])
     with col_vm:
-        view_mode = st.radio("View", options=["Overlay", "Small multiples"], index=0, horizontal=True)
+        # If your Streamlit version doesn't support horizontal=True, remove that argument.
+        view_mode = st.radio("View", options=["Overlay", "Heatmap table"], index=0, horizontal=True)
     with col_lb:
         show_all_labels = st.checkbox("Show labels on every point", value=(len(sel_countries) <= 3))
 
@@ -381,7 +382,6 @@ def render_compare_tab():
                 title="Viability Score Trend"
             )
 
-            # If many countries, vary dash to help distinguish
             if len(sel_countries) >= 6:
                 dash_seq = ["solid","dot","dash","longdash","dashdot","longdashdot"]
                 dash_map = {c: dash_seq[i % len(dash_seq)] for i, c in enumerate(sel_countries)}
@@ -424,24 +424,47 @@ def render_compare_tab():
                         st.markdown("<hr style='margin:8px 0; opacity:.25'>", unsafe_allow_html=True)
 
         else:
-            # Small multiples
-            last_per_ctry = score_df.groupby("country")["year"].transform("max")
-            score_df["label"] = np.where(score_df["year"].eq(last_per_ctry),
-                                         score_df["score"].map(lambda v: f"{v:.3f}"), "")
-            fig_score = px.line(
-                score_df, x="ys", y="score", color="country", markers=True,
-                facet_col="country", facet_col_wrap=3, text="label",
-                color_discrete_sequence=px.colors.qualitative.Safe,
-                title="Viability Score Trend"
+            # ---------- Score & Grade: Heatmap table ----------
+            s = wb[wb["country"].isin(sel_countries)].copy()
+            s = s.groupby(["country","year"], as_index=False).agg(
+                score=("score","mean"),
+                grade=("grade", lambda x: x.dropna().astype(str).iloc[0] if x.notna().any() else "-")
             )
-            fig_score.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
-            fig_score.update_xaxes(type="category", showgrid=False, title=None, matches=None)
-            fig_score.update_yaxes(visible=False)
-            fig_score.update_traces(textposition="middle right", cliponaxis=False,
-                                    hovertemplate="Country: %{fullData.name}<br>Year: %{x}<br>Score: %{y:.3f}<extra></extra>")
-            fig_score.update_layout(margin=dict(l=10, r=10, t=40, b=20),
-                                    height=360 + 160*((len(sel_countries)-1)//3))
-            st.plotly_chart(fig_score, use_container_width=True)
+            if s.empty:
+                st.info("No score data for the selected countries.")
+            else:
+                s["year"] = s["year"].astype(int)
+                years = sorted(s["year"].unique().tolist())
+                # numeric pivot for color
+                p_score = s.pivot(index="country", columns="year", values="score").reindex(index=sel_countries)
+                # text inside cells: "score (grade)"
+                text_map = (s
+                            .assign(txt=lambda d: d["score"].map(lambda v: f"{v:.3f}") + " (" + d["grade"].astype(str) + ")")
+                            .pivot(index="country", columns="year", values="txt")
+                            .reindex(index=sel_countries))
+                fig_hm = px.imshow(
+                    p_score.to_numpy(),
+                    x=years,
+                    y=p_score.index.tolist(),
+                    color_continuous_scale="Blues",
+                    aspect="auto",
+                    origin="lower"
+                )
+                fig_hm.update_traces(
+                    text=text_map.to_numpy(),
+                    texttemplate="%{text}",
+                    hovertemplate="Country: %{y}<br>Year: %{x}<br>Score: %{z:.3f}<extra></extra>"
+                )
+                fig_hm.update_layout(
+                    title="Score & Grade (Heatmap)",
+                    xaxis_title="Year",
+                    yaxis_title="Country",
+                    margin=dict(l=10, r=10, t=60, b=10),
+                    height=140 + 40 * len(sel_countries)
+                )
+                fig_hm.update_xaxes(showgrid=False, type="category")
+                fig_hm.update_yaxes(showgrid=False)
+                st.plotly_chart(fig_hm, use_container_width=True)
     else:
         st.info("No score data for selection.")
 
@@ -454,23 +477,21 @@ def render_compare_tab():
     if not cap_df.empty:
         cap_df["ys"] = cap_df["year"].astype(int).astype(str)
 
-        col_scale, = st.columns(1)
-        with col_scale:
-            scale = st.radio("Scale", options=["Absolute ($B)", "Index (base=100)", "Log"],
-                             index=0, horizontal=True)
+        scale = st.radio("Scale", options=["Absolute ($B)", "Index (base=100)", "Log"],
+                         index=0, horizontal=True)
 
         plot_df = cap_df.copy()
         y_field = "capex"
         title_suffix = "$B"
         if scale == "Index (base=100)":
-            plot_df["capex_idx"] = (plot_df.sort_values("year")
-                                    .groupby("country")["capex"]
-                                    .transform(lambda s: (s / s.iloc[0])*100 if s.iloc[0] else np.nan))
-            y_field = "capex_idx"
+            plot_df["capex"] = (plot_df.sort_values("year")
+                                .groupby("country")["capex"]
+                                .transform(lambda s: (s / s.iloc[0])*100 if s.iloc[0] else np.nan))
+            y_field = "capex"
             title_suffix = "Index=100"
         elif scale == "Log":
-            plot_df["capex_log"] = np.log10(plot_df["capex"].clip(lower=1e-6))
-            y_field = "capex_log"
+            plot_df["capex"] = np.log10(plot_df["capex"].clip(lower=1e-6))
+            y_field = "capex"
             title_suffix = "log10"
 
         if view_mode == "Overlay":
@@ -497,19 +518,58 @@ def render_compare_tab():
             st.plotly_chart(fig_cap, use_container_width=True)
 
         else:
-            fig_cap = px.line(
-                plot_df, x="ys", y=y_field, color="country", markers=True,
-                facet_col="country", facet_col_wrap=3,
-                color_discrete_sequence=px.colors.qualitative.Safe,
-                title=f"CAPEX Trend ({title_suffix})"
-            )
-            fig_cap.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
-            fig_cap.update_xaxes(type="category", showgrid=False, title=None, matches=None)
-            fig_cap.update_yaxes(showgrid=False, title=None)
-            fig_cap.update_traces(hovertemplate="Country: %{fullData.name}<br>Year: %{x}<br>Value: %{y:.2f}<extra></extra>")
-            fig_cap.update_layout(margin=dict(l=10, r=10, t=40, b=20),
-                                  height=360 + 160*((len(sel_countries)-1)//3))
-            st.plotly_chart(fig_cap, use_container_width=True)
+            # ---------- CAPEX: Heatmap table ----------
+            c = cap[cap["country"].isin(sel_countries)].copy()
+            c = c.groupby(["country","year"], as_index=False)["capex"].sum()
+            if c.empty:
+                st.info("No CAPEX data for the selected countries.")
+            else:
+                c["year"] = c["year"].astype(int)
+                years = sorted(c["year"].unique().tolist())
+
+                plot_c = c.copy()
+                if scale == "Index (base=100)":
+                    plot_c["capex"] = (plot_c.sort_values("year")
+                                       .groupby("country")["capex"]
+                                       .transform(lambda s: (s / s.iloc[0])*100 if s.iloc[0] else np.nan))
+                elif scale == "Log":
+                    plot_c["capex"] = np.log10(plot_c["capex"].clip(lower=1e-6))
+
+                p_cap = plot_c.pivot(index="country", columns="year", values="capex").reindex(index=sel_countries)
+
+                def fmt_val(v):
+                    if pd.isna(v): return "–"
+                    if scale == "Absolute ($B)":
+                        return f"{v:,.2f}"
+                    if scale.startswith("Index"):
+                        return f"{v:,.0f}"
+                    return f"{v:.2f}"  # log
+
+                text_cap = p_cap.applymap(fmt_val)
+
+                fig_cap_hm = px.imshow(
+                    p_cap.to_numpy(),
+                    x=years,
+                    y=p_cap.index.tolist(),
+                    color_continuous_scale="Blues",
+                    aspect="auto",
+                    origin="lower"
+                )
+                fig_cap_hm.update_traces(
+                    text=text_cap.to_numpy(),
+                    texttemplate="%{text}",
+                    hovertemplate="Country: %{y}<br>Year: %{x}<br>Value: %{z:.2f}<extra></extra>"
+                )
+                fig_cap_hm.update_layout(
+                    title=f"CAPEX Heatmap ({'log10' if scale=='Log' else ('Index=100' if scale.startswith('Index') else '$B')})",
+                    xaxis_title="Year",
+                    yaxis_title="Country",
+                    margin=dict(l=10, r=10, t=60, b=10),
+                    height=140 + 40 * len(sel_countries)
+                )
+                fig_cap_hm.update_xaxes(showgrid=False, type="category")
+                fig_cap_hm.update_yaxes(showgrid=False)
+                st.plotly_chart(fig_cap_hm, use_container_width=True)
     else:
         st.info("No CAPEX data for selection.")
 
