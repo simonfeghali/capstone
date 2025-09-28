@@ -345,114 +345,45 @@ def _plot_forecast_only(country: str,
                         future_pred: pd.Series,
                         best_name: str,
                         rmse: float):
-    """
-    Two-panel layout:
-      - Row 1: full-history sparkline (faded, thin) for context
-      - Row 2: focus on recent years (2018 -> last forecast), thick line + dashed forecast,
-               band over forecast horizon (2025–2028).
-    """
-    import pandas as pd
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
+    fig = go.Figure()
 
-    # ---- settings you can tweak ----
-    focus_start = 2018
-    band_start  = 2025
-    band_end    = 2028
-
-    color_hist_faded = "rgba(60,60,60,0.35)"
-    color_hist_main  = "rgba(35,35,35,0.95)"
-    color_forecast   = "rgba(33,150,243,0.95)"
-    band_color       = "rgba(33,150,243,0.10)"
-
-    # convert X to datetimes (nicer axis control)
-    x_hist = pd.to_datetime(pd.Series(actual.index.astype(int), name="year"), format="%Y")
-    y_hist = actual.values
-
-    x_fc = pd.to_datetime(pd.Series(future_idx.astype(int)), format="%Y") if len(future_idx) else pd.Series([], dtype="datetime64[ns]")
-    y_fc = future_pred.values if len(future_idx) else []
-
-    # boundaries
-    min_year = int(x_hist.dt.year.min())
-    max_year = int((pd.concat([x_hist, x_fc]) if len(x_fc) else x_hist).dt.year.max())
-
-    # subplots: small top sparkline + large focus plot
-    fig = make_subplots(
-        rows=2, cols=1, shared_xaxes=False, shared_yaxes=True,
-        row_heights=[0.26, 0.74], vertical_spacing=0.06
-    )
-
-    # ---------- Row 1: full-history sparkline (faded) ----------
+    # Actual CAPEX ($B)
     fig.add_trace(go.Scatter(
-        x=x_hist, y=y_hist, mode="lines",
-        line=dict(color=color_hist_faded, width=2),
-        hovertemplate="Year: %{x|%Y}<br>FDI: %{y:.4f} $B<extra></extra>",
-        showlegend=False
-    ), row=1, col=1)
+        x=actual.index,
+        y=actual.values,
+        mode="lines",
+        name="Actual CAPEX",
+        hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
+        showlegend=False   # hide legend box for hover
+    ))
 
-    # sparse ticks (every ~3–5 years depending on span)
-    span = max_year - min_year
-    step = 5 if span > 20 else 3
-    ticks_top = pd.to_datetime([f"{y}-01-01" for y in range(min_year, max_year + 1, step)])
-
-    fig.update_xaxes(
-        row=1, col=1,
-        tickmode="array",
-        tickvals=ticks_top,
-        tickformat="%Y",
-        showgrid=False,
-        title=None
-    )
-    fig.update_yaxes(row=1, col=1, title=None, showgrid=False)
-
-    # ---------- Row 2: focus panel ----------
-    # recent actuals (>= focus_start)
-    mask_focus = x_hist.dt.year >= focus_start
-    if mask_focus.any():
+    # Forecast (2025–2028) ($B)
+    if len(future_idx) > 0:
         fig.add_trace(go.Scatter(
-            x=x_hist[mask_focus], y=y_hist[mask_focus], mode="lines",
-            line=dict(color=color_hist_main, width=3),
-            hovertemplate="Year: %{x|%Y}<br>FDI: %{y:.4f} $B<extra></extra>",
-            showlegend=False
-        ), row=2, col=1)
+            x=future_idx,
+            y=future_pred.values,
+            mode="lines",
+            line=dict(dash="dash"),
+            name="Forecast (2025–2028)",
+            hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
+            showlegend=False   # hide legend box for hover
+        ))
 
-    # forecast (dashed)
-    if len(x_fc) > 0:
-        fig.add_trace(go.Scatter(
-            x=x_fc, y=y_fc, mode="lines",
-            line=dict(color=color_forecast, width=3, dash="dash"),
-            hovertemplate="Year: %{x|%Y}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
-            showlegend=False
-        ), row=2, col=1)
-
-        # band over 2025–2028
-        fig.add_vrect(
-            x0=f"{band_start}-01-01", x1=f"{band_end}-12-31",
-            fillcolor=band_color, line_width=0, layer="below",
-            row=2, col=1
-        )
-
-    # bottom axis: yearly ticks from max(focus_start,min_year) to max_year
-    left = max(focus_start, min_year)
-    ticks_bottom = pd.to_datetime([f"{y}-01-01" for y in range(left, max_year + 1)])
-
-    fig.update_xaxes(
-        row=2, col=1,
-        tickmode="array", tickvals=ticks_bottom, tickformat="%Y",
-        showgrid=False, title=None,
-        range=[pd.to_datetime(f"{left}-01-01"), pd.to_datetime(f"{max_year}-12-31")]
-    )
-    fig.update_yaxes(row=2, col=1, title=None, showgrid=True)
-
-    # ---------- overall layout ----------
     fig.update_layout(
         title=f"{best_name} Forecast for {country} | RMSE: {rmse:.2f} $B",
+        xaxis_title="",
+        yaxis_title="",
+        hovermode="x",            # removes the vertical unified line
+        hoverlabel=dict(
+            bgcolor="white",      # clean white box
+            font_size=12,
+            font_color="black"
+        ),
         margin=dict(l=10, r=10, t=60, b=10),
-        hovermode="x unified",
-        height=560
+        height=520
     )
-
     return fig
+
 
 
 # ── public entrypoint ────────────────────────────────────────────────────────
