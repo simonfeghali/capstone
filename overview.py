@@ -391,6 +391,21 @@ def _auto_jump():
 # Main renderer
 # ─────────────────────────────────────────────────────────────────────────────
 def render_overview_tab():
+
+    st_html(
+        """
+        <style>
+          .toc-wrap, .toc-chip, .toc-label,
+          .weights-table, .weights-table td, .weights-table th,
+          .grade-grid, .grade-item, .grade-badge, .grade-desc,
+          .callout, .fx-card, .fx-list, .fx-sublist {
+            font-family: inherit !important;
+          }
+        </style>
+        """,
+        height=0,
+    )
+    
     _toc()
     st.markdown("---")
 
