@@ -440,7 +440,7 @@ def render_compare_tab():
 
     # ---------------- Section 2: CAPEX ----------------
     st.subheader("CAPEX")
-        if year_any == "All":
+    if year_any == "All":
         tA = cap[cap["country"] == a].groupby("year", as_index=False)["capex"].sum()
         tB = cap[cap["country"] == b].groupby("year", as_index=False)["capex"].sum()
         tA["country"] = a
