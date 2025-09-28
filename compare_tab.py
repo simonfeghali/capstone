@@ -414,13 +414,7 @@ def render_compare_tab():
         with c2:
             st.write(gr)
             st.write(f"**Continent:** {cont}")
-    
-    # 3) show the two KPI blocks (A and B) side-by-side
-    left, right = st.columns(2, gap="large")
-    with left:
-        _render_score_kpi(a)
-    with right:
-        _render_score_kpi(b)
+
         
     if year_any == "All":
         sA = wb[wb["country"] == a].groupby("year", as_index=False)["score"].mean()
@@ -453,10 +447,29 @@ def render_compare_tab():
                 cliponaxis=False,
                 hovertemplate="Country: %{legendgroup}<br>Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
             )
+
     
-            fig_score.update_layout(margin=dict(l=10, r=10, t=60, b=30),
-                                    height=360, legend_title_text=None)
-            st.plotly_chart(fig_score, use_container_width=True)
+                # Place legend outside on the right so there's visual alignment with the KPI stack
+            fig_score.update_layout(
+                legend=dict(
+                    orientation="v",
+                    yanchor="top", y=1.0,
+                    xanchor="left", x=1.02   # push legend just outside the plot
+                ),
+                margin=dict(l=10, r=160, t=60, b=30),  # extra right margin for legend
+                height=360,
+                legend_title_text=None
+            )
+
+                # Chart on the left, KPIs stacked vertically on the right
+            plot_col, kpi_col = st.columns([4, 1], gap="large")
+            with plot_col:
+                st.plotly_chart(fig_score, use_container_width=True)
+    
+            with kpi_col:
+                _render_score_kpi(a)
+                st.markdown("<hr style='margin:8px 0; opacity:.25'>", unsafe_allow_html=True)
+                _render_score_kpi(b)
         
     st.markdown("---")
 
