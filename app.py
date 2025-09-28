@@ -543,34 +543,44 @@ with tab_scoring:
             else:
                 yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)
                 # after yoy_df is built and year_str added
-                y = yoy_df["score"].astype(float)                      # for labels + padding
+                y = yoy_df["score"].astype(float)
+                pad = max((y.max() - y.min()) * 0.12, 0.002)
+                
                 fig_line = px.line(
                     yoy_df, x="year_str", y="score", markers=True,
                     labels={"year_str": "", "score": ""}, title=title
                 )
+                
+                # X-axis clean
                 fig_line.update_xaxes(
                     type="category",
                     categoryorder="array",
                     categoryarray=yoy_df["year_str"].tolist(),
-                    showgrid=False
+                    showgrid=False,
+                    ticks="",
+                    title_text=""
                 )
-                # always-visible labels above points
+                
+                # Hide y-axis completely but keep range so labels fit
+                fig_line.update_yaxes(
+                    visible=False,
+                    range=[float(y.min() - pad), float(y.max() + pad)]
+                )
+                
+                # Labels above points
                 fig_line.update_traces(
                     mode="lines+markers+text",
                     text=[f"{v:.3f}" for v in y],
                     textposition="top center",
+                    cliponaxis=False,
                     hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
                 )
-
-                # Show only 0 and 1 on the y-axis
-                fig_line.update_yaxes(
-                    range=[0, 1],
-                    tickvals=[0, 1],
-                    ticktext=["0", "1"],
-                    showgrid=False
-                )
                 
-                fig_line.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=340)
+                # Align baseline with map by matching height & bottom margin
+                fig_line.update_layout(
+                    height=410,                         # match map height
+                    margin=dict(l=10, r=10, t=60, b=30) # push x-axis lower
+                )
                 
                 st.plotly_chart(fig_line, use_container_width=True)
  
@@ -684,15 +694,45 @@ with tab_scoring:
                 base = wb[wb["continent"] == sel_cont_sc]; title = f"Year-over-Year Viability Score — {sel_cont_sc}"
             else:
                 base = wb.copy(); title = "Year-over-Year Viability Score — Global"
-            yoy_df = base.groupby("year", as_index=False)["score"].mean().sort_values("year")
-            yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)
-            fig_line = px.line(yoy_df, x="year_str", y="score", markers=True,
-                               labels={"year_str": "", "score": "Mean score"}, title=title)
-            fig_line.update_xaxes(type="category", categoryorder="array",
-                                  categoryarray=yoy_df["year_str"].tolist(), showgrid=False)
-            fig_line.update_yaxes(showgrid=False)
-            fig_line.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=340)
-            fig_line.update_traces(mode="lines+markers",hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>")
+            y = yoy_df["score"].astype(float)
+            pad = max((y.max() - y.min()) * 0.12, 0.002)
+            
+            fig_line = px.line(
+                yoy_df, x="year_str", y="score", markers=True,
+                labels={"year_str": "", "score": ""}, title=title
+            )
+            
+            # X-axis formatting
+            fig_line.update_xaxes(
+                type="category",
+                categoryorder="array",
+                categoryarray=yoy_df["year_str"].tolist(),
+                showgrid=False,
+                ticks="",
+                title_text=""
+            )
+            
+            # Hide y-axis but keep range so labels fit
+            fig_line.update_yaxes(
+                visible=False,
+                range=[float(y.min() - pad), float(y.max() + pad)]
+            )
+            
+            # Labels above points
+            fig_line.update_traces(
+                mode="lines+markers+text",
+                text=[f"{v:.3f}" for v in y],
+                textposition="top center",
+                cliponaxis=False,
+                hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
+            )
+            
+            # Match map alignment
+            fig_line.update_layout(
+                height=410,                         # same as map
+                margin=dict(l=10, r=10, t=60, b=30)
+            )
+            
             st.plotly_chart(fig_line, use_container_width=True)
 
         with t2:
