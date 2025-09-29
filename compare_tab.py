@@ -323,9 +323,9 @@ def _build_selection_lists(all_countries, continents):
     # mapping label -> (kind, name, display)
     m = {}
     for c in top:
-        m[f"⭐ {c}"] = ("country", c, c)
+        m[f" {c}"] = ("country", c, c)
     for ct in continents:
-        m[f"🌍 {ct}"] = ("continent", ct, f"{ct} (avg/sum)")
+        m[f" {ct}"] = ("continent", ct, f"{ct} (avg/sum)")
     for c in others:
         m[c] = ("country", c, c)
 
