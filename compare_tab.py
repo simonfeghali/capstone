@@ -29,41 +29,39 @@ TOP_COUNTRIES = [
     "Bahrain","Kuwait","Qatar","Oman","Saudi Arabia"
 ]
 
+# Multiselect section headers (non-selectable)
+HDR_TOP = "— Top countries —"
+HDR_CONT = "— Continents —"
+HDR_OTHER = "— Other countries —"
+HEADERS = {HDR_TOP, HDR_CONT, HDR_OTHER}
+
 def _raw(fname: str) -> str:
     return f"{RAW_BASE}/{quote(fname)}"
 
 def _find_col(cols, *cands):
     low = {str(c).lower(): c for c in cols}
     for c in cands:
-        if c.lower() in low:
-            return low[c.lower()]
+      if c.lower() in low:
+        return low[c.lower()]
     for cand in cands:
-        for col in cols:
-            if cand.lower() in str(col).lower():
-                return col
+      for col in cols:
+        if cand.lower() in str(col).lower():
+          return col
     return None
 
 def _style_compare_line(fig, unit: str | None = None):
-    """
-    Apply consistent styling/hover to compare tab line charts.
-    unit=None -> Score; unit="$B" -> CAPEX
-    """
+    """Apply consistent styling/hover to compare tab line charts."""
     if unit == "$B":
         htmpl = "Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>"
     else:
         htmpl = "Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
-
-    fig.update_traces(
-        mode="lines+markers",
-        hovertemplate=htmpl,
-        text=None, texttemplate=None, textposition=None
-    )
+    fig.update_traces(mode="lines+markers", hovertemplate=htmpl, text=None, texttemplate=None, textposition=None)
     fig.update_xaxes(type="category", showgrid=False, title=None)
     fig.update_yaxes(showgrid=False, title=None)
-    fig.update_layout(hovermode="closest")  # removes dotted guideline
+    fig.update_layout(hovermode="closest")
     return fig
 
-# === Canonicalize country names (same mapping you use elsewhere) ===
+# === Canonicalize country names ===
 def _canon_country(name: str) -> str:
     if not isinstance(name, str):
         return ""
@@ -313,23 +311,21 @@ def _grade_pill(g: str) -> str:
 
 # ---------- Entity helpers (country vs continent) ----------
 def _build_selection_lists(all_countries, continents):
-    # compose labels, ordered: top countries -> continents -> other countries
+    # Compose options with headers. Headers are included in the options but ignored on read.
     top = [c for c in TOP_COUNTRIES if c in all_countries]
     others = [c for c in all_countries if c not in top]
-    lbl_top = [f"⭐ {c}" for c in top]
-    lbl_cont = [f"🌍 {ct}" for ct in continents]
-    lbl_others = others  # plain labels
+
+    options = [HDR_TOP] + top + [HDR_CONT] + continents + [HDR_OTHER] + others
 
     # mapping label -> (kind, name, display)
     m = {}
     for c in top:
-        m[f" {c}"] = ("country", c, c)
+        m[c] = ("country", c, c)
     for ct in continents:
-        m[f" {ct}"] = ("continent", ct, f"{ct} (avg/sum)")
+        m[ct] = ("continent", ct, f"{ct} (aggregate)")
     for c in others:
         m[c] = ("country", c, c)
 
-    options = lbl_top + lbl_cont + lbl_others
     return options, m
 
 def _expand_score_series(wb, kind, name, disp):
@@ -394,32 +390,29 @@ def render_compare_tab():
     options_labels, label_map = _build_selection_lists(all_countries, continents)
 
     with c2:
-        default_labels = [lbl for lbl in options_labels if lbl.startswith("⭐ ") and lbl[2:] in {"United States","France"}][:2]
+        # defaults: United States, France if available
+        default_candidates = ["United States", "France"]
+        default_labels = [c for c in default_candidates if c in label_map][:2]
         if not default_labels:
-            # fallback to first two options if stars missing
-            default_labels = options_labels[:2]
-        sel_labels = st.multiselect("Select countries/continents (up to 6)",
-                                    options=options_labels,
-                                    default=default_labels,
-                                    max_selections=6)
+            default_labels = [c for c in options_labels if c not in HEADERS][:2]
+        sel_labels = st.multiselect(
+            "Select countries/continents (up to 6)",
+            options=options_labels,
+            default=default_labels,
+            max_selections=6
+        )
 
     if len(sel_labels) == 0:
         st.info("Pick at least one country or continent.")
         st.stop()
 
-    # Parse selection into structured list
-    sel_entities = [label_map[lbl] for lbl in sel_labels if lbl in label_map]  # list of tuples (kind,name,display)
+    # Parse selection into structured list, skipping headers
+    sel_entities = [label_map[lbl] for lbl in sel_labels if lbl in label_map]  # tuples (kind, name, display)
 
     # For sectors/destinations we only consider first two selected countries (not continents)
     only_countries = [disp for kind,name,disp in sel_entities if kind == "country"]
-    if len(only_countries) >= 1:
-        a = only_countries[0]
-    else:
-        a = None
-    if len(only_countries) >= 2:
-        b = only_countries[1]
-    else:
-        b = None
+    a = only_countries[0] if len(only_countries) >= 1 else None
+    b = only_countries[1] if len(only_countries) >= 2 else None
     allowed_pair = bool(a and b and (a in SECT_DEST_ALLOWED) and (b in SECT_DEST_ALLOWED))
 
     st.markdown("---")
@@ -435,7 +428,7 @@ def render_compare_tab():
         show_all_labels = st.checkbox("Show labels on every point", value=(len(sel_entities) <= 3))
 
     # Build combined score df
-    score_parts = [ _expand_score_series(wb, kind, name, disp) for (kind,name,disp) in sel_entities ]
+    score_parts = [_expand_score_series(wb, kind, name, disp) for (kind,name,disp) in sel_entities]
     score_df = pd.concat(score_parts, ignore_index=True) if score_parts else pd.DataFrame(columns=["entity","year","ys","score"])
 
     if not score_df.empty:
@@ -559,7 +552,7 @@ def render_compare_tab():
     # ======================= CAPEX =======================
     st.subheader("CAPEX")
 
-    cap_parts = [ _expand_capex_series(cap, wb, kind, name, disp) for (kind,name,disp) in sel_entities ]
+    cap_parts = [_expand_capex_series(cap, wb, kind, name, disp) for (kind,name,disp) in sel_entities]
     cap_df = pd.concat(cap_parts, ignore_index=True) if cap_parts else pd.DataFrame(columns=["entity","year","ys","capex"])
 
     if not cap_df.empty:
