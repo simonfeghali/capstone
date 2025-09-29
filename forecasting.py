@@ -1,13 +1,10 @@
 # forecasting.py
 # ─────────────────────────────────────────────────────────────────────────────
-# Forecasting tab aligned to notebook behavior, with emphasized forecast area:
-# - Data prep: prefer final cleaned CSVs; drop 2003; remove countries with any missing CAPEX
-# - Split: adaptive 15% (bounded 2–4 yrs) for model selection (RMSE)
-# - Forecast horizon: EXACTLY 2025–2028
-# - Plot: ONE continuous axis
-#     • History: thin, light gray over full range
-#     • Forecast (2025–2028): bold navy, with a shaded background band
-#     • Each year shown (tick every year)
+# Forecasting tab with split view:
+# - Left: 2004–2023 actuals (small area, thin/light)
+# - Right: 2025–2028 forecast (larger area, bold with markers)
+# - No connection between actual and forecast; no shading
+# - Every year labeled on each X axis (dtick=1)
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -17,16 +14,15 @@ import re
 from urllib.parse import quote
 from sklearn.preprocessing import StandardScaler
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from overview import info_button, emit_auto_jump_script
 
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
-    # Notebook-preferred files
     "final_clean": "final_capex_and_indicators_cleaned.csv",
     "forecasting_final_clean": "forecasting_final_capex_and_indicators_cleaned.csv",
-    # Older app sources as fallbacks
     "combined": "combined_capex_and_indicators_filtered.csv",
     "capex_long": "capex2003-2025.csv",
     "indicators": "indicators.csv",
@@ -42,7 +38,6 @@ EXOG_DEFAULT = [
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def _adaptive_test_horizon(n_total: int) -> int:
-    # 15% bounded to [2, 4]
     return max(2, min(4, int(np.ceil(0.15 * n_total))))
 
 def _raw(fname: str) -> str:
@@ -70,15 +65,10 @@ def _rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     y_pred = np.asarray(y_pred, dtype=float) / 1000.0
     return float(np.sqrt(np.nanmean((y_true - y_pred) ** 2)))
 
-# ── data loading (notebook-aligned) ──────────────────────────────────────────
+# ── data loading ─────────────────────────────────────────────────────────────
 
 @st.cache_data(show_spinner=True)
 def _load_notebook_style_panel() -> pd.DataFrame:
-    """
-    Load the same data the notebook trains on when available, else fall back.
-    Normalize to: Country, Year, CAPEX, plus indicators/exog columns.
-    Apply notebook cleaning (drop 2003; drop countries with any missing CAPEX).
-    """
     df = None
     for key in ("final_clean", "forecasting_final_clean", "combined"):
         try:
@@ -96,16 +86,17 @@ def _load_notebook_style_panel() -> pd.DataFrame:
             df = None
 
     if df is None:
-        # Fallback: merge capex_long + indicators (as in original app)
         cap = pd.read_csv(_raw(FILES["capex_long"]))
         ctry = _find_col(cap.columns, "Source Country", "Country", "source_country", "Source Co")
         if not ctry:
             for c in cap.columns:
                 if "country" in str(c).lower():
                     ctry = c; break
-        if not ctry: raise RuntimeError("No country column in capex file.")
+        if not ctry:
+            raise RuntimeError("No country column in capex file.")
         year_cols = [c for c in cap.columns if re.fullmatch(r"\d{4}", str(c))]
-        if not year_cols: raise RuntimeError("No 4-digit year columns in capex file.")
+        if not year_cols:
+            raise RuntimeError("No 4-digit year columns in capex file.")
         m = cap.melt(id_vars=[ctry], value_vars=year_cols, var_name="Year", value_name="CAPEX")
         m = m.rename(columns={ctry: "Country"})
         m["Year"] = pd.to_numeric(m["Year"], errors="coerce").astype("Int64")
@@ -117,16 +108,16 @@ def _load_notebook_style_panel() -> pd.DataFrame:
             ind = pd.read_csv(_raw(FILES["indicators"]))
             ctry_i = _find_col(ind.columns, "Country", "Country Name")
             year_i = _find_col(ind.columns, "Year")
-            if not (ctry_i and year_i): raise ValueError("Indicators missing Country/Year.")
+            if not (ctry_i and year_i):
+                raise ValueError("Indicators missing Country/Year.")
             ind = ind.rename(columns={ctry_i: "Country", year_i: "Year"})
-            ind["Country"] = ind["Country"].astype(str).str.strip()
+            ind["Country"] = ind["Country"].astype(str).stripped()
             ind["Year"] = pd.to_numeric(ind["Year"], errors="coerce").astype("Int64")
         except Exception:
             df = cap_long
         else:
             df = cap_long.merge(ind, on=["Country", "Year"], how="left")
 
-    # Cleaning
     df = df[df["Year"] != 2003].copy()
     miss = df[df["CAPEX"].isna()]
     if not miss.empty:
@@ -139,15 +130,9 @@ def _load_notebook_style_panel() -> pd.DataFrame:
     df["Country"] = df["Country"].astype(str).str.strip()
     return df
 
-# ── modeling (notebook grids & choices) ──────────────────────────────────────
+# ── modeling ─────────────────────────────────────────────────────────────────
 
 def _prep_country_notebook(df_all: pd.DataFrame, country: str):
-    """
-    - endog = log(CAPEX) with CAPEX>0
-    - exog = StandardScaler fit on TRAIN ONLY
-    - split = adaptive last 15% (bounded 2–4 years)
-    - future years = EXACT 2025–2028 (repeat last TRAIN-scaled row)
-    """
     d = df_all[df_all["Country"] == country].copy().sort_values("Year")
     d["CAPEX"] = d["CAPEX"].map(_numify)
     d = d.dropna(subset=["CAPEX"])
@@ -158,7 +143,6 @@ def _prep_country_notebook(df_all: pd.DataFrame, country: str):
     years = d["Year"].astype(int).values
     endog_log = pd.Series(np.log(d["CAPEX"].values), index=years, name="log_CAPEX")
 
-    # exog columns (if present)
     exog_cols = []
     for col in EXOG_DEFAULT:
         hit = _find_col(d.columns, col)
@@ -171,7 +155,6 @@ def _prep_country_notebook(df_all: pd.DataFrame, country: str):
         xr = xr.interpolate(limit_direction="both")
         exog_raw = pd.DataFrame(xr.values, index=years, columns=exog_cols)
 
-    # adaptive split
     n = len(endog_log)
     split_years = _adaptive_test_horizon(n)
     train_idx = years[: n - split_years]
@@ -180,7 +163,6 @@ def _prep_country_notebook(df_all: pd.DataFrame, country: str):
     train_y = endog_log.loc[train_idx]
     test_y  = endog_log.loc[test_idx]
 
-    # TRAIN-only scaling (no leakage)
     if exog_raw is not None:
         scaler = StandardScaler()
         train_x_raw = exog_raw.loc[train_idx]
@@ -192,13 +174,11 @@ def _prep_country_notebook(df_all: pd.DataFrame, country: str):
                                index=test_x_raw.index, columns=test_x_raw.columns)
         exog_full = pd.DataFrame(scaler.transform(exog_raw),
                                  index=exog_raw.index, columns=exog_raw.columns)
-
         last_row_scaled = exog_full.loc[[exog_full.index.max()]]
     else:
         train_x = test_x = exog_full = None
         last_row_scaled = None
 
-    # future horizon: exactly 2025–2028 (> last observed)
     last_year = int(max(years))
     requested_years = [2025, 2026, 2027, 2028]
     future_years = [y for y in requested_years if y > last_year]
@@ -213,7 +193,7 @@ def _prep_country_notebook(df_all: pd.DataFrame, country: str):
         future_exog = None
 
     return {
-        "capex_actual": pd.Series(d["CAPEX"].values / 1000.0, index=years, name="CAPEX"),  # $B
+        "capex_actual": pd.Series(d["CAPEX"].values / 1000.0, index=years, name="CAPEX"),
         "endog_log": endog_log,
         "train_y": train_y, "test_y": test_y,
         "train_x": train_x, "test_x": test_x,
@@ -295,7 +275,6 @@ def _fit_eval_sarimax(train_y, test_y, train_x, test_x):
 def _refit_and_forecast_full(best_model: dict, endog_log: pd.Series,
                              exog_full: pd.DataFrame, future_index: pd.Index,
                              future_exog: pd.DataFrame):
-    """Refit best model on full series; forecast future_index length."""
     steps = len(future_index)
     if steps == 0:
         return pd.Series([], dtype=float, name="forecast")
@@ -315,79 +294,81 @@ def _refit_and_forecast_full(best_model: dict, endog_log: pd.Series,
                         order=best_model["order"], seasonal_order=best_model["seasonal"]).fit(disp=False)
         future_log = final.forecast(steps=steps, exog=future_exog)
 
-    future = pd.Series(np.exp(future_log).values / 1000.0, index=future_index, name="forecast")  # $B
+    future = pd.Series(np.exp(future_log).values / 1000.0, index=future_index, name="forecast")
     return future
 
-# ── plotting (continuous axis; emphasize forecast) ───────────────────────────
+# ── plotting (split, gap, yearly ticks) ──────────────────────────────────────
 
-def _plot_forecast_emphasized_continuous(country: str,
-                                         actual: pd.Series,
-                                         future_idx: pd.Index,
-                                         future_pred: pd.Series,
-                                         best_name: str,
-                                         rmse: float):
+def _plot_forecast_split_gap(country: str,
+                             actual: pd.Series,
+                             future_idx: pd.Index,
+                             future_pred: pd.Series,
+                             best_name: str,
+                             rmse: float):
     """
-    Single axis:
-      - History: thin, light gray line (full span)
-      - Forecast: bold navy with markers; background shaded for 2025–2028
-      - Every year is a tick (dtick=1)
-      - Line is continuous by bridging the last actual point to the first forecast year
+    Two subplots share Y:
+      col=1 (smaller): actuals 2004–2023, thin/light
+      col=2 (larger): forecast 2025–2028, bold with markers
+      No line connecting them. Each panel ticks every year.
     """
-    fig = go.Figure()
-
-    # Background band for forecast horizon
-    if len(future_idx) > 0:
-        x0 = int(future_idx[0]) - 0.5
-        x1 = int(future_idx[-1]) + 0.5
-        fig.add_vrect(x0=x0, x1=x1, fillcolor="rgba(13,42,82,0.06)", line_width=0)
-
-    # History (full)
-    if len(actual) > 0:
-        fig.add_trace(go.Scatter(
-            x=actual.index.astype(int),
-            y=actual.values,
-            mode="lines",
-            line=dict(color="rgba(60,60,60,0.45)", width=1.6),
-            name="Actual CAPEX",
-            hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
-            showlegend=False
-        ))
-
-    # Forecast (bridge last actual point so the line continues)
-    if len(future_idx) > 0:
-        if len(actual) > 0:
-            bridge_x = [int(actual.index.max())] + list(map(int, future_idx.values))
-            bridge_y = [float(actual.iloc[-1])] + list(map(float, future_pred.values))
-        else:
-            bridge_x = list(map(int, future_idx.values))
-            bridge_y = list(map(float, future_pred.values))
-
-        fig.add_trace(go.Scatter(
-            x=bridge_x,
-            y=bridge_y,
-            mode="lines+markers",
-            line=dict(color="#0D2A52", width=4),
-            marker=dict(size=7),
-            name="Forecast 2025–2028",
-            hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
-            showlegend=False
-        ))
-
-    # Axes: each year shown
-    all_years = []
-    if len(actual) > 0:
-        all_years += list(map(int, actual.index.values))
-    if len(future_idx) > 0:
-        all_years += list(map(int, future_idx.values))
-    if not all_years:
-        all_years = [2025, 2026, 2027, 2028]
-
-    xmin, xmax = min(all_years) - 0.5, max(all_years) + 0.5
-
-    fig.update_xaxes(
-        tickmode="linear", dtick=1, range=[xmin, xmax],
-        showgrid=False, title_text=""
+    fig = make_subplots(
+        rows=1, cols=2, shared_yaxes=True,
+        horizontal_spacing=0.06,
+        column_widths=[0.35, 0.65]
     )
+
+    # LEFT: actual history (2004–2023)
+    if len(actual) > 0:
+        left_x = [y for y in actual.index.astype(int) if 2004 <= y <= 2023]
+        left_y = [actual.loc[y] for y in left_x]
+        if left_x:
+            fig.add_trace(
+                go.Scatter(
+                    x=left_x,
+                    y=left_y,
+                    mode="lines",
+                    line=dict(color="rgba(80,80,80,0.6)", width=1.8),
+                    name="Actual (2004–2023)",
+                    hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
+                    showlegend=False
+                ),
+                row=1, col=1
+            )
+        # year ticks for left
+        if left_x:
+            fig.update_xaxes(
+                tickmode="linear", dtick=1,
+                range=[min(left_x)-0.5, max(left_x)+0.5],
+                showgrid=False, title_text="", row=1, col=1
+            )
+        else:
+            fig.update_xaxes(tickmode="linear", dtick=1, showgrid=False, title_text="", row=1, col=1)
+
+    # RIGHT: forecast only (2025–2028)
+    if len(future_idx) > 0:
+        right_x = list(map(int, future_idx.values))
+        right_y = list(map(float, future_pred.values))
+        fig.add_trace(
+            go.Scatter(
+                x=right_x,
+                y=right_y,
+                mode="lines+markers",
+                line=dict(color="#0D2A52", width=4),
+                marker=dict(size=8),
+                name="Forecast (2025–2028)",
+                hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
+                showlegend=False
+            ),
+            row=1, col=2
+        )
+        fig.update_xaxes(
+            tickmode="linear", dtick=1,
+            range=[min(right_x)-0.5, max(right_x)+0.5],
+            showgrid=False, title_text="", row=1, col=2
+        )
+    else:
+        fig.update_xaxes(tickmode="linear", dtick=1, showgrid=False, title_text="", row=1, col=2)
+
     fig.update_yaxes(showgrid=False, title_text="")
 
     fig.update_layout(
@@ -402,12 +383,11 @@ def _plot_forecast_emphasized_continuous(country: str,
 # ── public entrypoint ────────────────────────────────────────────────────────
 
 def render_forecasting_tab():
-    # Top bar
     _f_left, _f_right = st.columns([20, 1], gap="small")
     with _f_left:
         st.caption("Forecasts — 2025–2028")
     with _f_right:
-        info_button("forecast")  # scrolls to 'FDI Forecasts (2025–2028)' in Overview
+        info_button("forecast")
 
     emit_auto_jump_script()
 
@@ -417,16 +397,14 @@ def render_forecasting_tab():
         return
 
     countries = sorted(panel["Country"].dropna().unique().tolist())
-    sel_country = st.selectbox("Country", countries, index=0, key="forecast_country_forecastonly")
+    sel_country = st.selectbox("Country", countries, index=0, key="forecast_country_split")
 
-    # Prep data
     try:
         prep = _prep_country_notebook(panel, sel_country)
     except Exception as e:
         st.error(f"Could not prepare data: {e}")
         return
 
-    # Model selection on held-out tail
     train_y, test_y = prep["train_y"], prep["test_y"]
     train_x, test_x = prep["train_x"], prep["test_x"]
 
@@ -439,18 +417,15 @@ def render_forecasting_tab():
     best = min(cand, key=lambda d: d["rmse"])
     best_name = best["name"]
 
-    # Refit on full & forecast exactly 2025–2028
     future_pred = _refit_and_forecast_full(
         best, prep["endog_log"], prep["exog_full"], prep["future_index"], prep["future_exog"]
     )
 
-    # Plot continuous axis with bold forecast and shaded future
-    fig = _plot_forecast_emphasized_continuous(
+    fig = _plot_forecast_split_gap(
         sel_country, prep["capex_actual"], prep["future_index"], future_pred, best_name, best["rmse"]
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # Summary
     left, right = st.columns(2)
     with left:
         st.markdown(f"**Best model:** `{best_name}`")
