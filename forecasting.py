@@ -2,10 +2,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Split view:
 # - Left (smaller): 2004–2023 actuals, thin/light
-#   * Years on X-axis are NOT every year (tick every 2 years) and rotated 90°
+#   * X ticks every 3 years, rotated 90°
 # - Right (larger): 2025–2028 forecast, bold with markers
 # - No shaded area, no connection between panels
-# - Panels are moved closer together
+# - Panels are close together
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -309,13 +309,13 @@ def _plot_forecast_split_gap(country: str,
     """
     Two subplots share Y:
       col=1 (smaller): actuals 2004–2023, thin/light
-        - ticks every 2 years, rotated 90°
+        - ticks every 3 years, rotated 90°
       col=2 (larger): forecast 2025–2028, bold with markers
       No line connecting them. Panels closer together.
     """
     fig = make_subplots(
         rows=1, cols=2, shared_yaxes=True,
-        horizontal_spacing=0.025,               # closer panels
+        horizontal_spacing=0.02,                # closer panels
         column_widths=[0.33, 0.67]              # smaller left, larger right
     )
 
@@ -336,14 +336,14 @@ def _plot_forecast_split_gap(country: str,
                 ),
                 row=1, col=1
             )
-            # ticks every 2 years, rotated
+            # ticks every 3 years, rotated 90°
             fig.update_xaxes(
-                tickmode="linear", tick0=2004, dtick=2, tickangle=90,
+                tickmode="linear", tick0=2004, dtick=3, tickangle=90,
                 range=[min(left_x)-0.5, max(left_x)+0.5],
                 showgrid=False, title_text="", row=1, col=1
             )
         else:
-            fig.update_xaxes(tickmode="linear", dtick=2, tickangle=90,
+            fig.update_xaxes(tickmode="linear", tick0=2004, dtick=3, tickangle=90,
                              showgrid=False, title_text="", row=1, col=1)
 
     # RIGHT: forecast only (2025–2028)
