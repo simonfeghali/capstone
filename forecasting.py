@@ -4,10 +4,10 @@
 # - Data prep: prefer final cleaned CSVs; drop 2003; remove countries with any missing CAPEX
 # - Split: adaptive 15% (bounded 2–4 yrs) for model selection (RMSE)
 # - Forecast horizon: EXACTLY 2025–2028
-# - Plot: two subplots sharing Y
-#     • Left (smaller width): full Actual CAPEX history, thin & light
-#     • Right (larger width): last 3–4 actual years (for context) + bold Forecast
-# - X axes: tick every year (dtick=1) so each year appears
+# - Plot: ONE continuous axis
+#     • History: thin, light gray over full range
+#     • Forecast (2025–2028): bold navy, with a shaded background band
+#     • Each year shown (tick every year)
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -17,7 +17,6 @@ import re
 from urllib.parse import quote
 from sklearn.preprocessing import StandardScaler
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from overview import info_button, emit_auto_jump_script
@@ -60,12 +59,10 @@ def _numify(x):
 def _find_col(cols, *cands):
     low = {str(c).lower(): c for c in cols}
     for c in cands:
-        if c.lower() in low:
-            return low[c.lower()]
+        if c.lower() in low: return low[c.lower()]
     for cand in cands:
         for col in cols:
-            if cand.lower() in str(col).lower():
-                return col
+            if cand.lower() in str(col).lower(): return col
     return None
 
 def _rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
@@ -106,11 +103,9 @@ def _load_notebook_style_panel() -> pd.DataFrame:
             for c in cap.columns:
                 if "country" in str(c).lower():
                     ctry = c; break
-        if not ctry:
-            raise RuntimeError("No country column in capex file.")
+        if not ctry: raise RuntimeError("No country column in capex file.")
         year_cols = [c for c in cap.columns if re.fullmatch(r"\d{4}", str(c))]
-        if not year_cols:
-            raise RuntimeError("No 4-digit year columns in capex file.")
+        if not year_cols: raise RuntimeError("No 4-digit year columns in capex file.")
         m = cap.melt(id_vars=[ctry], value_vars=year_cols, var_name="Year", value_name="CAPEX")
         m = m.rename(columns={ctry: "Country"})
         m["Year"] = pd.to_numeric(m["Year"], errors="coerce").astype("Int64")
@@ -119,11 +114,10 @@ def _load_notebook_style_panel() -> pd.DataFrame:
         cap_long = m.dropna(subset=["Year"]).copy()
 
         try:
-            ind = pd.read_csv(_raw(FILES["indicators"]))
+            ind = pd.read_csv(_raw(FILES["indicators"]])
             ctry_i = _find_col(ind.columns, "Country", "Country Name")
             year_i = _find_col(ind.columns, "Year")
-            if not (ctry_i and year_i):
-                raise ValueError("Indicators missing Country/Year.")
+            if not (ctry_i and year_i): raise ValueError("Indicators missing Country/Year.")
             ind = ind.rename(columns={ctry_i: "Country", year_i: "Year"})
             ind["Country"] = ind["Country"].astype(str).str.strip()
             ind["Year"] = pd.to_numeric(ind["Year"], errors="coerce").astype("Int64")
@@ -324,100 +318,76 @@ def _refit_and_forecast_full(best_model: dict, endog_log: pd.Series,
     future = pd.Series(np.exp(future_log).values / 1000.0, index=future_index, name="forecast")  # $B
     return future
 
-# ── plotting (emphasize forecast) ────────────────────────────────────────────
+# ── plotting (continuous axis; emphasize forecast) ───────────────────────────
 
-def _plot_forecast_emphasized(country: str,
-                              actual: pd.Series,
-                              future_idx: pd.Index,
-                              future_pred: pd.Series,
-                              best_name: str,
-                              rmse: float):
+def _plot_forecast_emphasized_continuous(country: str,
+                                         actual: pd.Series,
+                                         future_idx: pd.Index,
+                                         future_pred: pd.Series,
+                                         best_name: str,
+                                         rmse: float):
     """
-    Two subplots share Y:
-      col=1 (smaller): full actual history, thin/light; every year tick
-      col=2 (larger): last few actual years + bold forecast (2025–2028); every year tick
+    Single axis:
+      - History: thin, light gray line (full span)
+      - Forecast: bold navy with markers; background shaded for 2025–2028
+      - Every year is a tick (dtick=1)
+      - Line is continuous by bridging the last actual point to the first forecast year
     """
-    # Decide context years to show on the right
-    if len(actual.index) > 0:
-        last_actual_year = int(max(actual.index))
-    else:
-        last_actual_year = 0
-    right_context_start = max(last_actual_year - 3, (actual.index.min() if len(actual.index) else 0))
-    right_actual = actual.loc[actual.index >= right_context_start]
+    fig = go.Figure()
 
-    fig = make_subplots(
-        rows=1, cols=2, shared_yaxes=True,
-        horizontal_spacing=0.04,
-        column_widths=[0.45, 0.55]  # shrink training, enlarge forecast
-    )
+    # Background band for forecast horizon
+    if len(future_idx) > 0:
+        x0 = int(future_idx[0]) - 0.5
+        x1 = int(future_idx[-1]) + 0.5
+        fig.add_vrect(x0=x0, x1=x1, fillcolor="rgba(13,42,82,0.06)", line_width=0)
 
-    # LEFT: entire history (light)
-    fig.add_trace(
-        go.Scatter(
+    # History (full)
+    if len(actual) > 0:
+        fig.add_trace(go.Scatter(
             x=actual.index.astype(int),
             y=actual.values,
             mode="lines",
-            line=dict(color="rgba(60,60,60,0.5)", width=1.5),
-            name="Actual CAPEX (history)",
+            line=dict(color="rgba(60,60,60,0.45)", width=1.6),
+            name="Actual CAPEX",
             hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
             showlegend=False
-        ),
-        row=1, col=1
-    )
+        ))
 
-    # RIGHT: last few actual years (subtle)
-    if len(right_actual) > 0:
-        fig.add_trace(
-            go.Scatter(
-                x=right_actual.index.astype(int),
-                y=right_actual.values,
-                mode="lines+markers",
-                line=dict(color="rgba(80,80,80,0.7)", width=2),
-                marker=dict(size=6),
-                name="Actual (recent)",
-                hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
-                showlegend=False
-            ),
-            row=1, col=2
-        )
-
-    # RIGHT: forecast — bold & prominent
+    # Forecast (bridge last actual point so the line continues)
     if len(future_idx) > 0:
-        fig.add_trace(
-            go.Scatter(
-                x=pd.Index(future_idx).astype(int),
-                y=future_pred.values,
-                mode="lines+markers",
-                line=dict(color="#0D2A52", width=4),   # bold navy
-                marker=dict(size=8),
-                name="Forecast (2025–2028)",
-                hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
-                showlegend=False
-            ),
-            row=1, col=2
-        )
+        if len(actual) > 0:
+            bridge_x = [int(actual.index.max())] + list(map(int, future_idx.values))
+            bridge_y = [float(actual.iloc[-1])] + list(map(float, future_pred.values))
+        else:
+            bridge_x = list(map(int, future_idx.values))
+            bridge_y = list(map(float, future_pred.values))
 
-    # Axes: show every year (dtick=1)
-    if len(actual.index) > 0:
-        left_min = int(min(actual.index))
-        left_max = int(max(actual.index))
-    else:
-        left_min, left_max = (0, 0)
+        fig.add_trace(go.Scatter(
+            x=bridge_x,
+            y=bridge_y,
+            mode="lines+markers",
+            line=dict(color="#0D2A52", width=4),
+            marker=dict(size=7),
+            name="Forecast 2025–2028",
+            hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
+            showlegend=False
+        ))
 
-    # Left axis: all history years
+    # Axes: each year shown
+    all_years = []
+    if len(actual) > 0:
+        all_years += list(map(int, actual.index.values))
+    if len(future_idx) > 0:
+        all_years += list(map(int, future_idx.values))
+    if not all_years:
+        all_years = [2025, 2026, 2027, 2028]
+
+    xmin, xmax = min(all_years) - 0.5, max(all_years) + 0.5
+
     fig.update_xaxes(
-        tickmode="linear", dtick=1, range=[left_min - 0.5, left_max + 0.5],
-        showgrid=False, title_text="", row=1, col=1
+        tickmode="linear", dtick=1, range=[xmin, xmax],
+        showgrid=False, title_text=""
     )
-
-    # Right axis: from context start to end of forecast (or last actual if no forecast)
-    right_max = int(future_idx[-1]) if len(future_idx) > 0 else left_max
-    fig.update_xaxes(
-        tickmode="linear", dtick=1,
-        range=[int(right_context_start) - 0.5, right_max + 0.5],
-        showgrid=False, title_text="", row=1, col=2
-    )
-
     fig.update_yaxes(showgrid=False, title_text="")
 
     fig.update_layout(
@@ -456,7 +426,7 @@ def render_forecasting_tab():
         st.error(f"Could not prepare data: {e}")
         return
 
-    # Model selection on the last-portion test split
+    # Model selection on held-out tail
     train_y, test_y = prep["train_y"], prep["test_y"]
     train_x, test_x = prep["train_x"], prep["test_x"]
 
@@ -474,8 +444,8 @@ def render_forecasting_tab():
         best, prep["endog_log"], prep["exog_full"], prep["future_index"], prep["future_exog"]
     )
 
-    # Plot: history compact on left, forecast bold on right; yearly ticks everywhere
-    fig = _plot_forecast_emphasized(
+    # Plot continuous axis with bold forecast and shaded future
+    fig = _plot_forecast_emphasized_continuous(
         sel_country, prep["capex_actual"], prep["future_index"], future_pred, best_name, best["rmse"]
     )
     st.plotly_chart(fig, use_container_width=True)
