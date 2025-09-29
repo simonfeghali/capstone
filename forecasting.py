@@ -1,10 +1,11 @@
 # forecasting.py
 # ─────────────────────────────────────────────────────────────────────────────
-# Forecasting tab with split view:
-# - Left: 2004–2023 actuals (small area, thin/light)
-# - Right: 2025–2028 forecast (larger area, bold with markers)
-# - No connection between actual and forecast; no shading
-# - Every year labeled on each X axis (dtick=1)
+# Split view:
+# - Left (smaller): 2004–2023 actuals, thin/light
+#   * Years on X-axis are NOT every year (tick every 2 years) and rotated 90°
+# - Right (larger): 2025–2028 forecast, bold with markers
+# - No shaded area, no connection between panels
+# - Panels are moved closer together
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -111,7 +112,7 @@ def _load_notebook_style_panel() -> pd.DataFrame:
             if not (ctry_i and year_i):
                 raise ValueError("Indicators missing Country/Year.")
             ind = ind.rename(columns={ctry_i: "Country", year_i: "Year"})
-            ind["Country"] = ind["Country"].astype(str).stripped()
+            ind["Country"] = ind["Country"].astype(str).str.strip()
             ind["Year"] = pd.to_numeric(ind["Year"], errors="coerce").astype("Int64")
         except Exception:
             df = cap_long
@@ -297,7 +298,7 @@ def _refit_and_forecast_full(best_model: dict, endog_log: pd.Series,
     future = pd.Series(np.exp(future_log).values / 1000.0, index=future_index, name="forecast")
     return future
 
-# ── plotting (split, gap, yearly ticks) ──────────────────────────────────────
+# ── plotting (split, gap, custom ticks) ──────────────────────────────────────
 
 def _plot_forecast_split_gap(country: str,
                              actual: pd.Series,
@@ -308,13 +309,14 @@ def _plot_forecast_split_gap(country: str,
     """
     Two subplots share Y:
       col=1 (smaller): actuals 2004–2023, thin/light
+        - ticks every 2 years, rotated 90°
       col=2 (larger): forecast 2025–2028, bold with markers
-      No line connecting them. Each panel ticks every year.
+      No line connecting them. Panels closer together.
     """
     fig = make_subplots(
         rows=1, cols=2, shared_yaxes=True,
-        horizontal_spacing=0.06,
-        column_widths=[0.35, 0.65]
+        horizontal_spacing=0.025,               # closer panels
+        column_widths=[0.33, 0.67]              # smaller left, larger right
     )
 
     # LEFT: actual history (2004–2023)
@@ -334,15 +336,15 @@ def _plot_forecast_split_gap(country: str,
                 ),
                 row=1, col=1
             )
-        # year ticks for left
-        if left_x:
+            # ticks every 2 years, rotated
             fig.update_xaxes(
-                tickmode="linear", dtick=1,
+                tickmode="linear", tick0=2004, dtick=2, tickangle=90,
                 range=[min(left_x)-0.5, max(left_x)+0.5],
                 showgrid=False, title_text="", row=1, col=1
             )
         else:
-            fig.update_xaxes(tickmode="linear", dtick=1, showgrid=False, title_text="", row=1, col=1)
+            fig.update_xaxes(tickmode="linear", dtick=2, tickangle=90,
+                             showgrid=False, title_text="", row=1, col=1)
 
     # RIGHT: forecast only (2025–2028)
     if len(future_idx) > 0:
@@ -362,7 +364,7 @@ def _plot_forecast_split_gap(country: str,
             row=1, col=2
         )
         fig.update_xaxes(
-            tickmode="linear", dtick=1,
+            tickmode="linear", dtick=1,  # every year on forecast side
             range=[min(right_x)-0.5, max(right_x)+0.5],
             showgrid=False, title_text="", row=1, col=2
         )
