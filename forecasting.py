@@ -114,7 +114,7 @@ def _load_notebook_style_panel() -> pd.DataFrame:
         cap_long = m.dropna(subset=["Year"]).copy()
 
         try:
-            ind = pd.read_csv(_raw(FILES["indicators"]])
+            ind = pd.read_csv(_raw(FILES["indicators"]))
             ctry_i = _find_col(ind.columns, "Country", "Country Name")
             year_i = _find_col(ind.columns, "Year")
             if not (ctry_i and year_i): raise ValueError("Indicators missing Country/Year.")
