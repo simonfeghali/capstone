@@ -308,58 +308,56 @@ def _plot_forecast_split_gap(country: str,
                              rmse: float,
                              start_year: int = 2015):
     """
-    Two subplots share Y:
-      • Left (smaller): actuals start_year–2023, thin/light, horizontal ticks
-      • Right (larger): forecast 2025–2028, clean slim line (no markers)
-      • No connecting line; subtle dotted guide at last actual value across the gap
+    Split view with uniform x-axis styling:
+      • Left: history start_year–2023
+      • Right: forecast 2025–2028
+      • Both x-axes use 'category' so year ticks are equally spaced and same size.
+      • Slim forecast line, no markers; dotted guide across the gap.
     """
     fig = make_subplots(
         rows=1, cols=2, shared_yaxes=True,
-        horizontal_spacing=0.002,          # tight gap
-        column_widths=[0.44, 0.56]         # slightly wider forecast panel
+        horizontal_spacing=0.006,       # close but readable
+        column_widths=[0.50, 0.50]      # equal widths → equal visual spacing
     )
 
-    # LEFT: history from start_year..2023 (squeezed)
-    if len(actual) > 0:
-        left_x_all = actual.index.astype(int)
-        left_x = [y for y in left_x_all if start_year <= y <= 2023]
-        left_y = [actual.loc[y] for y in left_x] if left_x else []
-
-        if left_x:
-            fig.add_trace(
-                go.Scatter(
-                    x=left_x, y=left_y, mode="lines",
-                    line=dict(color="rgba(90,90,90,0.70)", width=1.6),
-                    name=f"Actual ({start_year}–2023)",
-                    hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
-                    showlegend=False
-                ),
-                row=1, col=1
-            )
-            span = max(1, max(left_x) - min(left_x))
-            dtick = 1 if span <= 6 else (2 if span <= 12 else 3)
-            fig.update_xaxes(
-                tickmode="linear", tick0=min(left_x), dtick=dtick,
-                tickangle=0,  # horizontal labels
-                range=[min(left_x) - 0.5, max(left_x) + 0.5],
-                showgrid=False, title_text="", row=1, col=1
-            )
-        else:
-            fig.update_xaxes(
-                tickmode="linear", tick0=start_year, dtick=3,
-                tickangle=0, showgrid=False, title_text="", row=1, col=1
-            )
-
-    # RIGHT: forecast only (2025–2028), dominant but clean
-    if len(future_idx) > 0:
-        right_x = list(map(int, future_idx.values))
-        right_y = list(map(float, future_pred.values))
-
+    # ── LEFT: actual history (start_year–2023) ────────────────────────────────
+    left_x = [y for y in actual.index.astype(int) if start_year <= y <= 2023]
+    if left_x:
+        left_y = [float(actual.loc[y]) for y in left_x]
         fig.add_trace(
             go.Scatter(
-                x=right_x, y=right_y,
+                x=[str(y) for y in left_x],  # category axis
+                y=left_y,
                 mode="lines",
-                line=dict(color="#0D2A52", width=2.2, shape="linear"),  # slim, no markers
+                line=dict(color="rgba(90,90,90,0.70)", width=1.6),
+                name=f"Actual ({start_year}–2023)",
+                hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
+                showlegend=False
+            ),
+            row=1, col=1
+        )
+
+    # Category axis → equal spacing per year, horizontal labels
+    fig.update_xaxes(
+        type="category",
+        categoryorder="array",
+        categoryarray=[str(y) for y in left_x] if left_x else [],
+        tickangle=0,
+        showgrid=False,
+        title_text="",
+        row=1, col=1
+    )
+
+    # ── RIGHT: forecast only (2025–2028) ──────────────────────────────────────
+    right_x = list(map(int, future_idx.values)) if len(future_idx) > 0 else []
+    if right_x:
+        right_y = list(map(float, future_pred.values))
+        fig.add_trace(
+            go.Scatter(
+                x=[str(y) for y in right_x],  # category axis
+                y=right_y,
+                mode="lines",
+                line=dict(color="#0D2A52", width=2.2, shape="linear"),
                 name="Forecast (2025–2028)",
                 hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
                 showlegend=False
@@ -367,33 +365,30 @@ def _plot_forecast_split_gap(country: str,
             row=1, col=2
         )
 
-        # tight ticks & minimal margins so years feel closer
-        fig.update_xaxes(
-            tickmode="linear", tick0=right_x[0], dtick=1,
-            tickangle=0,
-            range=[min(right_x) - 0.05, max(right_x) + 0.05],
-            showgrid=False, title_text="", row=1, col=2
+    fig.update_xaxes(
+        type="category",
+        categoryorder="array",
+        categoryarray=[str(y) for y in right_x] if right_x else [],
+        tickangle=0,
+        showgrid=False,
+        title_text="",
+        row=1, col=2
+    )
+
+    # ── Subtle continuity guide across the gap (last actual value) ───────────
+    if left_x:
+        last_hist_val = float(actual.loc[left_x[-1]])
+        d1 = fig.layout.xaxis.domain
+        d2 = fig.layout.xaxis2.domain
+        fig.add_shape(
+            type="line",
+            xref="paper", yref="y",
+            x0=d1[1], x1=d2[0],
+            y0=last_hist_val, y1=last_hist_val,
+            line=dict(color="rgba(90,90,90,0.30)", width=1, dash="dot")
         )
 
-        # subtle continuity guide at the last historical value across the gap
-        if len(actual) > 0:
-            hist_before = [y for y in actual.index.astype(int) if y <= 2023]
-            if hist_before:
-                last_hist_val = float(actual.loc[hist_before[-1]])
-                d1 = fig.layout.xaxis.domain
-                d2 = fig.layout.xaxis2.domain
-                fig.add_shape(
-                    type="line",
-                    xref="paper", yref="y",
-                    x0=d1[1], x1=d2[0],
-                    y0=last_hist_val, y1=last_hist_val,
-                    line=dict(color="rgba(90,90,90,0.30)", width=1, dash="dot")
-                )
-    else:
-        fig.update_xaxes(tickmode="linear", dtick=1, tickangle=0,
-                         showgrid=False, title_text="", row=1, col=2)
-
-    # Shared styling
+    # ── Shared styling ────────────────────────────────────────────────────────
     fig.update_yaxes(showgrid=False, title_text="")
     fig.update_layout(
         title=f"{best_name} Forecast for {country} | RMSE: {rmse:.2f} $B",
@@ -401,8 +396,8 @@ def _plot_forecast_split_gap(country: str,
         hoverlabel=dict(bgcolor="white", font_size=12, font_color="black"),
         margin=dict(l=10, r=10, t=60, b=10),
         height=520,
-        xaxis=dict(tickfont=dict(size=12)),   # bigger left labels
-        xaxis2=dict(tickfont=dict(size=14))   # bigger right labels
+        xaxis=dict(tickfont=dict(size=12)),   # same size on both panels
+        xaxis2=dict(tickfont=dict(size=12))
     )
     return fig
 
