@@ -987,10 +987,15 @@ with tab_eda:
                 locationmode="country names",
                 color="capex_band",
                 title=map_title,
-                color_discrete_sequence=px.colors.sequential.Blues
+                color_discrete_sequence=px.colors.sequential.Blues,
+                category_orders={"capex_band": labels}
             )
+            # Show both raw value and band in hover
             fig.update_traces(
-                hovertemplate="Country: %{location}<br>Capex Band: %{z}<extra></extra>"
+                customdata=np.array(map_df["capex"], dtype=float),
+                hovertemplate="Country: %{location}"
+                              "<br>Capex: %{customdata:,.0f} $B"
+                              "<br>Band: %{z}<extra></extra>"
             )
             # Cleaner legend
             fig.update_layout(
