@@ -300,55 +300,60 @@ def _refit_and_forecast_full(best_model: dict, endog_log: pd.Series,
 
 # ── plotting (split, gap, custom ticks) ──────────────────────────────────────
 
-def _plot_forecast_split_gap(country, actual, future_idx, future_pred, best_name, rmse):
+def _plot_forecast_split_gap(country: str,
+                             actual: pd.Series,
+                             future_idx: pd.Index,
+                             future_pred: pd.Series,
+                             best_name: str,
+                             rmse: float):
+    """
+    Two subplots share Y:
+      • Left (smaller): actuals 2004–2023, thin/light, ticks every 3 years rotated 90°
+      • Right (larger): forecast 2025–2028, clean slim line (no markers), tighter year spacing
+      • No connecting line; subtle dotted guide at last actual value across the gap
+    """
     fig = make_subplots(
         rows=1, cols=2, shared_yaxes=True,
-        # bring panels tighter + make the forecast panel a bit narrower (ticks feel closer)
-        horizontal_spacing=0.004,
-        column_widths=[0.36, 0.64]
+        horizontal_spacing=0.004,         # panels very close
+        column_widths=[0.36, 0.64]        # squeezed history, wider forecast
     )
 
-    # LEFT (unchanged except we keep it squeezed)
+    # ── LEFT: actual history (2004–2023), squeezed ───────────────────────────
     if len(actual) > 0:
         left_x = [y for y in actual.index.astype(int) if 2004 <= y <= 2023]
         left_y = [actual.loc[y] for y in left_x]
         if left_x:
             fig.add_trace(
                 go.Scatter(
-                    x=left_x, y=left_y, mode="lines",
-                    line=dict(color="rgba(90,90,90,0.65)", width=1.6),
-                    name="Actual (2004–2023)", hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
+                    x=left_x, y=left_y,
+                    mode="lines",
+                    line=dict(color="rgba(90,90,90,0.70)", width=1.6),
+                    name="Actual (2004–2023)",
+                    hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
                     showlegend=False
                 ),
                 row=1, col=1
             )
-            fig.update_xaxes(tickmode="linear", tick0=2004, dtick=3, tickangle=90,
-                             range=[min(left_x)-0.5, max(left_x)+0.5],
-                             showgrid=False, title_text="", row=1, col=1)
+            fig.update_xaxes(
+                tickmode="linear", tick0=2004, dtick=3, tickangle=90,
+                range=[min(left_x) - 0.5, max(left_x) + 0.5],
+                showgrid=False, title_text="", row=1, col=1
+            )
         else:
             fig.update_xaxes(tickmode="linear", tick0=2004, dtick=3, tickangle=90,
                              showgrid=False, title_text="", row=1, col=1)
 
-    # RIGHT (make it dominant but cleaner)
+    # ── RIGHT: forecast only (2025–2028), dominant but clean ─────────────────
     if len(future_idx) > 0:
         right_x = list(map(int, future_idx.values))
         right_y = list(map(float, future_pred.values))
 
-        # 1) A soft "glow" under the main line to make it visually dominant without markers
+        # single slim line (no markers, no glow)
         fig.add_trace(
             go.Scatter(
-                x=right_x, y=right_y, mode="lines",
-                line=dict(color="rgba(13,42,82,0.20)", width=10, shape="spline", smoothing=0.6),
-                hoverinfo="skip", showlegend=False
-            ),
-            row=1, col=2
-        )
-
-        # 2) The actual forecast line (no dots)
-        fig.add_trace(
-            go.Scatter(
-                x=right_x, y=right_y, mode="lines",
-                line=dict(color="#0D2A52", width=4, shape="spline", smoothing=0.6),
+                x=right_x, y=right_y,
+                mode="lines",
+                line=dict(color="#0D2A52", width=2.2, shape="linear"),
                 name="Forecast (2025–2028)",
                 hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
                 showlegend=False
@@ -356,19 +361,18 @@ def _plot_forecast_split_gap(country, actual, future_idx, future_pred, best_name
             row=1, col=2
         )
 
-        # Make ticks feel closer by slightly tightening the x-range and narrowing this panel
+        # tighter year spacing and smaller side margins on the x-range
         fig.update_xaxes(
-            tickmode="linear", dtick=1,
-            range=[min(right_x)-0.3, max(right_x)+0.3],   # tighter than ±0.5
+            tickmode="linear", tick0=right_x[0], dtick=1,
+            range=[min(right_x) - 0.15, max(right_x) + 0.15],
             tickangle=0, showgrid=False, title_text="", row=1, col=2
         )
 
-        # 3) Subtle dotted guide across the gap at the last actual value (visual continuity, not a connector)
+        # subtle continuity guide at the last historical value (not a connector)
         if len(actual) > 0:
             last_hist_years = [y for y in actual.index.astype(int) if y <= 2023]
             if last_hist_years:
                 last_hist_val = float(actual.loc[last_hist_years[-1]])
-                # get domains to draw across the gap
                 d1 = fig.layout.xaxis.domain
                 d2 = fig.layout.xaxis2.domain
                 fig.add_shape(
@@ -376,12 +380,12 @@ def _plot_forecast_split_gap(country, actual, future_idx, future_pred, best_name
                     xref="paper", yref="y",
                     x0=d1[1], x1=d2[0],
                     y0=last_hist_val, y1=last_hist_val,
-                    line=dict(color="rgba(90,90,90,0.35)", width=1, dash="dot")
+                    line=dict(color="rgba(90,90,90,0.30)", width=1, dash="dot")
                 )
-
     else:
         fig.update_xaxes(tickmode="linear", dtick=1, showgrid=False, title_text="", row=1, col=2)
 
+    # ── Shared styling ────────────────────────────────────────────────────────
     fig.update_yaxes(showgrid=False, title_text="")
 
     fig.update_layout(
@@ -390,9 +394,8 @@ def _plot_forecast_split_gap(country, actual, future_idx, future_pred, best_name
         hoverlabel=dict(bgcolor="white", font_size=12, font_color="black"),
         margin=dict(l=10, r=10, t=60, b=10),
         height=520,
-        # smaller left tick labels, slightly larger on the right
-        xaxis=dict(tickfont=dict(size=10)),
-        xaxis2=dict(tickfont=dict(size=12))
+        xaxis=dict(tickfont=dict(size=10)),   # left ticks smaller
+        xaxis2=dict(tickfont=dict(size=12))   # right ticks slightly larger
     )
     return fig
     
