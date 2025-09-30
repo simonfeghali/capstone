@@ -603,8 +603,7 @@ with tab_scoring:
                 fig_map.update_geos(scope=current_scope, projection_type="natural earth",
                                     showcountries=True, showcoastlines=True,
                                     landcolor="white", bgcolor="white")
-                if sel_cont_sc != "All" or sel_country_sc != "All":
-                    fig_map.update_geos(fitbounds="locations")
+                fig_map.update_geos(fitbounds="locations")
                 fig_map.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=410,
                                       paper_bgcolor="white", plot_bgcolor="white")
                 st.plotly_chart(fig_map, use_container_width=True)
