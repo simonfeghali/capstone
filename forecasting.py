@@ -390,7 +390,7 @@ def _plot_forecast_split_gap(country: str,
         hoverlabel=dict(bgcolor="white", font_size=12, font_color="black"),
         margin=dict(l=10, r=10, t=60, b=10),
         height=520,
-        xaxis=dict(tickfont=dict(size=10)),    # left tick labels smaller
+        xaxis=dict(tickfont=dict(size=12)),    # left tick labels smaller
         xaxis2=dict(tickfont=dict(size=12))    # right tick labels slightly larger
     )
     return fig
