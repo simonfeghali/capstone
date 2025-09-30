@@ -1,11 +1,11 @@
 # forecasting.py
 # ─────────────────────────────────────────────────────────────────────────────
-# Split view with compact history by default:
-# - Default left panel shows 2015–2023 actuals (thin/light, horizontal ticks)
-# - Toggle reveals a slider to show older history (min 2004)
-# - Right panel shows 2025–2028 forecast (slim line, no markers, tight ticks)
-# - Subtle dotted guide across the gap (no actual connection)
-# - Panels close together
+# Unified chart:
+# • One continuous x-axis (equal spacing), horizontal labels
+# • Solid blue for history (default 2015–2023)
+# • Dashed blue for forecast (2025–2028)
+# • No markers; clean Y gridlines; same tick size on both sides
+# • Toggle + slider to reveal earlier history (to 2004)
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -62,6 +62,7 @@ def _find_col(cols, *cands):
     return None
 
 def _rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    # values in $B
     y_true = np.asarray(y_true, dtype=float) / 1000.0
     y_pred = np.asarray(y_pred, dtype=float) / 1000.0
     return float(np.sqrt(np.nanmean((y_true - y_pred) ** 2)))
@@ -71,6 +72,7 @@ def _rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 @st.cache_data(show_spinner=True)
 def _load_notebook_style_panel() -> pd.DataFrame:
     df = None
+    # try the “wide” cleaned files first
     for key in ("final_clean", "forecasting_final_clean", "combined"):
         try:
             tmp = pd.read_csv(_raw(FILES[key]))
@@ -86,6 +88,7 @@ def _load_notebook_style_panel() -> pd.DataFrame:
         except Exception:
             df = None
 
+    # fallback: melt the long CAPEX file and merge indicators
     if df is None:
         cap = pd.read_csv(_raw(FILES["capex_long"]))
         ctry = _find_col(cap.columns, "Source Country", "Country", "source_country", "Source Co")
@@ -119,6 +122,7 @@ def _load_notebook_style_panel() -> pd.DataFrame:
         else:
             df = cap_long.merge(ind, on=["Country", "Year"], how="left")
 
+    # clean
     df = df[df["Year"] != 2003].copy()
     miss = df[df["CAPEX"].isna()]
     if not miss.empty:
@@ -298,160 +302,4 @@ def _refit_and_forecast_full(best_model: dict, endog_log: pd.Series,
     future = pd.Series(np.exp(future_log).values / 1000.0, index=future_index, name="forecast")
     return future
 
-# ── plotting (split, gap, custom ticks, start_year) ──────────────────────────
-
-def _plot_forecast_unified(country: str,
-                           actual: pd.Series,
-                           future_idx: pd.Index,
-                           future_pred: pd.Series,
-                           best_name: str,
-                           rmse: float,
-                           start_year: int = 2015):
-    """
-    Single-axis design (like your reference):
-      • Solid blue for history (start_year–2023)
-      • Dashed blue for forecast (2025–2028)
-      • One shared x-axis with equal year spacing; horizontal labels
-      • No markers; horizontal gridlines on Y only
-    """
-    # Prepare series
-    hist_years = [int(y) for y in actual.index if int(y) >= start_year and int(y) <= 2023]
-    hist_vals  = [float(actual.loc[y]) for y in hist_years]
-
-    f_years = list(map(int, future_idx.values)) if len(future_idx) > 0 else []
-    f_vals  = list(map(float, future_pred.values)) if f_years else []
-
-    # Build figure (single subplot)
-    fig = make_subplots(rows=1, cols=1)
-
-    # Solid history line
-    if hist_years:
-        fig.add_trace(
-            go.Scatter(
-                x=hist_years, y=hist_vals,
-                mode="lines",
-                line=dict(color="#1f77b4", width=2.2, shape="linear"),
-                name=f"Actual ({start_year}–2023)",
-                hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
-                showlegend=False
-            )
-        )
-
-    # Dashed forecast line (starts at 2025)
-    if f_years:
-        fig.add_trace(
-            go.Scatter(
-                x=f_years, y=f_vals,
-                mode="lines",
-                line=dict(color="#1f77b4", width=2.2, dash="dash", shape="linear"),
-                name="Forecast (2025–2028)",
-                hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
-                showlegend=False
-            )
-        )
-
-    # X-axis span & ticks
-    xmin_candidates = []
-    xmax_candidates = []
-    if hist_years: xmin_candidates.append(min(hist_years)); xmax_candidates.append(max(hist_years))
-    if f_years:    xmin_candidates.append(min(f_years));    xmax_candidates.append(max(f_years))
-    if not xmin_candidates:  # fallback
-        xmin, xmax = start_year, 2028
-    else:
-        xmin, xmax = min(xmin_candidates), max(xmax_candidates)
-
-    # Choose nice dtick (5-year ticks like the reference)
-    dtick = 5
-
-    fig.update_xaxes(
-        tickmode="linear", dtick=dtick, tickangle=0,
-        range=[xmin - 0.5, xmax + 0.5],
-        showgrid=False, title_text=""
-    )
-
-    # Y-axis: show horizontal gridlines only
-    fig.update_yaxes(showgrid=True, title_text="", zeroline=False)
-
-    fig.update_layout(
-        title=f"{best_name} Forecast for {country} | RMSE: {rmse:.2f} $B",
-        hovermode="x",
-        hoverlabel=dict(bgcolor="white", font_size=12, font_color="black"),
-        margin=dict(l=10, r=10, t=60, b=10),
-        height=520,
-        xaxis=dict(tickfont=dict(size=12)),
-        yaxis=dict(tickfont=dict(size=12))
-    )
-    return fig
-
-# ── public entrypoint ────────────────────────────────────────────────────────
-
-def render_forecasting_tab():
-    _f_left, _f_right = st.columns([20, 1], gap="small")
-    with _f_left:
-        st.caption("Forecasts — 2025–2028")
-    with _f_right:
-        info_button("forecast")
-
-    emit_auto_jump_script()
-
-    panel = _load_notebook_style_panel()
-    if panel.empty:
-        st.info("No forecasting data available.")
-        return
-
-    countries = sorted(panel["Country"].dropna().unique().tolist())
-    sel_country = st.selectbox("Country", countries, index=0, key="forecast_country_split")
-
-    try:
-        prep = _prep_country_notebook(panel, sel_country)
-    except Exception as e:
-        st.error(f"Could not prepare data: {e}")
-        return
-
-    train_y, test_y = prep["train_y"], prep["test_y"]
-    train_x, test_x = prep["train_x"], prep["test_x"]
-
-    cand = [
-        _fit_eval_arima(train_y, test_y),
-        _fit_eval_arimax(train_y, test_y, train_x, test_x),
-        _fit_eval_sarima(train_y, test_y),
-        _fit_eval_sarimax(train_y, test_y, train_x, test_x),
-    ]
-    best = min(cand, key=lambda d: d["rmse"])
-    best_name = best["name"]
-
-    future_pred = _refit_and_forecast_full(
-        best, prep["endog_log"], prep["exog_full"], prep["future_index"], prep["future_exog"]
-    )
-
-    # ── history window controls (default = compact view 2015–2023)
-    # If your Streamlit version doesn't have st.toggle, replace with st.checkbox.
-    show_more_hist = st.toggle("Show earlier history", value=False, help="Toggle to reveal older history.")
-    if show_more_hist:
-        start_year = st.slider(
-            "Start year for historical panel",
-            min_value=2004, max_value=2023, value=2010, step=1,
-            help="Choose how far back to show on the left panel."
-        )
-    else:
-        start_year = 2015
-
-    fig = _plot_forecast_split_gap(
-        sel_country, prep["capex_actual"], prep["future_index"], future_pred, best_name, best["rmse"],
-        start_year=start_year
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    left, right = st.columns(2)
-    with left:
-        st.markdown(f"**Best model:** `{best_name}`")
-        if best.get("order") is not None:
-            st.markdown(f"**Order:** `{best['order']}`")
-        if best.get("seasonal") is not None:
-            st.markdown(f"**Seasonal:** `{best['seasonal']}`")
-    with right:
-        st.markdown(f"**RMSE (test):** `{best['rmse']:.2f} $B`")
-        if len(prep["future_index"]) > 0:
-            st.markdown(f"**Forecast horizon:** `{int(prep['future_index'][0])}–{int(prep['future_index'][-1])}`")
-        else:
-            st.markdown("**Forecast horizon:** `No future years beyond last observed data`")
+# ─
