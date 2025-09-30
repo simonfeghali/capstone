@@ -311,19 +311,20 @@ def _plot_forecast_unified(country: str,
                            rmse: float,
                            start_year: int = 2015):
     """
-    Single-axis design (like the provided blue-line reference):
-      • Solid blue history from start_year–2023
-      • Dashed blue forecast 2025–2028
-      • Linear x-axis with equal spacing; horizontal labels
-      • No markers; Y gridlines only
+    Single-axis design:
+      • Solid blue for history (start_year–2023)
+      • Dashed blue for forecast (2025–2028)
+      • Show EVERY year tick in the selected range (dtick=1)
+      • No gridlines on either axis
     """
     # Prepare data
-    hist_years = [int(y) for y in actual.index if int(y) >= start_year and int(y) <= 2023]
+    hist_years = [int(y) for y in actual.index if start_year <= int(y) <= 2023]
     hist_vals  = [float(actual.loc[y]) for y in hist_years]
 
     f_years = list(map(int, future_idx.values)) if len(future_idx) > 0 else []
     f_vals  = list(map(float, future_pred.values)) if f_years else []
 
+    # Build figure
     fig = make_subplots(rows=1, cols=1)
 
     # History — solid blue
@@ -339,7 +340,7 @@ def _plot_forecast_unified(country: str,
             )
         )
 
-    # Forecast — dashed blue
+    # Forecast — dashed blue (starts at 2025)
     if f_years:
         fig.add_trace(
             go.Scatter(
@@ -352,21 +353,27 @@ def _plot_forecast_unified(country: str,
             )
         )
 
-    # Determine x span & ticks (nice 5-year ticks like the reference)
-    xmin_candidates, xmax_candidates = [], []
-    if hist_years: xmin_candidates.append(min(hist_years)); xmax_candidates.append(max(hist_years))
-    if f_years:    xmin_candidates.append(min(f_years));    xmax_candidates.append(max(f_years))
-    xmin = min(xmin_candidates) if xmin_candidates else start_year
+    # X span = full selected range (every year tick)
+    xmin_candidates, xmax_candidates = [start_year], []
+    if hist_years: xmax_candidates.append(max(hist_years))
+    if f_years:    xmax_candidates.append(max(f_years))
     xmax = max(xmax_candidates) if xmax_candidates else 2028
 
     fig.update_xaxes(
-        tickmode="linear", dtick=5, tickangle=0,
-        range=[xmin - 0.5, xmax + 0.5],
-        showgrid=False, title_text=""
+        tickmode="linear",
+        tick0=start_year, dtick=1,          # ✅ show EVERY year
+        tickangle=0,
+        range=[start_year - 0.5, xmax + 0.5],
+        showgrid=False,                     # ✅ no vertical gridlines
+        title_text=""
     )
 
-    # Y axis: horizontal gridlines only
-    fig.update_yaxes(showgrid=True, zeroline=False, title_text="")
+    # Y axis — no gridlines
+    fig.update_yaxes(
+        showgrid=False,                     # ✅ no horizontal gridlines
+        zeroline=False,
+        title_text=""
+    )
 
     fig.update_layout(
         title=f"{best_name} Forecast for {country} | RMSE: {rmse:.2f} $B",
@@ -378,7 +385,7 @@ def _plot_forecast_unified(country: str,
         yaxis=dict(tickfont=dict(size=12)),
     )
     return fig
-
+                               
 # ── public entrypoint ────────────────────────────────────────────────────────
 
 def render_forecasting_tab():
