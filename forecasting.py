@@ -306,27 +306,21 @@ def _plot_forecast_split_gap(country: str,
                              future_pred: pd.Series,
                              best_name: str,
                              rmse: float):
-    """
-    Two subplots share Y:
-      • Left (smaller): actuals 2004–2023, thin/light, ticks every 3 years rotated 90°
-      • Right (larger): forecast 2025–2028, clean slim line (no markers), tighter year spacing
-      • No connecting line; subtle dotted guide at last actual value across the gap
-    """
+
     fig = make_subplots(
         rows=1, cols=2, shared_yaxes=True,
-        horizontal_spacing=0.004,         # panels very close
-        column_widths=[0.36, 0.64]        # squeezed history, wider forecast
+        horizontal_spacing=0.002,          # tighter gap
+        column_widths=[0.44, 0.56]         # right panel narrower → ticks feel closer
     )
 
-    # ── LEFT: actual history (2004–2023), squeezed ───────────────────────────
+    # LEFT: actual history (2004–2023)
     if len(actual) > 0:
         left_x = [y for y in actual.index.astype(int) if 2004 <= y <= 2023]
         left_y = [actual.loc[y] for y in left_x]
         if left_x:
             fig.add_trace(
                 go.Scatter(
-                    x=left_x, y=left_y,
-                    mode="lines",
+                    x=left_x, y=left_y, mode="lines",
                     line=dict(color="rgba(90,90,90,0.70)", width=1.6),
                     name="Actual (2004–2023)",
                     hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
@@ -335,7 +329,8 @@ def _plot_forecast_split_gap(country: str,
                 row=1, col=1
             )
             fig.update_xaxes(
-                tickmode="linear", tick0=2004, dtick=3, tickangle=90,
+                tickmode="linear", tick0=2004, dtick=3,
+                tickangle=90,                     # left vertical (history squeezed)
                 range=[min(left_x) - 0.5, max(left_x) + 0.5],
                 showgrid=False, title_text="", row=1, col=1
             )
@@ -343,12 +338,12 @@ def _plot_forecast_split_gap(country: str,
             fig.update_xaxes(tickmode="linear", tick0=2004, dtick=3, tickangle=90,
                              showgrid=False, title_text="", row=1, col=1)
 
-    # ── RIGHT: forecast only (2025–2028), dominant but clean ─────────────────
+    # RIGHT: forecast only (2025–2028)
     if len(future_idx) > 0:
         right_x = list(map(int, future_idx.values))
         right_y = list(map(float, future_pred.values))
 
-        # single slim line (no markers, no glow)
+        # slim, clean line (no markers)
         fig.add_trace(
             go.Scatter(
                 x=right_x, y=right_y,
@@ -361,14 +356,15 @@ def _plot_forecast_split_gap(country: str,
             row=1, col=2
         )
 
-        # tighter year spacing and smaller side margins on the x-range
+        # make ticks feel closer: very small side margins, horizontal labels
         fig.update_xaxes(
             tickmode="linear", tick0=right_x[0], dtick=1,
-            range=[min(right_x) - 0.15, max(right_x) + 0.15],
-            tickangle=0, showgrid=False, title_text="", row=1, col=2
+            tickangle=0,                        # right horizontal
+            range=[min(right_x) - 0.05, max(right_x) + 0.05],  # tighter than before
+            showgrid=False, title_text="", row=1, col=2
         )
 
-        # subtle continuity guide at the last historical value (not a connector)
+        # subtle continuity guide at last historical value across the gap
         if len(actual) > 0:
             last_hist_years = [y for y in actual.index.astype(int) if y <= 2023]
             if last_hist_years:
@@ -383,9 +379,9 @@ def _plot_forecast_split_gap(country: str,
                     line=dict(color="rgba(90,90,90,0.30)", width=1, dash="dot")
                 )
     else:
-        fig.update_xaxes(tickmode="linear", dtick=1, showgrid=False, title_text="", row=1, col=2)
+        fig.update_xaxes(tickmode="linear", dtick=1, tickangle=0,
+                         showgrid=False, title_text="", row=1, col=2)
 
-    # ── Shared styling ────────────────────────────────────────────────────────
     fig.update_yaxes(showgrid=False, title_text="")
 
     fig.update_layout(
@@ -394,8 +390,8 @@ def _plot_forecast_split_gap(country: str,
         hoverlabel=dict(bgcolor="white", font_size=12, font_color="black"),
         margin=dict(l=10, r=10, t=60, b=10),
         height=520,
-        xaxis=dict(tickfont=dict(size=10)),   # left ticks smaller
-        xaxis2=dict(tickfont=dict(size=12))   # right ticks slightly larger
+        xaxis=dict(tickfont=dict(size=10)),    # left tick labels smaller
+        xaxis2=dict(tickfont=dict(size=12))    # right tick labels slightly larger
     )
     return fig
     
