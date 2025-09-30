@@ -1008,14 +1008,12 @@ with tab_eda:
                         title=map_title,
                     )
             
-                    # Nice hover: show exact capex and the bin
+
+                    # Nice hover: show only country + exact capex (no bin)
+                    hover_capex = map_df["capex"].astype(float)
                     fig.update_traces(
-                        hovertemplate=(
-                            "Country: %{location}"
-                            "<br>Capex: %{customdata:,.0f} $B"
-                            "<br>Bin: %{z}<extra></extra>"
-                        ),
-                        customdata=map_df["capex"].values.reshape(-1, 1)
+                        hovertemplate="Country: %{location}<br>Capex: %{customdata:,.0f} $B<extra></extra>",
+                        customdata=hover_capex.values.reshape(-1, 1)
                     )
             
                     # Legend label
