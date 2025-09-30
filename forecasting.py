@@ -300,104 +300,86 @@ def _refit_and_forecast_full(best_model: dict, endog_log: pd.Series,
 
 # ── plotting (split, gap, custom ticks, start_year) ──────────────────────────
 
-def _plot_forecast_split_gap(country: str,
-                             actual: pd.Series,
-                             future_idx: pd.Index,
-                             future_pred: pd.Series,
-                             best_name: str,
-                             rmse: float,
-                             start_year: int = 2015):
+def _plot_forecast_unified(country: str,
+                           actual: pd.Series,
+                           future_idx: pd.Index,
+                           future_pred: pd.Series,
+                           best_name: str,
+                           rmse: float,
+                           start_year: int = 2015):
     """
-    Split view with uniform x-axis styling:
-      • Left: history start_year–2023
-      • Right: forecast 2025–2028
-      • Both x-axes use 'category' so year ticks are equally spaced and same size.
-      • Slim forecast line, no markers; dotted guide across the gap.
+    Single-axis design (like your reference):
+      • Solid blue for history (start_year–2023)
+      • Dashed blue for forecast (2025–2028)
+      • One shared x-axis with equal year spacing; horizontal labels
+      • No markers; horizontal gridlines on Y only
     """
-    fig = make_subplots(
-        rows=1, cols=2, shared_yaxes=True,
-        horizontal_spacing=0.006,       # close but readable
-        column_widths=[0.50, 0.50]      # equal widths → equal visual spacing
-    )
+    # Prepare series
+    hist_years = [int(y) for y in actual.index if int(y) >= start_year and int(y) <= 2023]
+    hist_vals  = [float(actual.loc[y]) for y in hist_years]
 
-    # ── LEFT: actual history (start_year–2023) ────────────────────────────────
-    left_x = [y for y in actual.index.astype(int) if start_year <= y <= 2023]
-    if left_x:
-        left_y = [float(actual.loc[y]) for y in left_x]
+    f_years = list(map(int, future_idx.values)) if len(future_idx) > 0 else []
+    f_vals  = list(map(float, future_pred.values)) if f_years else []
+
+    # Build figure (single subplot)
+    fig = make_subplots(rows=1, cols=1)
+
+    # Solid history line
+    if hist_years:
         fig.add_trace(
             go.Scatter(
-                x=[str(y) for y in left_x],  # category axis
-                y=left_y,
+                x=hist_years, y=hist_vals,
                 mode="lines",
-                line=dict(color="rgba(90,90,90,0.70)", width=1.6),
+                line=dict(color="#1f77b4", width=2.2, shape="linear"),
                 name=f"Actual ({start_year}–2023)",
                 hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
                 showlegend=False
-            ),
-            row=1, col=1
+            )
         )
 
-    # Category axis → equal spacing per year, horizontal labels
-    fig.update_xaxes(
-        type="category",
-        categoryorder="array",
-        categoryarray=[str(y) for y in left_x] if left_x else [],
-        tickangle=0,
-        showgrid=False,
-        title_text="",
-        row=1, col=1
-    )
-
-    # ── RIGHT: forecast only (2025–2028) ──────────────────────────────────────
-    right_x = list(map(int, future_idx.values)) if len(future_idx) > 0 else []
-    if right_x:
-        right_y = list(map(float, future_pred.values))
+    # Dashed forecast line (starts at 2025)
+    if f_years:
         fig.add_trace(
             go.Scatter(
-                x=[str(y) for y in right_x],  # category axis
-                y=right_y,
+                x=f_years, y=f_vals,
                 mode="lines",
-                line=dict(color="#0D2A52", width=2.2, shape="linear"),
+                line=dict(color="#1f77b4", width=2.2, dash="dash", shape="linear"),
                 name="Forecast (2025–2028)",
                 hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
                 showlegend=False
-            ),
-            row=1, col=2
+            )
         )
+
+    # X-axis span & ticks
+    xmin_candidates = []
+    xmax_candidates = []
+    if hist_years: xmin_candidates.append(min(hist_years)); xmax_candidates.append(max(hist_years))
+    if f_years:    xmin_candidates.append(min(f_years));    xmax_candidates.append(max(f_years))
+    if not xmin_candidates:  # fallback
+        xmin, xmax = start_year, 2028
+    else:
+        xmin, xmax = min(xmin_candidates), max(xmax_candidates)
+
+    # Choose nice dtick (5-year ticks like the reference)
+    dtick = 5
 
     fig.update_xaxes(
-        type="category",
-        categoryorder="array",
-        categoryarray=[str(y) for y in right_x] if right_x else [],
-        tickangle=0,
-        showgrid=False,
-        title_text="",
-        row=1, col=2
+        tickmode="linear", dtick=dtick, tickangle=0,
+        range=[xmin - 0.5, xmax + 0.5],
+        showgrid=False, title_text=""
     )
 
-    # ── Subtle continuity guide across the gap (last actual value) ───────────
-    if left_x:
-        last_hist_val = float(actual.loc[left_x[-1]])
-        d1 = fig.layout.xaxis.domain
-        d2 = fig.layout.xaxis2.domain
-        fig.add_shape(
-            type="line",
-            xref="paper", yref="y",
-            x0=d1[1], x1=d2[0],
-            y0=last_hist_val, y1=last_hist_val,
-            line=dict(color="rgba(90,90,90,0.30)", width=1, dash="dot")
-        )
+    # Y-axis: show horizontal gridlines only
+    fig.update_yaxes(showgrid=True, title_text="", zeroline=False)
 
-    # ── Shared styling ────────────────────────────────────────────────────────
-    fig.update_yaxes(showgrid=False, title_text="")
     fig.update_layout(
         title=f"{best_name} Forecast for {country} | RMSE: {rmse:.2f} $B",
         hovermode="x",
         hoverlabel=dict(bgcolor="white", font_size=12, font_color="black"),
         margin=dict(l=10, r=10, t=60, b=10),
         height=520,
-        xaxis=dict(tickfont=dict(size=12)),   # same size on both panels
-        xaxis2=dict(tickfont=dict(size=12))
+        xaxis=dict(tickfont=dict(size=12)),
+        yaxis=dict(tickfont=dict(size=12))
     )
     return fig
 
