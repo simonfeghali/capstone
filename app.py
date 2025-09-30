@@ -1012,7 +1012,7 @@ with tab_eda:
                     # Nice hover: show only country + exact capex (no bin)
                     hover_capex = map_df["capex"].astype(float)
                     fig.update_traces(
-                        hovertemplate="Country: %{location}<br>Capex: %{customdata:,.0f} $B<extra></extra>",
+                        hovertemplate="Country: %{location}<br>Capex: %{customdata:,.3f} $B<extra></extra>",
                         customdata=hover_capex.values.reshape(-1, 1)
                     )
             
