@@ -976,9 +976,28 @@ with tab_eda:
             map_title = "CAPEX Map — All Years"
         if map_df.empty: st.info("No CAPEX data for this selection.")
         else:
-            fig = px.choropleth(map_df,locations="country",locationmode="country names",color="capex",color_continuous_scale="Blues",title=map_title,)
-            fig.update_traces(hovertemplate="Country: %{location}<br>Capex: %{z:,.0f} $B<extra></extra>")
-            fig.update_coloraxes(showscale=True)
+            # Define bands
+            bins   = [-0.1, 1, 5, 10, 25, 50, 100, np.inf]   # billions
+            labels = ["≤1", "1–5", "5–10", "10–25", "25–50", "50–100", ">100"]
+            map_df["capex_band"] = pd.cut(map_df["capex"], bins=bins, labels=labels)
+            # Discrete choropleth
+            fig = px.choropleth(
+                map_df,
+                locations="country",
+                locationmode="country names",
+                color="capex_band",
+                title=map_title,
+                color_discrete_sequence=px.colors.sequential.Blues
+            )
+            fig.update_traces(
+                hovertemplate="Country: %{location}<br>Capex Band: %{z}<extra></extra>"
+            )
+            # Cleaner legend
+            fig.update_layout(
+                legend_title_text="Capex ($B)",
+                margin=dict(l=10, r=10, t=60, b=10),
+                height=420
+            )
             scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
                          "North America":"north america","South America":"south america",
                          "Oceania":"world","All":"world"}
