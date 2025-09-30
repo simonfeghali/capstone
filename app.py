@@ -985,8 +985,7 @@ with tab_eda:
             current_scope = scope_map.get(sel_cont, "world")
             fig.update_geos(scope=current_scope, projection_type="natural earth",
                             showcountries=True, showcoastlines=True,
-                            landcolor="white", bgcolor="white")
-            if sel_cont != "All" or sel_country != "All": fig.update_geos(fitbounds="locations")
+                            landcolor="white", bgcolor="white", fitbounds="locations")
             fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420,
                               paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig, use_container_width=True)
