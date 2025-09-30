@@ -977,9 +977,17 @@ with tab_eda:
         if map_df.empty: st.info("No CAPEX data for this selection.")
         else:
             # Define bands
-            bins   = [-0.1, 1, 5, 10, 25, 50, 100, np.inf]   # billions
-            labels = ["≤1", "1–5", "5–10", "10–25", "25–50", "50–100", ">100"]
+            map_df["capex"] = pd.to_numeric(map_df["capex"], errors="coerce")
+            bins   = [0, 1, 5, 10, 25, 50, 100, np.inf]   # billions
+            labels = ["<=1","1-5","5-10","10-25","25-50","50-100",">100"]
             map_df["capex_band"] = pd.cut(map_df["capex"], bins=bins, labels=labels)
+            mask_pos = map_df["capex"] > 0
+            map_df.loc[~mask_pos, "capex_band"] = "No Data"
+            map_df.loc[mask_pos, "capex_band"] = pd.cut(
+                map_df.loc[mask_pos, "capex"], bins=bins, labels=labels, include_lowest=True
+            ).astype(str)
+            # Build customdata: [raw_capex, band_label]
+            custom = np.c_[map_df["capex"].values, map_df["capex_band"].values]
             # Discrete choropleth
             fig = px.choropleth(
                 map_df,
@@ -987,15 +995,24 @@ with tab_eda:
                 locationmode="country names",
                 color="capex_band",
                 title=map_title,
-                color_discrete_sequence=px.colors.sequential.Blues,
-                category_orders={"capex_band": labels}
+                category_orders={"capex_band": ["No Data"] + labels},
+                color_discrete_map={"No Data": "#e0e0e0"},   # grey for no data
             )
-            # Show both raw value and band in hover
+            # Use customdata explicitly; avoid %{z}
             fig.update_traces(
-                customdata=np.array(map_df["capex"], dtype=float),
-                hovertemplate="Country: %{location}"
-                              "<br>Capex: %{customdata:,.0f} $B"
-                              "<br>Band: %{z}<extra></extra>"
+                customdata=custom,
+                hovertemplate=(
+                    "Country: %{location}"
+                    "<br>Capex: %{customdata[0]:,.0f} $B"
+                    "<br>Band: %{customdata[1]}<extra></extra>"
+                )
+            )
+            fig.update_geos(
+                scope=current_scope,
+                projection_type="natural earth",
+                showcountries=True, showcoastlines=True,
+                landcolor="white", bgcolor="white",
+                fitbounds="locations"
             )
             # Cleaner legend
             fig.update_layout(
@@ -1007,11 +1024,6 @@ with tab_eda:
                          "North America":"north america","South America":"south america",
                          "Oceania":"world","All":"world"}
             current_scope = scope_map.get(sel_cont, "world")
-            fig.update_geos(scope=current_scope, projection_type="natural earth",
-                            showcountries=True, showcoastlines=True,
-                            landcolor="white", bgcolor="white", fitbounds="locations")
-            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420,
-                              paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig, use_container_width=True)
 
     # Grade views
