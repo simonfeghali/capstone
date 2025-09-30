@@ -979,47 +979,37 @@ with tab_eda:
 
 
     with e2:
-                # 1) Build a dataframe with ONE normalized column in $B
+                # Build a base slice (respecting your filters already applied to capx_eda)
+                base = capx_eda.copy()
                 if isinstance(sel_year_any, int):
-                    tmp = capx_enriched.copy()
-                    if sel_cont != "All":    tmp = tmp[tmp["continent"] == sel_cont]
-                    if sel_country != "All": tmp = tmp[tmp["country"] == sel_country]
-                    tmp = tmp[tmp["year"] == sel_year_any]
-                else:
-                    tmp = capx_enriched.copy()
-                    if sel_cont != "All":    tmp = tmp[tmp["continent"] == sel_cont]
-                    if sel_country != "All": tmp = tmp[tmp["country"] == sel_country]
-            
-                # Detect units and normalize to billions exactly once
-                # (Assumes raw is either millions or billions)
-                raw_cap = pd.to_numeric(tmp["capex"], errors="coerce")
-                if raw_cap.max() >= 10_000:          # e.g., >= $10,000M → likely in millions
-                    tmp["capex_b"] = raw_cap / 1000  # → billions
-                else:
-                    tmp["capex_b"] = raw_cap         # already billions
-            
-                # Aggregate for "All years"
-                if isinstance(sel_year_any, int):
-                    map_df = tmp[["country", "capex_b"]].groupby("country", as_index=False)["capex_b"].sum()
+                    base = base[base["year"] == sel_year_any]
                     map_title = f"CAPEX Map — {sel_year_any}"
                 else:
-                    map_df = tmp[["country", "capex_b"]].groupby("country", as_index=False)["capex_b"].sum()
                     map_title = "CAPEX Map — All Years"
             
-                if map_df.empty:
+                # IMPORTANT: always aggregate to ONE ROW per country (this is what color/legend should reflect)
+                # Use the billions column if you created it; otherwise replace "capex_b" with "capex" as appropriate.
+                # (capex_b should be the same units you want to show and to bin on)
+                agg = (base.groupby("country", as_index=False)["capex_b"]
+                            .sum(min_count=1)
+                            .rename(columns={"capex_b": "capex_b"}))
+            
+                if agg.empty:
                     st.info("No CAPEX data for this selection.")
                 else:
-                    # 2) Bin using the SAME normalized series
-                    map_df["capex_bin"] = _capex_bin_series(map_df["capex_b"])
-            
-                    # 3) Colors for the 5 bins (light → dark)
-                    blues  = px.colors.sequential.Blues
+                    # Make bins from the SAME aggregated series
                     labels = ["< 1", "1–5", "5–20", "20–100", "100+"]
+                    bins   = [-np.inf, 1, 5, 20, 100, np.inf]
+                    agg["capex_bin"] = pd.cut(agg["capex_b"], bins=bins, labels=labels, right=False)
+                    agg["capex_bin"] = agg["capex_bin"].cat.set_categories(labels, ordered=True)
+            
+                    # Blues scale for 5 bins (light -> dark)
+                    blues  = px.colors.sequential.Blues
                     shades = [blues[2], blues[4], blues[6], blues[8], blues[-1]]
                     cmap   = dict(zip(labels, shades))
             
                     fig = px.choropleth(
-                        map_df,
+                        agg,
                         locations="country",
                         locationmode="country names",
                         color="capex_bin",
@@ -1028,29 +1018,22 @@ with tab_eda:
                         title=map_title,
                     )
             
-                    # 4) Hover uses the SAME normalized series (capex_b)
+                    # HOVER: read ONLY the same aggregated billions series
                     fig.update_traces(
-                        hovertemplate="Country: %{location}<br>Capex: %{customdata:,.2f} $B<extra></extra>",
-                        customdata=map_df[["capex_b"]].values
+                        customdata=agg[["capex_b"]].values,
+                        hovertemplate="Country: %{location}<br>Capex: %{customdata:,.2f} $B<extra></extra>"
                     )
                     fig.update_layout(legend_title_text="Capex ($B)")
             
-                    # 5) Geo styling and scope
-                    scope_map = {
-                        "Africa": "africa", "Asia": "asia", "Europe": "europe",
-                        "North America": "north america", "South America": "south america",
-                        "Oceania": "world", "All": "world"
-                    }
+                    scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
+                                 "North America":"north america","South America":"south america",
+                                 "Oceania":"world","All":"world"}
                     current_scope = scope_map.get(sel_cont, "world")
-                    fig.update_geos(
-                        scope=current_scope,
-                        projection_type="natural earth",
-                        showcountries=True, showcoastlines=True,
-                        landcolor="white", bgcolor="white"
-                    )
+                    fig.update_geos(scope=current_scope, projection_type="natural earth",
+                                    showcountries=True, showcoastlines=True,
+                                    landcolor="white", bgcolor="white")
                     if sel_cont != "All" or sel_country != "All":
                         fig.update_geos(fitbounds="locations")
-            
                     fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420,
                                       paper_bgcolor="white", plot_bgcolor="white")
                     st.plotly_chart(fig, use_container_width=True)
