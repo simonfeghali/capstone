@@ -977,17 +977,21 @@ with tab_eda:
         if map_df.empty: st.info("No CAPEX data for this selection.")
         else:
             # Define bands
+            # Ensure numeric
+            map_df = map_df.copy()
             map_df["capex"] = pd.to_numeric(map_df["capex"], errors="coerce")
             bins   = [0, 1, 5, 10, 25, 50, 100, np.inf]   # billions
             labels = ["<=1","1-5","5-10","10-25","25-50","50-100",">100"]
-            map_df["capex_band"] = pd.cut(map_df["capex"], bins=bins, labels=labels)
-            mask_pos = map_df["capex"] > 0
-            map_df.loc[~mask_pos, "capex_band"] = "No Data"
-            map_df.loc[mask_pos, "capex_band"] = pd.cut(
-                map_df.loc[mask_pos, "capex"], bins=bins, labels=labels, include_lowest=True
+            # start as strings (object dtype) so assigning "No Data" is safe
+            map_df["capex_band"] = "No Data"
+            mask = map_df["capex"] > 0
+            map_df.loc[mask, "capex_band"] = pd.cut(
+                map_df.loc[mask, "capex"],
+                bins=bins, labels=labels, include_lowest=True
             ).astype(str)
-            # Build customdata: [raw_capex, band_label]
-            custom = np.c_[map_df["capex"].values, map_df["capex_band"].values]
+            # customdata for clean hover (format NaN/≤0 as "-")
+            capex_str = map_df["capex"].apply(lambda v: "-" if (pd.isna(v) or v <= 0) else f"{v:,.0f}")
+            custom = np.c_[capex_str.values, map_df["capex_band"].values]
             # Discrete choropleth
             fig = px.choropleth(
                 map_df,
