@@ -330,12 +330,12 @@ def _plot_forecast_split_gap(country: str,
             )
             fig.update_xaxes(
                 tickmode="linear", tick0=2004, dtick=3,
-                tickangle=90,                     # left vertical (history squeezed)
+                tickangle=0,                     # left vertical (history squeezed)
                 range=[min(left_x) - 0.5, max(left_x) + 0.5],
                 showgrid=False, title_text="", row=1, col=1
             )
         else:
-            fig.update_xaxes(tickmode="linear", tick0=2004, dtick=3, tickangle=90,
+            fig.update_xaxes(tickmode="linear", tick0=2004, dtick=3, tickangle=0,
                              showgrid=False, title_text="", row=1, col=1)
 
     # RIGHT: forecast only (2025–2028)
