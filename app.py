@@ -603,7 +603,8 @@ with tab_scoring:
                 fig_map.update_geos(scope=current_scope, projection_type="natural earth",
                                     showcountries=True, showcoastlines=True,
                                     landcolor="white", bgcolor="white")
-                fig_map.update_geos(fitbounds="locations")
+                if sel_cont_sc != "All" or sel_country_sc != "All":
+                    fig_map.update_geos(fitbounds="locations")
                 fig_map.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=410,
                                       paper_bgcolor="white", plot_bgcolor="white")
                 st.plotly_chart(fig_map, use_container_width=True)
@@ -976,58 +977,19 @@ with tab_eda:
             map_title = "CAPEX Map — All Years"
         if map_df.empty: st.info("No CAPEX data for this selection.")
         else:
-            # Define bands
-            # Ensure numeric
-            map_df = map_df.copy()
-            map_df["capex"] = pd.to_numeric(map_df["capex"], errors="coerce")
-            bins   = [0, 1, 5, 10, 25, 50, 100, np.inf]   # billions
-            labels = ["<=1","1-5","5-10","10-25","25-50","50-100",">100"]
-            # start as strings (object dtype) so assigning "No Data" is safe
-            map_df["capex_band"] = "No Data"
-            mask = map_df["capex"] > 0
-            map_df.loc[mask, "capex_band"] = pd.cut(
-                map_df.loc[mask, "capex"],
-                bins=bins, labels=labels, include_lowest=True
-            ).astype(str)
-            # customdata for clean hover (format NaN/≤0 as "-")
-            capex_str = map_df["capex"].apply(lambda v: "-" if (pd.isna(v) or v <= 0) else f"{v:,.0f}")
-            custom = np.c_[capex_str.values, map_df["capex_band"].values]
-            # Discrete choropleth
-            fig = px.choropleth(
-                map_df,
-                locations="country",
-                locationmode="country names",
-                color="capex_band",
-                title=map_title,
-                category_orders={"capex_band": ["No Data"] + labels},
-                color_discrete_map={"No Data": "#e0e0e0"},   # grey for no data
-            )
-            # Use customdata explicitly; avoid %{z}
-            fig.update_traces(
-                customdata=custom,
-                hovertemplate=(
-                    "Country: %{location}"
-                    "<br>Capex: %{customdata[0]:,.0f} $B"
-                    "<br>Band: %{customdata[1]}<extra></extra>"
-                )
-            )
-            fig.update_geos(
-                scope=current_scope,
-                projection_type="natural earth",
-                showcountries=True, showcoastlines=True,
-                landcolor="white", bgcolor="white",
-                fitbounds="locations"
-            )
-            # Cleaner legend
-            fig.update_layout(
-                legend_title_text="Capex ($B)",
-                margin=dict(l=10, r=10, t=60, b=10),
-                height=420
-            )
+            fig = px.choropleth(map_df,locations="country",locationmode="country names",color="capex",color_continuous_scale="Blues",title=map_title,)
+            fig.update_traces(hovertemplate="Country: %{location}<br>Capex: %{z:,.0f} $B<extra></extra>")
+            fig.update_coloraxes(showscale=True)
             scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
                          "North America":"north america","South America":"south america",
                          "Oceania":"world","All":"world"}
             current_scope = scope_map.get(sel_cont, "world")
+            fig.update_geos(scope=current_scope, projection_type="natural earth",
+                            showcountries=True, showcoastlines=True,
+                            landcolor="white", bgcolor="white")
+            if sel_cont != "All" or sel_country != "All": fig.update_geos(fitbounds="locations")
+            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420,
+                              paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig, use_container_width=True)
 
     # Grade views
