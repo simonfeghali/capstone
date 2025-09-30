@@ -327,32 +327,32 @@ def _plot_forecast_unified(country: str,
     # Build figure
     fig = make_subplots(rows=1, cols=1)
 
-    # History — solid blue
+    # History — light grey
     if hist_years:
         fig.add_trace(
             go.Scatter(
                 x=hist_years, y=hist_vals,
                 mode="lines",
-                line=dict(color="#1f77b4", width=2.2, shape="linear"),
+                line=dict(color="rgba(120,120,120,0.75)", width=2.0, shape="linear"),
                 name=f"Actual ({start_year}–2023)",
                 hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
                 showlegend=False,
             )
         )
-
-    # Forecast — dashed blue (starts at 2025)
+    
+    # Forecast — dark blue (dashed)
     if f_years:
         fig.add_trace(
             go.Scatter(
                 x=f_years, y=f_vals,
                 mode="lines",
-                line=dict(color="#1f77b4", width=2.2, dash="dash", shape="linear"),
+                line=dict(color="#0D2A52", width=2.4, dash="dash", shape="linear"),
                 name="Forecast (2025–2028)",
                 hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
                 showlegend=False,
             )
         )
-
+        
     # X span = full selected range (every year tick)
     xmin_candidates, xmax_candidates = [start_year], []
     if hist_years: xmax_candidates.append(max(hist_years))
@@ -429,14 +429,21 @@ def render_forecasting_tab():
     )
 
     # History window controls
-    Toggle = getattr(st, "toggle", st.checkbox)  # fallback for older Streamlit
-    show_more_hist = Toggle("Show earlier history", value=False, help="Reveal older historical years.")
+    Toggle = getattr(st, "toggle", st.checkbox)
+    show_more_hist = Toggle(
+        "Show earlier history",
+        value=False,
+        help="Drag the left handle to include earlier years."
+    )
+    
     if show_more_hist:
-        start_year = st.slider(
-            "Start year for history",
-            min_value=2004, max_value=2023, value=2010, step=1,
-            help="Choose how far back to show."
+        yr_start, yr_end = st.slider(
+            "Years shown (x-axis)",
+            min_value=2004, max_value=2028,
+            value=(2015, 2028), step=1,
+            help="Left handle controls the history start. Forecast years (2025–2028) are at the right end."
         )
+        start_year = int(yr_start)
     else:
         start_year = 2015
 
