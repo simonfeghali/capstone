@@ -1,11 +1,11 @@
 # forecasting.py
 # ─────────────────────────────────────────────────────────────────────────────
-# Split view:
-# - Left (smaller): 2004–2023 actuals, thin/light
-#   * X ticks every 3 years, rotated 90°
-# - Right (larger): 2025–2028 forecast, bold with markers
-# - No shaded area, no connection between panels
-# - Panels are close together
+# Split view with compact history by default:
+# - Default left panel shows 2015–2023 actuals (thin/light, horizontal ticks)
+# - Toggle reveals a slider to show older history (min 2004)
+# - Right panel shows 2025–2028 forecast (slim line, no markers, tight ticks)
+# - Subtle dotted guide across the gap (no actual connection)
+# - Panels close together
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -298,57 +298,68 @@ def _refit_and_forecast_full(best_model: dict, endog_log: pd.Series,
     future = pd.Series(np.exp(future_log).values / 1000.0, index=future_index, name="forecast")
     return future
 
-# ── plotting (split, gap, custom ticks) ──────────────────────────────────────
+# ── plotting (split, gap, custom ticks, start_year) ──────────────────────────
 
 def _plot_forecast_split_gap(country: str,
                              actual: pd.Series,
                              future_idx: pd.Index,
                              future_pred: pd.Series,
                              best_name: str,
-                             rmse: float):
-
+                             rmse: float,
+                             start_year: int = 2015):
+    """
+    Two subplots share Y:
+      • Left (smaller): actuals start_year–2023, thin/light, horizontal ticks
+      • Right (larger): forecast 2025–2028, clean slim line (no markers)
+      • No connecting line; subtle dotted guide at last actual value across the gap
+    """
     fig = make_subplots(
         rows=1, cols=2, shared_yaxes=True,
-        horizontal_spacing=0.002,          # tighter gap
-        column_widths=[0.44, 0.56]         # right panel narrower → ticks feel closer
+        horizontal_spacing=0.002,          # tight gap
+        column_widths=[0.44, 0.56]         # slightly wider forecast panel
     )
 
-    # LEFT: actual history (2004–2023)
+    # LEFT: history from start_year..2023 (squeezed)
     if len(actual) > 0:
-        left_x = [y for y in actual.index.astype(int) if 2004 <= y <= 2023]
-        left_y = [actual.loc[y] for y in left_x]
+        left_x_all = actual.index.astype(int)
+        left_x = [y for y in left_x_all if start_year <= y <= 2023]
+        left_y = [actual.loc[y] for y in left_x] if left_x else []
+
         if left_x:
             fig.add_trace(
                 go.Scatter(
                     x=left_x, y=left_y, mode="lines",
                     line=dict(color="rgba(90,90,90,0.70)", width=1.6),
-                    name="Actual (2004–2023)",
+                    name=f"Actual ({start_year}–2023)",
                     hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
                     showlegend=False
                 ),
                 row=1, col=1
             )
+            span = max(1, max(left_x) - min(left_x))
+            dtick = 1 if span <= 6 else (2 if span <= 12 else 3)
             fig.update_xaxes(
-                tickmode="linear", tick0=2004, dtick=3,
-                tickangle=0,                     # left vertical (history squeezed)
+                tickmode="linear", tick0=min(left_x), dtick=dtick,
+                tickangle=0,  # horizontal labels
                 range=[min(left_x) - 0.5, max(left_x) + 0.5],
                 showgrid=False, title_text="", row=1, col=1
             )
         else:
-            fig.update_xaxes(tickmode="linear", tick0=2004, dtick=3, tickangle=0,
-                             showgrid=False, title_text="", row=1, col=1)
+            fig.update_xaxes(
+                tickmode="linear", tick0=start_year, dtick=3,
+                tickangle=0, showgrid=False, title_text="", row=1, col=1
+            )
 
-    # RIGHT: forecast only (2025–2028)
+    # RIGHT: forecast only (2025–2028), dominant but clean
     if len(future_idx) > 0:
         right_x = list(map(int, future_idx.values))
         right_y = list(map(float, future_pred.values))
 
-        # slim, clean line (no markers)
         fig.add_trace(
             go.Scatter(
                 x=right_x, y=right_y,
                 mode="lines",
-                line=dict(color="#0D2A52", width=2.2, shape="linear"),
+                line=dict(color="#0D2A52", width=2.2, shape="linear"),  # slim, no markers
                 name="Forecast (2025–2028)",
                 hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
                 showlegend=False
@@ -356,19 +367,19 @@ def _plot_forecast_split_gap(country: str,
             row=1, col=2
         )
 
-        # make ticks feel closer: very small side margins, horizontal labels
+        # tight ticks & minimal margins so years feel closer
         fig.update_xaxes(
             tickmode="linear", tick0=right_x[0], dtick=1,
-            tickangle=0,                        # right horizontal
-            range=[min(right_x) - 0.05, max(right_x) + 0.05],  # tighter than before
+            tickangle=0,
+            range=[min(right_x) - 0.05, max(right_x) + 0.05],
             showgrid=False, title_text="", row=1, col=2
         )
 
-        # subtle continuity guide at last historical value across the gap
+        # subtle continuity guide at the last historical value across the gap
         if len(actual) > 0:
-            last_hist_years = [y for y in actual.index.astype(int) if y <= 2023]
-            if last_hist_years:
-                last_hist_val = float(actual.loc[last_hist_years[-1]])
+            hist_before = [y for y in actual.index.astype(int) if y <= 2023]
+            if hist_before:
+                last_hist_val = float(actual.loc[hist_before[-1]])
                 d1 = fig.layout.xaxis.domain
                 d2 = fig.layout.xaxis2.domain
                 fig.add_shape(
@@ -382,19 +393,19 @@ def _plot_forecast_split_gap(country: str,
         fig.update_xaxes(tickmode="linear", dtick=1, tickangle=0,
                          showgrid=False, title_text="", row=1, col=2)
 
+    # Shared styling
     fig.update_yaxes(showgrid=False, title_text="")
-
     fig.update_layout(
         title=f"{best_name} Forecast for {country} | RMSE: {rmse:.2f} $B",
         hovermode="x",
         hoverlabel=dict(bgcolor="white", font_size=12, font_color="black"),
         margin=dict(l=10, r=10, t=60, b=10),
         height=520,
-        xaxis=dict(tickfont=dict(size=12)),    # left tick labels smaller
-        xaxis2=dict(tickfont=dict(size=12))    # right tick labels slightly larger
+        xaxis=dict(tickfont=dict(size=12)),   # bigger left labels
+        xaxis2=dict(tickfont=dict(size=14))   # bigger right labels
     )
     return fig
-    
+
 # ── public entrypoint ────────────────────────────────────────────────────────
 
 def render_forecasting_tab():
@@ -436,8 +447,21 @@ def render_forecasting_tab():
         best, prep["endog_log"], prep["exog_full"], prep["future_index"], prep["future_exog"]
     )
 
+    # ── history window controls (default = compact view 2015–2023)
+    # If your Streamlit version doesn't have st.toggle, replace with st.checkbox.
+    show_more_hist = st.toggle("Show earlier history", value=False, help="Toggle to reveal older history.")
+    if show_more_hist:
+        start_year = st.slider(
+            "Start year for historical panel",
+            min_value=2004, max_value=2023, value=2010, step=1,
+            help="Choose how far back to show on the left panel."
+        )
+    else:
+        start_year = 2015
+
     fig = _plot_forecast_split_gap(
-        sel_country, prep["capex_actual"], prep["future_index"], future_pred, best_name, best["rmse"]
+        sel_country, prep["capex_actual"], prep["future_index"], future_pred, best_name, best["rmse"],
+        start_year=start_year
     )
     st.plotly_chart(fig, use_container_width=True)
 
