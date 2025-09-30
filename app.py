@@ -62,15 +62,6 @@ def _b64_png(path_or_url) -> str:
         return base64.b64encode(data).decode("ascii")
     except Exception:
         return ""
-def _capex_bin_series(s: pd.Series) -> pd.Series:
-    """Return categorical bins for CAPEX in $B."""
-    bins   = [-np.inf, 1, 5, 20, 100, np.inf]
-    labels = ["< 1", "1–5", "5–20", "20–100", "100+"]
-    # right=False makes intervals like [1,5)
-    out = pd.cut(s.astype(float), bins=bins, labels=labels, right=False, include_lowest=True)
-    # Ensure consistent category order even if some bins are missing in the slice
-    out = out.cat.set_categories(labels, ordered=True)
-    return out
 
 # Build header HTML with left icon, centered title, and right logo
 logo_b64 = _b64_img(ROOT / LOGO_FILE)
@@ -979,65 +970,27 @@ with tab_eda:
 
 
     with e2:
-                # Build a base slice (respecting your filters already applied to capx_eda)
-                base = capx_eda.copy()
-                if isinstance(sel_year_any, int):
-                    base = base[base["year"] == sel_year_any]
-                    map_title = f"CAPEX Map — {sel_year_any}"
-                else:
-                    map_title = "CAPEX Map — All Years"
-            
-                # IMPORTANT: always aggregate to ONE ROW per country (this is what color/legend should reflect)
-                # Use the billions column if you created it; otherwise replace "capex_b" with "capex" as appropriate.
-                # (capex_b should be the same units you want to show and to bin on)
-                agg = (base.groupby("country", as_index=False)["capex_b"]
-                            .sum(min_count=1)
-                            .rename(columns={"capex_b": "capex_b"}))
-            
-                if agg.empty:
-                    st.info("No CAPEX data for this selection.")
-                else:
-                    # Make bins from the SAME aggregated series
-                    labels = ["< 1", "1–5", "5–20", "20–100", "100+"]
-                    bins   = [-np.inf, 1, 5, 20, 100, np.inf]
-                    agg["capex_bin"] = pd.cut(agg["capex_b"], bins=bins, labels=labels, right=False)
-                    agg["capex_bin"] = agg["capex_bin"].cat.set_categories(labels, ordered=True)
-            
-                    # Blues scale for 5 bins (light -> dark)
-                    blues  = px.colors.sequential.Blues
-                    shades = [blues[2], blues[4], blues[6], blues[8], blues[-1]]
-                    cmap   = dict(zip(labels, shades))
-            
-                    fig = px.choropleth(
-                        agg,
-                        locations="country",
-                        locationmode="country names",
-                        color="capex_bin",
-                        color_discrete_map=cmap,
-                        category_orders={"capex_bin": labels},
-                        title=map_title,
-                    )
-            
-                    # HOVER: read ONLY the same aggregated billions series
-                    fig.update_traces(
-                        customdata=agg[["capex_b"]].values,
-                        hovertemplate="Country: %{location}<br>Capex: %{customdata:,.2f} $B<extra></extra>"
-                    )
-                    fig.update_layout(legend_title_text="Capex ($B)")
-            
-                    scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
-                                 "North America":"north america","South America":"south america",
-                                 "Oceania":"world","All":"world"}
-                    current_scope = scope_map.get(sel_cont, "world")
-                    fig.update_geos(scope=current_scope, projection_type="natural earth",
-                                    showcountries=True, showcoastlines=True,
-                                    landcolor="white", bgcolor="white")
-                    if sel_cont != "All" or sel_country != "All":
-                        fig.update_geos(fitbounds="locations")
-                    fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420,
-                                      paper_bgcolor="white", plot_bgcolor="white")
-                    st.plotly_chart(fig, use_container_width=True)
-
+        if isinstance(sel_year_any, int):
+            map_df = capx_eda.copy(); map_title = f"CAPEX Map — {sel_year_any}"
+        else:
+            map_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
+            map_title = "CAPEX Map — All Years"
+        if map_df.empty: st.info("No CAPEX data for this selection.")
+        else:
+            fig = px.choropleth(map_df,locations="country",locationmode="country names",color="capex",color_continuous_scale="Blues",title=map_title,)
+            fig.update_traces(hovertemplate="Country: %{location}<br>Capex: %{z:,.0f} $B<extra></extra>")
+            fig.update_coloraxes(showscale=True)
+            scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
+                         "North America":"north america","South America":"south america",
+                         "Oceania":"world","All":"world"}
+            current_scope = scope_map.get(sel_cont, "world")
+            fig.update_geos(scope=current_scope, projection_type="natural earth",
+                            showcountries=True, showcoastlines=True,
+                            landcolor="white", bgcolor="white")
+            if sel_cont != "All" or sel_country != "All": fig.update_geos(fitbounds="locations")
+            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420,
+                              paper_bgcolor="white", plot_bgcolor="white")
+            st.plotly_chart(fig, use_container_width=True)
 
     # Grade views
     show_grade_trend = (sel_grade_eda == "All")
