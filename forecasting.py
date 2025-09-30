@@ -346,7 +346,7 @@ def _plot_forecast_unified(country: str,
             go.Scatter(
                 x=f_years, y=f_vals,
                 mode="lines",
-                line=dict(color="#0D2A52", width=2.4, dash="dash", shape="linear"),
+                line=dict(color="#0D2A52", width=2.4, shape="linear"),
                 name="Forecast (2025–2028)",
                 hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
                 showlegend=False,
@@ -438,7 +438,7 @@ def render_forecasting_tab():
     
     if show_more_hist:
         yr_start, yr_end = st.slider(
-            "Years shown (x-axis)",
+            "Years",
             min_value=2004, max_value=2028,
             value=(2015, 2028), step=1,
             help="Left handle controls the history start. Forecast years (2025–2028) are at the right end."
