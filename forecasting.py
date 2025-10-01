@@ -340,18 +340,23 @@ def _plot_forecast_unified(country: str,
             )
         )
     
-    # Forecast — dark blue (dashed)
-    if f_years:
-        fig.add_trace(
-            go.Scatter(
-                x=f_years, y=f_vals,
-                mode="lines",
-                line=dict(color="#0D2A52", width=2.4, shape="linear"),
-                name="Forecast (2025–2028)",
-                hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
-                showlegend=False,
-            )
-        )
+    # Forecast — dark blue, continuous from last actual point
+            if f_years:
+                # Prepend last actual year/value so forecast line connects directly
+                if hist_years:
+                    f_years = [hist_years[-1]] + f_years
+                    f_vals  = [hist_vals[-1]]  + f_vals
+            
+                fig.add_trace(
+                    go.Scatter(
+                        x=f_years, y=f_vals,
+                        mode="lines",
+                        line=dict(color="#0D2A52", width=2.4, shape="linear"),
+                        name="Forecast (2024–2028)",
+                        hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
+                        showlegend=False,
+                    )
+                )
         
     # X span = full selected range (every year tick)
     xmin_candidates, xmax_candidates = [start_year], []
