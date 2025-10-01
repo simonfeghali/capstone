@@ -482,21 +482,38 @@ def render_forecasting_tab():
     )
 
     # History window controls
+    fixed_end = int(prep["future_index"][-1]) if len(prep["future_index"]) else 2028
+
     Toggle = getattr(st, "toggle", st.checkbox)
-    show_more_hist = Toggle(
-        "Show earlier history",
-        value=False,
-        help="Drag the left handle to include earlier years."
-    )
+    show_more_hist = Toggle("Show earlier history", value=False,
+                            help="Drag the LEFT handle. The right handle is locked at the last year.")
     
     if show_more_hist:
+        # Initialize session state once
+        if "yr_range_locked" not in st.session_state:
+            st.session_state.yr_range_locked = (2015, fixed_end)
+    
+        # Range slider UI, but we'll lock the right handle in code
         yr_start, yr_end = st.slider(
             "Years shown (x-axis)",
-            min_value=2004, max_value=2028,
-            value=(2015, 2028), step=1,
-            help="Left handle controls the history start. Forecast years (2025–2028) are at the right end."
+            min_value=2004, max_value=fixed_end,
+            value=st.session_state.yr_range_locked,
+            step=1, key="yr_range_locked"
         )
+    
+        # ---- Lock behavior ----
+        # 1) Clamp LEFT handle so it cannot go beyond 2025
+        yr_start = min(yr_start, 2025)
+    
+        # 2) Force RIGHT handle back to the fixed end if user moves it
+        if yr_end != fixed_end:
+            st.session_state.yr_range_locked = (yr_start, fixed_end)
+            yr_end = fixed_end
+        else:
+            st.session_state.yr_range_locked = (yr_start, fixed_end)
+    
         start_year = int(yr_start)
+    
     else:
         start_year = 2015
 
