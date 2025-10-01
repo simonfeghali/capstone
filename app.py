@@ -1388,19 +1388,37 @@ def load_destinations_raw() -> pd.DataFrame:
 
 def make_top_map(source_country: str, dest_list: list[str]) -> go.Figure:
     fig = go.Figure()
-    fig.add_trace(go.Scattergeo(
-        locationmode="country names",
-        locations=[source_country],
-        mode="text",
-        text=["📍"],
-        textfont=dict(size=22),
-        name="Source",
-        showlegend=False
-    ))
 
-    # Dummy trace for legend
+    is_gcc = str(source_country).strip().lower() == "gcc"
+    if is_gcc:
+        # Fill all GCC countries in red
+        fig.add_trace(go.Choropleth(
+            locations=list(GCC_MEMBERS),
+            z=[1]*len(GCC_MEMBERS),
+            locationmode="country names",
+            colorscale=[[0, "#e63946"], [1, "#e63946"]],
+            showscale=False,
+            name="Source",
+            zmin=0, zmax=1,
+            marker_line_color="white",
+            marker_line_width=0.4,
+            hoverinfo="skip",
+        ))
+    else:
+        # Single-country source: keep your red pin
+        fig.add_trace(go.Scattergeo(
+            locationmode="country names",
+            locations=[source_country],
+            mode="text",
+            text=["📍"],
+            textfont=dict(size=22),
+            name="Source",
+            showlegend=False
+        ))
+    
+    # Keep the dummy trace so "Source" appears in legend as a red marker
     fig.add_trace(go.Scattergeo(
-        lon=[None], lat=[None],  # not shown on map
+        lon=[None], lat=[None],
         mode="markers",
         marker=dict(symbol="circle", size=12, color="#e63946"),
         name="Source"
@@ -1417,16 +1435,30 @@ def make_top_map(source_country: str, dest_list: list[str]) -> go.Figure:
     return _style_geo_white(fig, height=420)
 
 def make_route_map(source_country: str, dest_country: str) -> go.Figure:
-    fig = go.Figure()
-    fig.add_trace(go.Scattergeo(
-        locationmode="country names",
-        locations=[source_country],
-        mode="text",
-        text=["📍"],
-        textfont=dict(size=22),
-        name="Source",
-        showlegend=False
-    ))
+    is_gcc = str(source_country).strip().lower() == "gcc"
+    if is_gcc:
+        fig.add_trace(go.Choropleth(
+            locations=list(GCC_MEMBERS),
+            z=[1]*len(GCC_MEMBERS),
+            locationmode="country names",
+            colorscale=[[0, "#e63946"], [1, "#e63946"]],
+            showscale=False,
+            name="Source",
+            zmin=0, zmax=1,
+            marker_line_color="white",
+            marker_line_width=0.4,
+            hoverinfo="skip",
+        ))
+    else:
+        fig.add_trace(go.Scattergeo(
+            locationmode="country names",
+            locations=[source_country],
+            mode="text",
+            text=["📍"],
+            textfont=dict(size=22),
+            name="Source",
+            showlegend=False
+        ))
 
     # Dummy trace for legend
     fig.add_trace(go.Scattergeo(
@@ -1466,9 +1498,11 @@ with tab_dest:
             src_countries,
             index=(src_countries.index(default_src) if default_src in src_countries else 0),
             key="dest_src",
-            # Display "GCC" while keeping the underlying value ("Gcc") unchanged
             format_func=lambda s: "GCC" if str(s).strip().lower() == "gcc" else s
         )
+        
+        # Use this label in every title (bar, map, KPI, route map)
+        shown_src_label = "GCC" if str(sel_src_country).strip().lower() == "gcc" else sel_src_country
 
     dest_opts_all = sorted(
         dest_df.loc[dest_df["source_country"] == sel_src_country,
@@ -1550,7 +1584,7 @@ with tab_dest:
         with right:
             top_dests = bars["destination_country"].tolist()
             fig_top_map = make_top_map(sel_src_country, top_dests)
-            fig_top_map.update_layout(title=f"Top Destinations Map — {sel_src_country}")
+            fig_top_map.update_layout(title=f"Top Destinations Map — {shown_src_label}")
             st.plotly_chart(fig_top_map, use_container_width=True)
 
     else:
@@ -1561,7 +1595,7 @@ with tab_dest:
             st.markdown(
                 f"""
                 <div class="kpi-box">
-                  <div class="kpi-title">{sel_src_country} → {sel_dest_country} • {metric_dest}</div>
+                  <div class="kpi-title">{shown_src_label} → {shown_src_label} • {metric_dest}</div>
                   <div class="kpi-number">{val:,.3f}</div>
                   <div class="kpi-sub">{unit}</div>
                 </div>
@@ -1570,7 +1604,7 @@ with tab_dest:
             )
         with right:
             fig_route = make_route_map(sel_src_country, sel_dest_country)
-            fig_route.update_layout(title=f"Route Map — {sel_src_country} → {sel_dest_country}")
+            fig_route.update_layout(title=f"Route Map — {shown_src_label} → {sel_dest_country}")
             st.plotly_chart(fig_route, use_container_width=True)
 
 with tab_compare:
