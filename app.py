@@ -1435,6 +1435,7 @@ def make_top_map(source_country: str, dest_list: list[str]) -> go.Figure:
     return _style_geo_white(fig, height=420)
 
 def make_route_map(source_country: str, dest_country: str) -> go.Figure:
+    fig = go.Figure()   # NEW — prevents reusing a previous global `fig`
     is_gcc = str(source_country).strip().lower() == "gcc"
     if is_gcc:
         fig.add_trace(go.Choropleth(
@@ -1460,14 +1461,14 @@ def make_route_map(source_country: str, dest_country: str) -> go.Figure:
             showlegend=False
         ))
 
-    # Dummy trace for legend
+    # Dummy legend entry (keep)
     fig.add_trace(go.Scattergeo(
-        lon=[None], lat=[None],  # not shown on map
+        lon=[None], lat=[None],
         mode="markers",
         marker=dict(symbol="circle", size=12, color="#e63946"),
         name="Source"
     ))
-    
+
     fig.add_trace(go.Scattergeo(
         locationmode="country names",
         locations=[dest_country],
@@ -1596,12 +1597,14 @@ with tab_dest:
                 f"""
                 <div class="kpi-box">
                   <div class="kpi-title">{shown_src_label} → {shown_src_label} • {metric_dest}</div>
+                  <div class="kpi-title">{shown_src_label} → {sel_dest_country} • {metric_dest}</div>
                   <div class="kpi-number">{val:,.3f}</div>
                   <div class="kpi-sub">{unit}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
+
         with right:
             fig_route = make_route_map(sel_src_country, sel_dest_country)
             fig_route.update_layout(title=f"Route Map — {shown_src_label} → {sel_dest_country}")
