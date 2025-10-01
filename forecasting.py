@@ -1,13 +1,10 @@
 # forecasting.py
 # ─────────────────────────────────────────────────────────────────────────────
 # Unified chart:
-# - One x-axis from start_year → 2028
-# - Solid light grey for historical values (…–2023)
-# - 2024 is FORECASTED but drawn in light grey
-# - Solid dark blue for forecasts (2025–2028)
-# - Default start_year = 2015; toggle + slider to reveal earlier history
-# - Equal tick spacing (EVERY year tick), horizontal labels
-# - No markers; no gridlines
+# - History (…–2023) = light grey
+# - 2024 is FORECASTED but drawn in light grey (with a single "CAPEX:" hover)
+# - 2025–2028 forecasts = dark blue
+# - Clean axis (every year tick), no gridlines, continuous line
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -188,9 +185,8 @@ def _prep_country_notebook(df_all: pd.DataFrame, country: str):
 
     last_year = int(max(years))
 
-    # ── Forecast horizon starts at 2024 (through 2028)
+    # Forecast horizon: 2024–2028 (only years > last observed)
     requested_years = [2024, 2025, 2026, 2027, 2028]
-    # Never forecast into the past relative to last observed year
     future_years = [y for y in requested_years if y > last_year]
     future_index = pd.Index(future_years, name="Year")
 
@@ -318,18 +314,17 @@ def _plot_forecast_unified(country: str,
                            start_year: int = 2015):
     """
     Single-axis design:
-      • Solid light grey for history (start_year–2023)
-      • 2024 forecast drawn in light grey
-      • Solid dark blue for forecast (2025–2028)
-      • Show EVERY year tick (dtick=1)
-      • No gridlines
+      • Light grey for history (start_year–2023)
+      • 2024 forecast drawn in light grey (single tooltip: "CAPEX: …")
+      • Dark blue for 2025–2028 forecasts
+      • Every year tick (dtick=1), no gridlines
     """
     # Prepare data
     hist_years = [int(y) for y in actual.index if start_year <= int(y) <= 2023]
     hist_vals  = [float(actual.loc[y]) for y in hist_years]
 
     f_years_all = list(map(int, future_idx.values)) if len(future_idx) > 0 else []
-    f_pred = future_pred  # Series indexed by year
+    f_pred = future_pred  # Series indexed by future years
 
     fig = make_subplots(rows=1, cols=1)
 
@@ -346,58 +341,63 @@ def _plot_forecast_unified(country: str,
             )
         )
 
-    # 2024 forecast as GREY (if 2024 is in the forecast horizon)
+    # 2024 forecast shown in GREY with a single "CAPEX:" tooltip
     has_f_2024 = (2024 in f_years_all)
     if has_f_2024:
-        y2023 = float(actual.loc[2023]) if 2023 in actual.index else None
         y2024f = float(f_pred.loc[2024])
-
-        if y2023 is not None:
+        # connector 2023->2024 with NO hover (avoids duplicate tooltip at 2023)
+        if 2023 in actual.index:
             fig.add_trace(
                 go.Scatter(
                     x=[2023, 2024],
-                    y=[y2023, y2024f],
+                    y=[float(actual.loc[2023]), y2024f],
                     mode="lines",
                     line=dict(color="rgba(120,120,120,0.75)", width=2.0, shape="linear"),
                     showlegend=False,
-                    hoverinfo="hoverinfo="skip"
+                    hoverinfo="skip"  # suppress connector hover
                 )
             )
-        else:
-            fig.add_trace(
-                go.Scatter(
-                    x=[2024],
-                    y=[y2024f],
-                    mode="markers",
-                    marker=dict(size=6, color="rgba(120,120,120,0.85)"),
-                    showlegend=False,
-                    hoverinfo="skip""
-                )
+        # a single grey marker at 2024 that carries the tooltip "CAPEX: …"
+        fig.add_trace(
+            go.Scatter(
+                x=[2024],
+                y=[y2024f],
+                mode="markers",
+                marker=dict(size=6, color="rgba(120,120,120,0.9)"),
+                showlegend=False,
+                hovertemplate="Year: %{x}<br>CAPEX: %{y:.4f} $B<extra></extra>",
             )
+        )
 
     # Forecast — dark blue from 2025 onward
     f_years_2528 = [y for y in f_years_all if y >= 2025]
     if f_years_2528:
         f_vals_2528 = [float(f_pred.loc[y]) for y in f_years_2528]
 
-        # Connect from 2024-forecast if available, else from last actual (2023) if present
-        anchor_year = None
-        anchor_val = None
+        # Draw a connector from 2024 (if forecasted) or 2023 (if no 2024 forecast) to 2025 with NO hover
         if has_f_2024:
             anchor_year, anchor_val = 2024, float(f_pred.loc[2024])
         elif 2023 in actual.index:
             anchor_year, anchor_val = 2023, float(actual.loc[2023])
+        else:
+            anchor_year = None
 
         if anchor_year is not None:
-            f_years_plot = [anchor_year] + f_years_2528
-            f_vals_plot  = [anchor_val]  + f_vals_2528
-        else:
-            f_years_plot = f_years_2528
-            f_vals_plot  = f_vals_2528
+            fig.add_trace(
+                go.Scatter(
+                    x=[anchor_year, 2025],
+                    y=[anchor_val, f_vals_2528[0]],
+                    mode="lines",
+                    line=dict(color="#0D2A52", width=2.4, shape="linear"),
+                    showlegend=False,
+                    hoverinfo="skip"  # avoid a second tooltip at 2024 or 2025
+                )
+            )
 
+        # Main blue forecast line 2025–2028 (with forecast tooltip)
         fig.add_trace(
             go.Scatter(
-                x=f_years_plot, y=f_vals_plot,
+                x=f_years_2528, y=f_vals_2528,
                 mode="lines",
                 line=dict(color="#0D2A52", width=2.4, shape="linear"),
                 name="Forecast (2025–2028)",
