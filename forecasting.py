@@ -492,7 +492,7 @@ def render_forecasting_tab():
     if show_more_hist:
         yr_start, _ = st.slider(
             "Years",
-            min_value=2004, max_value=2028,
+            min_value=2004, max_value=2024,
             value=(2015, 2028), step=1,
             help="Left handle controls the history start. Forecast years (2024–2028) are at the right end."
         )
