@@ -1473,7 +1473,7 @@ def make_route_map(source_country: str, dest_country: str) -> go.Figure:
         locationmode="country names",
         locations=[dest_country],
         mode="markers",
-        marker=dict(symbol="diamond", size=11, color="#1f77b4"),
+        marker=dict(symbol="circle", size=11, color="#1f77b4"),
         name="Destination"
     ))
     return _style_geo_white(fig, height=360)
