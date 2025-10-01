@@ -184,7 +184,7 @@ def _prep_country_notebook(df_all: pd.DataFrame, country: str):
         last_row_scaled = None
 
     last_year = int(max(years))
-    requested_years = [2025, 2026, 2027, 2028]
+    requested_years = [2024, 2025, 2026, 2027, 2028]
     future_years = [y for y in requested_years if y > last_year]
     future_index = pd.Index(future_years, name="Year")
 
