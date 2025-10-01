@@ -518,7 +518,7 @@ def render_forecasting_tab():
         _init_hist_slider_state(fixed_end, default_start=2015)
     
         st.slider(
-            "Years shown (x-axis)",
+            "Range of Years shown",
             min_value=2004,
             max_value=fixed_end,
             value=st.session_state.hist_slider_value,  # widget state (separate key)
