@@ -3,9 +3,10 @@
 # Unified chart:
 # - One x-axis from start_year → 2028
 # - Solid light grey for historical values (…–2023)
-# - Solid dark blue for forecasts (2024–2028), connected from last actual point
+# - 2024 is FORECASTED but drawn in light grey
+# - Solid dark blue for forecasts (2025–2028)
 # - Default start_year = 2015; toggle + slider to reveal earlier history
-# - Equal tick spacing (linear axis, EVERY year tick), horizontal labels
+# - Equal tick spacing (EVERY year tick), horizontal labels
 # - No markers; no gridlines
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ EXOG_DEFAULT = [
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def _adaptive_test_horizon(n_total: int) -> int:
-    return max(2, min(4, int(np.ceil(0.15 * n_total))))
+    return max(2, min(4), int(np.ceil(0.15 * n_total)))
 
 def _raw(fname: str) -> str:
     return f"{RAW_BASE}/{quote(fname)}"
@@ -186,7 +187,7 @@ def _prep_country_notebook(df_all: pd.DataFrame, country: str):
 
     last_year = int(max(years))
 
-    # ── Forecast horizon now starts at 2024 (through 2028)
+    # ── Forecast horizon starts at 2024 (through 2028)
     requested_years = [2024, 2025, 2026, 2027, 2028]
     # Never forecast into the past relative to last observed year
     future_years = [y for y in requested_years if y > last_year]
@@ -317,21 +318,21 @@ def _plot_forecast_unified(country: str,
     """
     Single-axis design:
       • Solid light grey for history (start_year–2023)
-      • Solid dark blue for forecast (2024–2028), continuous from the last actual point
-      • Show EVERY year tick in the selected range (dtick=1)
-      • No gridlines on either axis
+      • 2024 forecast drawn in light grey
+      • Solid dark blue for forecast (2025–2028)
+      • Show EVERY year tick (dtick=1)
+      • No gridlines
     """
     # Prepare data
     hist_years = [int(y) for y in actual.index if start_year <= int(y) <= 2023]
     hist_vals  = [float(actual.loc[y]) for y in hist_years]
 
-    f_years = list(map(int, future_idx.values)) if len(future_idx) > 0 else []
-    f_vals  = list(map(float, future_pred.values)) if f_years else []
+    f_years_all = list(map(int, future_idx.values)) if len(future_idx) > 0 else []
+    f_pred = future_pred  # Series indexed by year
 
-    # Build figure
     fig = make_subplots(rows=1, cols=1)
 
-    # History — light grey
+    # History — light grey up to 2023
     if hist_years:
         fig.add_trace(
             go.Scatter(
@@ -344,41 +345,84 @@ def _plot_forecast_unified(country: str,
             )
         )
 
-    # Forecast — dark blue, continuous from last actual point
-    if f_years:
-        if hist_years:  # prepend last actual point so 2023→2024 connects
-            f_years = [hist_years[-1]] + f_years
-            f_vals  = [hist_vals[-1]]  + f_vals
+    # 2024 forecast as GREY (if 2024 is in the forecast horizon)
+    has_f_2024 = (2024 in f_years_all)
+    if has_f_2024:
+        y2023 = float(actual.loc[2023]) if 2023 in actual.index else None
+        y2024f = float(f_pred.loc[2024])
+
+        if y2023 is not None:
+            fig.add_trace(
+                go.Scatter(
+                    x=[2023, 2024],
+                    y=[y2023, y2024f],
+                    mode="lines",
+                    line=dict(color="rgba(120,120,120,0.75)", width=2.0, shape="linear"),
+                    showlegend=False,
+                    hovertemplate="Year: %{x}<br>CAPEX (forecast 2024): %{y:.4f} $B<extra></extra>",
+                )
+            )
+        else:
+            fig.add_trace(
+                go.Scatter(
+                    x=[2024],
+                    y=[y2024f],
+                    mode="markers",
+                    marker=dict(size=6, color="rgba(120,120,120,0.85)"),
+                    showlegend=False,
+                    hovertemplate="Year: %{x}<br>CAPEX (forecast 2024): %{y:.4f} $B<extra></extra>",
+                )
+            )
+
+    # Forecast — dark blue from 2025 onward
+    f_years_2528 = [y for y in f_years_all if y >= 2025]
+    if f_years_2528:
+        f_vals_2528 = [float(f_pred.loc[y]) for y in f_years_2528]
+
+        # Connect from 2024-forecast if available, else from last actual (2023) if present
+        anchor_year = None
+        anchor_val = None
+        if has_f_2024:
+            anchor_year, anchor_val = 2024, float(f_pred.loc[2024])
+        elif 2023 in actual.index:
+            anchor_year, anchor_val = 2023, float(actual.loc[2023])
+
+        if anchor_year is not None:
+            f_years_plot = [anchor_year] + f_years_2528
+            f_vals_plot  = [anchor_val]  + f_vals_2528
+        else:
+            f_years_plot = f_years_2528
+            f_vals_plot  = f_vals_2528
 
         fig.add_trace(
             go.Scatter(
-                x=f_years, y=f_vals,
+                x=f_years_plot, y=f_vals_plot,
                 mode="lines",
                 line=dict(color="#0D2A52", width=2.4, shape="linear"),
-                name="Forecast (2024–2028)",
+                name="Forecast (2025–2028)",
                 hovertemplate="Year: %{x}<br>CAPEX (forecast): %{y:.4f} $B<extra></extra>",
                 showlegend=False,
             )
         )
 
-    # X span = full selected range (every year tick)
-    xmin_candidates, xmax_candidates = [start_year], []
+    # X span — show every year tick
+    xmax_candidates = []
     if hist_years: xmax_candidates.append(max(hist_years))
-    if f_years:    xmax_candidates.append(max(f_years))
+    if has_f_2024: xmax_candidates.append(2024)
+    if f_years_2528: xmax_candidates.append(max(f_years_2528))
     xmax = max(xmax_candidates) if xmax_candidates else 2028
 
     fig.update_xaxes(
         tickmode="linear",
-        tick0=start_year, dtick=1,          # show EVERY year
+        tick0=start_year, dtick=1,
         tickangle=0,
         range=[start_year - 0.5, xmax + 0.5],
-        showgrid=False,                     # no vertical gridlines
+        showgrid=False,
         title_text=""
     )
 
-    # Y axis — no gridlines
     fig.update_yaxes(
-        showgrid=False,                     # no horizontal gridlines
+        showgrid=False,
         zeroline=False,
         title_text=""
     )
