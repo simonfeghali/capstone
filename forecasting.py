@@ -2,10 +2,11 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Unified chart:
 # - One x-axis from start_year → 2028
-# - Solid blue for historical values, dashed blue for forecasts
+# - Solid light grey for historical values (…–2023)
+# - Solid dark blue for forecasts (2024–2028), connected from last actual point
 # - Default start_year = 2015; toggle + slider to reveal earlier history
-# - Equal tick spacing (linear axis, e.g., 5-year ticks), horizontal labels
-# - No markers; clean Y gridlines only
+# - Equal tick spacing (linear axis, EVERY year tick), horizontal labels
+# - No markers; no gridlines
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -184,7 +185,10 @@ def _prep_country_notebook(df_all: pd.DataFrame, country: str):
         last_row_scaled = None
 
     last_year = int(max(years))
+
+    # ── Forecast horizon now starts at 2024 (through 2028)
     requested_years = [2024, 2025, 2026, 2027, 2028]
+    # Never forecast into the past relative to last observed year
     future_years = [y for y in requested_years if y > last_year]
     future_index = pd.Index(future_years, name="Year")
 
@@ -312,8 +316,8 @@ def _plot_forecast_unified(country: str,
                            start_year: int = 2015):
     """
     Single-axis design:
-      • Solid blue for history (start_year–2023)
-      • Dashed blue for forecast (2025–2028)
+      • Solid light grey for history (start_year–2023)
+      • Solid dark blue for forecast (2024–2028), continuous from the last actual point
       • Show EVERY year tick in the selected range (dtick=1)
       • No gridlines on either axis
     """
@@ -335,29 +339,28 @@ def _plot_forecast_unified(country: str,
                 mode="lines",
                 line=dict(color="rgba(120,120,120,0.75)", width=2.0, shape="linear"),
                 name=f"Actual ({start_year}–2023)",
-                hovertemplate="Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>",
+                hovertemplate="Year: %{x}<br>CAPEX: %{y:.4f} $B<extra></extra>",
                 showlegend=False,
             )
         )
-    
+
     # Forecast — dark blue, continuous from last actual point
-            if f_years:
-                # Prepend last actual year/value so forecast line connects directly
-                if hist_years:
-                    f_years = [hist_years[-1]] + f_years
-                    f_vals  = [hist_vals[-1]]  + f_vals
-            
-                fig.add_trace(
-                    go.Scatter(
-                        x=f_years, y=f_vals,
-                        mode="lines",
-                        line=dict(color="#0D2A52", width=2.4, shape="linear"),
-                        name="Forecast (2024–2028)",
-                        hovertemplate="Year: %{x}<br>FDI (forecast): %{y:.4f} $B<extra></extra>",
-                        showlegend=False,
-                    )
-                )
-        
+    if f_years:
+        if hist_years:  # prepend last actual point so 2023→2024 connects
+            f_years = [hist_years[-1]] + f_years
+            f_vals  = [hist_vals[-1]]  + f_vals
+
+        fig.add_trace(
+            go.Scatter(
+                x=f_years, y=f_vals,
+                mode="lines",
+                line=dict(color="#0D2A52", width=2.4, shape="linear"),
+                name="Forecast (2024–2028)",
+                hovertemplate="Year: %{x}<br>CAPEX (forecast): %{y:.4f} $B<extra></extra>",
+                showlegend=False,
+            )
+        )
+
     # X span = full selected range (every year tick)
     xmin_candidates, xmax_candidates = [start_year], []
     if hist_years: xmax_candidates.append(max(hist_years))
@@ -366,16 +369,16 @@ def _plot_forecast_unified(country: str,
 
     fig.update_xaxes(
         tickmode="linear",
-        tick0=start_year, dtick=1,          # ✅ show EVERY year
+        tick0=start_year, dtick=1,          # show EVERY year
         tickangle=0,
         range=[start_year - 0.5, xmax + 0.5],
-        showgrid=False,                     # ✅ no vertical gridlines
+        showgrid=False,                     # no vertical gridlines
         title_text=""
     )
 
     # Y axis — no gridlines
     fig.update_yaxes(
-        showgrid=False,                     # ✅ no horizontal gridlines
+        showgrid=False,                     # no horizontal gridlines
         zeroline=False,
         title_text=""
     )
@@ -390,13 +393,13 @@ def _plot_forecast_unified(country: str,
         yaxis=dict(tickfont=dict(size=12)),
     )
     return fig
-                               
+
 # ── public entrypoint ────────────────────────────────────────────────────────
 
 def render_forecasting_tab():
     _f_left, _f_right = st.columns([20, 1], gap="small")
     with _f_left:
-        st.caption("Forecasts — 2025–2028")
+        st.caption("Forecasts — 2024–2028")
     with _f_right:
         info_button("forecast")
 
@@ -440,13 +443,13 @@ def render_forecasting_tab():
         value=False,
         help="Drag the left handle to include earlier years."
     )
-    
+
     if show_more_hist:
-        yr_start, yr_end = st.slider(
+        yr_start, _ = st.slider(
             "Years",
             min_value=2004, max_value=2028,
             value=(2015, 2028), step=1,
-            help="Left handle controls the history start. Forecast years (2025–2028) are at the right end."
+            help="Left handle controls the history start. Forecast years (2024–2028) are at the right end."
         )
         start_year = int(yr_start)
     else:
