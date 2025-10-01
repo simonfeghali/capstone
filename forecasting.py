@@ -19,6 +19,28 @@ from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from overview import info_button, emit_auto_jump_script
 
+
+# --- Slider helpers: left handle free (2004..2025), right handle fixed at last year ---
+def _init_hist_slider_state(fixed_end: int, default_start: int = 2015):
+    """Initialize session_state for the slider widget value and the 'locked' range used for plotting."""
+    if "hist_slider_value" not in st.session_state:
+        st.session_state.hist_slider_value = (default_start, fixed_end)
+    if "hist_range_locked" not in st.session_state:
+        st.session_state.hist_range_locked = (default_start, fixed_end)
+
+def _on_hist_slider_change(fixed_end: int):
+    """
+    Range slider callback:
+    - Clamp LEFT handle between 2004 and 2025
+    - Force RIGHT handle to fixed_end
+    - Mirror to hist_range_locked (used by the plot)
+    """
+    left, _right = st.session_state.hist_slider_value
+    left = int(max(2004, min(left, 2025)))
+    st.session_state.hist_slider_value = (left, fixed_end)   # snap UI
+    st.session_state.hist_range_locked = (left, fixed_end)   # value for plotting
+    
+
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
     "final_clean": "final_capex_and_indicators_cleaned.csv",
@@ -481,38 +503,43 @@ def render_forecasting_tab():
         best, prep["endog_log"], prep["exog_full"], prep["future_index"], prep["future_exog"]
     )
 
-    # History window controls
+    
+    # Fixed last year (right end) = last forecast year if available, else 2028
     fixed_end = int(prep["future_index"][-1]) if len(prep["future_index"]) else 2028
-
+    
     Toggle = getattr(st, "toggle", st.checkbox)
-    show_more_hist = Toggle("Show earlier history", value=False,
-                            help="Drag the LEFT handle. The right handle is locked at the last year.")
+    show_more_hist = Toggle(
+        "Show earlier history",
+        value=False,
+        help="Drag the LEFT handle to include earlier years. The right handle is locked."
+    )
     
     if show_more_hist:
-        # Initialize session state once
-        if "yr_range_locked" not in st.session_state:
-            st.session_state.yr_range_locked = (2015, fixed_end)
+        _init_hist_slider_state(fixed_end, default_start=2015)
     
-        # Range slider UI, but we'll lock the right handle in code
-        yr_start, yr_end = st.slider(
+        st.slider(
             "Years shown (x-axis)",
-            min_value=2004, max_value=fixed_end,
-            value=st.session_state.yr_range_locked,
-            step=1, key="yr_range_locked"
+            min_value=2004,
+            max_value=fixed_end,
+            value=st.session_state.hist_slider_value,  # widget state (separate key)
+            step=1,
+            key="hist_slider_value",
+            on_change=_on_hist_slider_change,
+            args=(fixed_end,),
+            help="Left handle moves (down to 2004, up to 2025). Right handle is fixed."
         )
     
-        # ---- Lock behavior ----
-        # 1) Clamp LEFT handle so it cannot go beyond 2025
-        yr_start = min(yr_start, 2025)
+        start_year = int(st.session_state.hist_range_locked[0])
     
-        # 2) Force RIGHT handle back to the fixed end if user moves it
-        if yr_end != fixed_end:
-            st.session_state.yr_range_locked = (yr_start, fixed_end)
-            yr_end = fixed_end
-        else:
-            st.session_state.yr_range_locked = (yr_start, fixed_end)
-    
-        start_year = int(yr_start)
+        # (Optional) visually disable the right thumb so it looks locked
+        st.markdown("""
+        <style>
+          /* Targets the right thumb of range sliders; affects all range sliders on the page */
+          div[data-baseweb="slider"] div[role="slider"]:last-child{
+            pointer-events:none; opacity:0.6;
+          }
+        </style>
+        """, unsafe_allow_html=True)
     
     else:
         start_year = 2015
