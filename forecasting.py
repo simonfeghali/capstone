@@ -41,7 +41,8 @@ EXOG_DEFAULT = [
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def _adaptive_test_horizon(n_total: int) -> int:
-    return max(2, min(4), int(np.ceil(0.15 * n_total)))
+    # 15% of the series, capped to [2, 4]
+    return max(2, min(4, int(np.ceil(0.15 * n_total))))
 
 def _raw(fname: str) -> str:
     return f"{RAW_BASE}/{quote(fname)}"
