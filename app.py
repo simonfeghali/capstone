@@ -1461,9 +1461,14 @@ with tab_dest:
     c1, c2 = st.columns([1, 3], gap="small")
 
     with c2:
-        sel_src_country = st.selectbox("Source Country", src_countries,
-                                       index=(src_countries.index(default_src) if default_src in src_countries else 0),
-                                       key="dest_src")
+        sel_src_country = st.selectbox(
+            "Source Country",
+            src_countries,
+            index=(src_countries.index(default_src) if default_src in src_countries else 0),
+            key="dest_src",
+            # Display "GCC" while keeping the underlying value ("Gcc") unchanged
+            format_func=lambda s: "GCC" if str(s).strip().lower() == "gcc" else s
+        )
 
     dest_opts_all = sorted(
         dest_df.loc[dest_df["source_country"] == sel_src_country,
