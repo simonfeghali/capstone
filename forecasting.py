@@ -360,7 +360,7 @@ def _plot_forecast_unified(country: str,
                     mode="lines",
                     line=dict(color="rgba(120,120,120,0.75)", width=2.0, shape="linear"),
                     showlegend=False,
-                    hovertemplate="Year: %{x}<br>CAPEX (forecast 2024): %{y:.4f} $B<extra></extra>",
+                    hoverinfo="hoverinfo="skip",
                 )
             )
         else:
@@ -371,7 +371,7 @@ def _plot_forecast_unified(country: str,
                     mode="markers",
                     marker=dict(size=6, color="rgba(120,120,120,0.85)"),
                     showlegend=False,
-                    hovertemplate="Year: %{x}<br>CAPEX (forecast 2024): %{y:.4f} $B<extra></extra>",
+                    hoverinfo="skip"",
                 )
             )
 
