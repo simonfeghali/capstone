@@ -493,7 +493,7 @@ def render_forecasting_tab():
     if show_more_hist:
         start_year = st.slider(
             "Start year (right end fixed at 2028)",
-            min_value=2004, max_value=END_YEAR - 1,  # so the window is non-empty
+            min_value=2004, max_value=END_YEAR - 3,  # so the window is non-empty
             value=2015, step=1,
             help="Choose how far back to start; the right end of the chart stays fixed at 2028."
         )
