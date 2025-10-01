@@ -1320,6 +1320,10 @@ with tab_sectors:
 # =============================================================================
 # DESTINATIONS TAB — UNCHANGED
 # =============================================================================
+
+# GCC members (canonical country names used in this app)
+GCC_MEMBERS = {"United Arab Emirates", "Bahrain", "Kuwait", "Saudi Arabia", "Qatar", "Oman"}
+
 def _style_geo_white(fig: go.Figure, height: int = 360) -> go.Figure:
     fig.update_geos(
         projection_type="natural earth",
@@ -1466,6 +1470,11 @@ with tab_dest:
                     "destination_country"].dropna().unique().tolist()
     )
     dest_opts_all = [d for d in dest_opts_all if str(d).strip().lower() != "total"]
+
+    #if source is GCC, exclude GCC members from destination options
+    if sel_src_country.strip().lower() == "gcc":
+        dest_opts_all = [d for d in dest_opts_all if d not in GCC_MEMBERS]
+    
     dest_options = ["All"] + dest_opts_all
 
     with c1:
@@ -1482,6 +1491,10 @@ with tab_dest:
 
     export = dest_df[dest_df["source_country"] == sel_src_country].copy()
     export = export[export["destination_country"].astype(str).str.strip().str.lower() != "total"]
+
+    if sel_src_country.strip().lower() == "gcc":
+        export = export[~export["destination_country"].isin(GCC_MEMBERS)]
+        
     if not export.empty:
         out_cols = ["source_country","destination_country","companies","jobs_created","capex","projects"]
         csv_bytes = export[out_cols].rename(columns={
@@ -1501,6 +1514,9 @@ with tab_dest:
     ddf = dest_df[dest_df["source_country"] == sel_src_country].copy()
     ddf = ddf[ddf["destination_country"].astype(str).str.strip().str.lower() != "total"]
 
+    if sel_src_country.strip().lower() == "gcc":
+        ddf = ddf[~ddf["destination_country"].isin(GCC_MEMBERS)]
+    
     if metric_dest == "Capex": ddf["capex"] = ddf["capex"] / 1000.0
 
     if sel_dest_country == "All":
