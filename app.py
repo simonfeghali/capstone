@@ -787,7 +787,7 @@ with tab_scoring:
                     st.plotly_chart(fig_cont, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB — show only your requested KPIs on TOP; suppress grade KPI when year+country chosen
+# CAPEX TAB — KPIs placed LEFT of map (instead of above)
 # =============================================================================
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
@@ -798,17 +798,20 @@ with tab_eda:
     with cap_right:
         info_button("capex_trend")
 
-    # --- TOP KPI slots (only the small KPIs you trigger will render here) ---
-    top_k1, top_k2 = st.columns([1, 1], gap="large")
-    _top_slots = [top_k1, top_k2]
-    _top_i = [0]  # mutable index
+    # ——— KPIs will render in a dedicated LEFT column beside the map ———
+    # create the main two columns first so KPI slots can point to the left one
+    e1, e2 = st.columns([1.2, 2], gap="large")
 
     # De-dup helpers (CAPEX tab only)
     shown_kpi_keys: set = set()
     shown_series_keys: set = set()
 
+    # KPI slots now target the left column (stacked)
+    _top_slots = [e1, e1]
+    _top_i = [0]  # mutable index
+
     def _kpi_block(title: str, value: float, unit: str = ""):
-        """Render single-value KPIs *on top* in the two slots."""
+        """Render single-value KPIs *in the left column next to the map*."""
         key = ("KPI", title)
         if key in shown_kpi_keys:
             return
@@ -845,7 +848,8 @@ with tab_eda:
         fig.update_xaxes(title=labels_x, type="category", showgrid=False)
         fig.update_yaxes(title=labels_y, showgrid=False)
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
-        st.plotly_chart(fig, use_container_width=True)
+        with e1:
+            st.plotly_chart(fig, use_container_width=True)
 
     # Contextual KPI title mapper
     def _pretty_kpi_title(orig_title: str, label: str) -> str:
@@ -894,7 +898,8 @@ with tab_eda:
         fig.update_traces(hovertemplate=h, text=None, texttemplate=None, textposition=None)
         fig.update_coloraxes(showscale=False)
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
-        st.plotly_chart(fig, use_container_width=True)
+        with e1:
+            st.plotly_chart(fig, use_container_width=True)
 
     # filters applied to CAPEX
     grade_options = ["All", "A+", "A", "B", "C", "D"]
@@ -908,7 +913,7 @@ with tab_eda:
     sel_grade_eda = st.selectbox("Grade", grade_options,
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
-    # A placeholder right under the Grade filter for the single KPI
+    # A placeholder right under the Grade filter for the single KPI (kept for spacing if needed)
     below_grade_kpi = st.empty()
 
     capx_eda = capx_enriched.copy()
@@ -922,18 +927,17 @@ with tab_eda:
     # Scale to $B
     capx_eda["capex"], capx_enriched["capex"] = capx_eda["capex"] / 1000.0, capx_enriched["capex"] / 1000.0
 
-    # --- Special rule: when Year + Country chosen, show ONLY this KPI on top ---
+    # --- Special rule: when Year + Country chosen, show ONLY this KPI (in LEFT column) ---
     if isinstance(sel_year_any, int) and sel_country != "All":
         total_capex = float(capx_eda["capex"].sum()) if not capx_eda.empty else 0.0
         _kpi_block(f"{sel_country} — Total CAPEX — {sel_year_any}", total_capex, "$B")
 
-    # ── Main 2-up area ────────────────────────────────────────────────────────
-    e1, e2 = st.columns([1.6, 2], gap="large")
+    # ── LEFT column: Trend (only when Year is "All"); RIGHT column: Map ──
     with e1:
-        # If a specific year is picked, we skip the left trend (you only want top KPI)
         if not isinstance(sel_year_any, int):
             trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
-            if trend.empty: st.info("No CAPEX data for the selected filters.")
+            if trend.empty:
+                st.info("No CAPEX data for the selected filters.")
             else:
                 x_vals = trend["year"].astype(int).astype(str).tolist()
                 y_vals = trend["capex"].astype(float).tolist()
@@ -1013,8 +1017,6 @@ with tab_eda:
                             if nonzero.empty:
                                 st.info("No CAPEX data for grade view.")
                             else:
-                                # previously this produced "CAPEX by Grade — YEAR — GRADE" KPI.
-                                # we won't hit this path anymore because we hide_grade_view when year+country chosen.
                                 _kpi_block(f"CAPEX by Grade — {sel_year_any} — {nonzero['grade'].iloc[0]}",
                                            float(nonzero["capex"].iloc[0]), "$B")
                         else:
