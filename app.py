@@ -531,15 +531,21 @@ with tab_scoring:
         # Trend + Map
         t1, t2 = st.columns([1, 2], gap="large")
         with t1:
+            # Decide the base dataframe and title
             if sel_country_sc != "All":
-                base = wb[wb["country"] == sel_country_sc]; title = f"Year-over-Year Viability Score — {sel_country_sc}"
+                base = wb[wb["country"] == sel_country_sc]
+                title = f"Year-over-Year Viability Score — {sel_country_sc}"
             elif sel_cont_sc != "All":
-                base = wb[wb["continent"] == sel_cont_sc]; title = f"Year-over-Year Viability Score — {sel_cont_sc}"
+                base = wb[wb["continent"] == sel_cont_sc]
+                title = f"Year-over-Year Viability Score — {sel_cont_sc}"
             else:
-                base = wb.copy(); title = "Year-over-Year Viability Score — Global"
+                base = wb.copy()
+                title = "Year-over-Year Viability Score — Global"
         
-            # Build yoy_df for this branch (you forgot this line before)
-            yoy_df = base.groupby("year", as_index=False)["score"].mean().sort_values("year")
+            # Build yoy_df (this was missing before)
+            yoy_df = (base.groupby("year", as_index=False)["score"]
+                            .mean()
+                            .sort_values("year"))
         
             if yoy_df.empty:
                 st.info("No data for this selection.")
@@ -563,7 +569,7 @@ with tab_scoring:
                     title_text=""
                 )
         
-                # Hide y-axis but keep range so labels fit
+                # Hide y-axis but keep range for labels
                 fig_line.update_yaxes(
                     visible=False,
                     range=[float(y.min() - pad), float(y.max() + pad)]
@@ -578,13 +584,13 @@ with tab_scoring:
                     hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
                 )
         
-                # Match map alignment
                 fig_line.update_layout(
                     height=410,
                     margin=dict(l=10, r=10, t=60, b=30)
                 )
         
                 st.plotly_chart(fig_line, use_container_width=True)
+
 
 
         with t2:
