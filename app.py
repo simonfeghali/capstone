@@ -71,7 +71,7 @@ st.markdown(f"""
 <style>
 .header-row {{
   display:flex; align-items:center; justify-content:space-between;
-  margin: 20px 0 24px 0;   /* increase top/bottom margin → pushes title lower */
+  margin: 20px 0 24px 0;
 }}
 .header-left {{
   display:flex; align-items:center; gap:14px;
@@ -83,7 +83,7 @@ st.markdown(f"""
   width: 42px; height: 42px;
 }}
 .header-logo {{
-  height: 160px;   /* was ~36–48px, now bigger */
+  height: 160px;
   width: auto;
 }}
 </style>
@@ -108,7 +108,6 @@ def inject_tab_icons():
     ]
     css_blocks = []
 
-    # General tab size/style override
     css_blocks.append("""
     .stTabs [data-baseweb="tab-list"] {
         display: flex;
@@ -116,10 +115,10 @@ def inject_tab_icons():
         width: 100%;
     }
     .stTabs [data-baseweb="tab"] {
-        flex-grow: 1;        /* stretch tabs equally */
-        text-align: center;  /* center text & icon */
-        padding: 14px 0;     /* taller tabs */
-        font-size: 1.1rem;   /* larger text */
+        flex-grow: 1;
+        text-align: center;
+        padding: 14px 0;
+        font-size: 1.1rem;
     }
     """)
 
@@ -132,7 +131,7 @@ def inject_tab_icons():
         div[data-baseweb="tab-list"] > div[role="tab"]:nth-child({i}) p::before {{
             content: "";
             display: inline-block;
-            width: 22px;   /* bigger icon */
+            width: 22px;
             height: 22px;
             margin-right: 10px;
             vertical-align: -4px;
@@ -154,7 +153,7 @@ inject_tab_icons()
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
     "wb":  "world_bank_data_with_scores_and_continent.csv",
-    "wb_avg": "world_bank_data_average_scores_and_grades.csv",  # precomputed averages for Year="All"
+    "wb_avg": "world_bank_data_average_scores_and_grades.csv",
     "cap_csv": "capex_EDA_cleaned_filled.csv",
     "cap_csv_alt": "capex_EDA_cleaned_filled.csv",
     "cap_xlsx": "capex_EDA.xlsx",
@@ -388,7 +387,6 @@ def _sync_continent_from_country():
 
     if not lookup.empty and lookup["continent"].notna().any():
         cont = str(lookup["continent"].dropna().iloc[0])
-        # Only set if it's a valid option for the current year
         cont_opts = st.session_state.get("_sc_cont_opts", [])
         if cont in cont_opts:
             st.session_state["sc_cont"] = cont
@@ -403,12 +401,10 @@ def scoring_filters_block(wb: pd.DataFrame):
     with c1:
         sel_year_sc = st.selectbox("Year", year_opts_sc, index=0, key="sc_year")
 
-    # Build continent options for the chosen year (or all)
     cont_pool = wb["continent"] if sel_year_sc == "All" else wb.loc[wb["year"] == int(sel_year_sc), "continent"]
     cont_opts_sc = ["All"] + sorted(cont_pool.dropna().unique().tolist())
     st.session_state["_sc_cont_opts"] = cont_opts_sc
 
-    # If a country is already chosen, suggest/force its continent BEFORE rendering widgets
     cur_country = st.session_state.get("sc_country", "All")
     suggested_cont = None
     if cur_country != "All":
@@ -421,7 +417,6 @@ def scoring_filters_block(wb: pd.DataFrame):
             if cand in cont_opts_sc:
                 suggested_cont = cand
 
-    # Decide the continent value to show (do NOT mutate if not needed)
     current_cont = st.session_state.get("sc_cont", "All")
     if suggested_cont and suggested_cont in cont_opts_sc:
         current_cont = suggested_cont
@@ -430,28 +425,22 @@ def scoring_filters_block(wb: pd.DataFrame):
 
     with c2:
         sel_cont_sc = st.selectbox(
-            "Continent",
-            cont_opts_sc,
+            "Continent", cont_opts_sc,
             index=cont_opts_sc.index(current_cont),
             key="sc_cont",
         )
 
-    # Build country options filtered by continent (or all)
     pool = wb if sel_year_sc == "All" else wb[wb["year"] == int(sel_year_sc)]
     if sel_cont_sc != "All":
         pool = pool[pool["continent"] == sel_cont_sc]
     country_opts_sc = ["All"] + sorted(pool["country"].dropna().unique().tolist())
 
-    # Use the existing country value if still valid; DO NOT overwrite session_state here
     cur_country = st.session_state.get("sc_country", "All")
     country_index = country_opts_sc.index(cur_country) if cur_country in country_opts_sc else 0
 
     with c3:
         sel_country_sc = st.selectbox(
-            "Country",
-            country_opts_sc,
-            index=country_index,
-            key="sc_country",
+            "Country", country_opts_sc, index=country_index, key="sc_country",
         )
 
     return sel_year_sc, sel_cont_sc, sel_country_sc
@@ -482,7 +471,7 @@ with tab_overview:
     render_overview_tab()
 
 # =============================================================================
-# SCORING TAB — Averages for "All", auto-sync continent, hide bottom row when country selected
+# SCORING TAB
 # =============================================================================
 with tab_scoring:
     sel_year_sc, sel_cont_sc, sel_country_sc = scoring_filters_block(wb)
@@ -492,7 +481,7 @@ with tab_scoring:
     with col1:
         st.caption("Scoring 2021–2023 • (World Bank–based)")
     with col2:
-        info_button("score_trend")   # takes you to Overview explanation for Scoring
+        info_button("score_trend")
         
     where_title = sel_country_sc if sel_country_sc != "All" else (sel_cont_sc if sel_cont_sc != "All" else "Worldwide")
     st.markdown(f"<h3 style='text-align:center; margin:0; font-weight:800'>{where_title}</h3>", unsafe_allow_html=True)
@@ -550,8 +539,6 @@ with tab_scoring:
                     yoy_df, x="year_str", y="score", markers=True,
                     labels={"year_str": "", "score": ""}, title=title
                 )
-                
-                # X-axis clean
                 fig_line.update_xaxes(
                     type="category",
                     categoryorder="array",
@@ -560,14 +547,10 @@ with tab_scoring:
                     ticks="",
                     title_text=""
                 )
-                
-                # Hide y-axis completely but keep range so labels fit
                 fig_line.update_yaxes(
                     visible=False,
                     range=[float(y.min() - pad), float(y.max() + pad)]
                 )
-                
-                # Labels above points
                 fig_line.update_traces(
                     mode="lines+markers+text",
                     text=[f"{v:.3f}" for v in y],
@@ -575,25 +558,19 @@ with tab_scoring:
                     cliponaxis=False,
                     hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
                 )
-                
-                # Align baseline with map by matching height & bottom margin
-                fig_line.update_layout(
-                    height=410,                         # match map height
-                    margin=dict(l=10, r=10, t=60, b=30) # push x-axis lower
-                )
-                
+                fig_line.update_layout(height=410, margin=dict(l=10, r=10, t=60, b=30))
                 st.plotly_chart(fig_line, use_container_width=True)
- 
 
         with t2:
             if avg_scope.empty:
                 st.info("No data for this selection.")
             else:
                 map_df = avg_scope.rename(columns={"avg_score": "score"})[["country", "score"]].copy()
-                map_title = "Global Performance Map — All Years"
-                fig_map = px.choropleth(map_df,locations="country",locationmode="country names",color="score",color_continuous_scale="Blues",title=map_title,)
-
-                # pretty hover
+                fig_map = px.choropleth(
+                    map_df, locations="country", locationmode="country names",
+                    color="score", color_continuous_scale="Blues",
+                    title="Global Performance Map — All Years",
+                )
                 fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{z:.3f}<extra></extra>")
                 fig_map.update_coloraxes(showscale=True)
                 scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
@@ -655,6 +632,19 @@ with tab_scoring:
                             .sort_values("score", ascending=True))
                 if cont_bar.empty:
                     st.info("No continent data for this selection.")
+                elif cont_bar.shape[0] == 1:
+                    label = str(cont_bar["continent"].iloc[0])
+                    val = float(cont_bar["score"].iloc[0])
+                    st.markdown(
+                        f"""
+                        <div class="kpi-box">
+                          <div class="kpi-title">Continent Viability Score — All Years — {label}</div>
+                          <div class="kpi-number">{val:,.3f}</div>
+                          <div class="kpi-sub"></div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
                 else:
                     title_cont = "Continent Viability Score — All Years"
                     fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
@@ -662,7 +652,8 @@ with tab_scoring:
                                       labels={"score": "", "continent": ""}, title=title_cont)
                     fig_cont.update_coloraxes(showscale=False)
                     fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                    fig_cont.update_traces(hovertemplate="%{y}: %{x:.3f}<extra></extra>",text=None, texttemplate=None, textposition=None)
+                    fig_cont.update_traces(hovertemplate="%{y}: %{x:.3f}<extra></extra>",
+                                           text=None, texttemplate=None, textposition=None)
                     st.plotly_chart(fig_cont, use_container_width=True)
 
     else:
@@ -689,9 +680,7 @@ with tab_scoring:
         # LEFT: KPI only (no line) when a specific year is selected
         t1, t2 = st.columns([1, 2], gap="large")
         with t1:
-            # sel_year_sc is guaranteed != "All" in this branch
             year_i = int(sel_year_sc)
-
             rows = wb[wb["year"] == year_i].copy()
             if sel_cont_sc != "All":
                 rows = rows[rows["continent"] == sel_cont_sc]
@@ -773,11 +762,26 @@ with tab_scoring:
 
             with b3:
                 cont_base = wb[wb["year"] == int(sel_year_sc)].copy()
-                if sel_cont_sc != "All": cont_base = cont_base[cont_base["continent"] == sel_cont_sc]
+                if sel_cont_sc != "All":
+                    cont_base = cont_base[cont_base["continent"] == sel_cont_sc]
                 cont_bar = cont_base.groupby("continent", as_index=False)["score"].mean().sort_values("score", ascending=True)
-                title_cont = f"Continent Viability Score — {sel_year_sc}"
-                if cont_bar.empty: st.info("No continent data for this selection.")
+                if cont_bar.empty:
+                    st.info("No continent data for this selection.")
+                elif cont_bar.shape[0] == 1:
+                    label = str(cont_bar["continent"].iloc[0])
+                    val = float(cont_bar["score"].iloc[0])
+                    st.markdown(
+                        f"""
+                        <div class="kpi-box">
+                          <div class="kpi-title">Continent Viability Score — {sel_year_sc} — {label}</div>
+                          <div class="kpi-number">{val:,.3f}</div>
+                          <div class="kpi-sub"></div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
                 else:
+                    title_cont = f"Continent Viability Score — {sel_year_sc}"
                     fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
                                       color="score", color_continuous_scale="Blues",
                                       labels={"score": "", "continent": ""}, title=title_cont)
@@ -786,7 +790,7 @@ with tab_scoring:
                     st.plotly_chart(fig_cont, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB — dedupe identical KPIs/graphs (keep the first only)
+# CAPEX TAB — KPI placement mirrors scoring tab (left column)
 # =============================================================================
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
@@ -797,12 +801,11 @@ with tab_eda:
     with cap_right:
         info_button("capex_trend")
     
-    # ---- De-dup helpers (CAPEX tab only) ----
+    # De-dup helpers (CAPEX tab only)
     shown_kpi_keys: set = set()
     shown_series_keys: set = set()
 
     def _kpi_block(title: str, value: float, unit: str = ""):
-        """Show KPI unless the same displayed number has been shown before."""
         key = ("KPI", round(float(value), 1))
         if key in shown_kpi_keys:
             return
@@ -824,49 +827,35 @@ with tab_eda:
         return (kind, x_tuple, y_tuple)
 
     def _plotly_line_once(x_vals, y_vals, title, labels_x, labels_y, height=360, color=None):
-        """Render line chart once if the (x,y) series hasn't been shown."""
         sig = _series_key("LINE", x_vals, y_vals)
         if sig in shown_series_keys:
             return
         shown_series_keys.add(sig)
-        fig = px.line(
-            pd.DataFrame({"x": x_vals, "y": y_vals}),
-            x="x", y="y", markers=True, title=title,
-        )
+        fig = px.line(pd.DataFrame({"x": x_vals, "y": y_vals}), x="x", y="y", markers=True, title=title)
         if color:
             fig.update_traces(line=dict(color=color))
-        # <<< add this line
         fig.update_traces(hovertemplate="Year: %{x}<br>Capex: %{y:,.0f} $B<extra></extra>")
         fig.update_xaxes(title=labels_x, type="category", showgrid=False)
         fig.update_yaxes(title=labels_y, showgrid=False)
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # NEW: Contextual KPI title mapper for single-row “Top Countries …” results
-    # ──────────────────────────────────────────────────────────────────────────
+    # Contextual KPI title mapper
     def _pretty_kpi_title(orig_title: str, label: str) -> str:
         t = str(orig_title).strip()
-
-        # Growth titles
         m = re.search(r"Top Countries by CAPEX Growth(.*)", t, flags=re.IGNORECASE)
         if m:
-            tail = m.group(1).strip()  # e.g. " (All Grades) [2021 → 2024]"
+            tail = m.group(1).strip()
             tail = tail.lstrip("—").strip()
             return f"{label} — CAPEX Growth{(' ' + tail) if tail else ''}"
-
-        # Level titles (total CAPEX)
         m = re.search(r"Top Countries by CAPEX\s*—\s*(.*)", t, flags=re.IGNORECASE)
         if m:
-            tail = m.group(1).strip()  # e.g. "All Years" or "2024"
+            tail = m.group(1).strip()
             return f"{label} — Total CAPEX — {tail}" if tail else f"{label} — Total CAPEX"
-
-        # Fallback
         return f"{label} — {t}"
 
     def _bars_or_kpi(df: pd.DataFrame, value_col: str, name_col: str, title: str,
                      unit: str, height: int = 420, ascending_for_hbar: bool = False):
-        # 1) keep only valid numeric rows
         valid = df.copy()
         valid[value_col] = pd.to_numeric(valid[value_col], errors="coerce")
         valid = valid[valid[value_col].notna()]
@@ -874,7 +863,6 @@ with tab_eda:
             st.info("No data for this selection.")
             return
     
-        # If only 1 row -> KPI
         if valid.shape[0] == 1:
             label = str(valid[name_col].iloc[0])
             val = float(valid[value_col].iloc[0])
@@ -883,7 +871,6 @@ with tab_eda:
             return
     
         ordered = valid.sort_values(value_col, ascending=ascending_for_hbar)
-    
         sig = _series_key("BAR",
                           ordered[name_col].astype(str).tolist(),
                           ordered[value_col].astype(float).tolist())
@@ -896,13 +883,11 @@ with tab_eda:
             color=value_col, color_continuous_scale="Blues",
             labels={value_col: "", name_col: ""}, title=title
         )
-        # 2) explicit hover (never uses text/customdata)
         h = f"%{{y}}: %{{x:,.0f}} {unit}<extra></extra>" if unit else "%{y}: %{x:,.0f}<extra></extra>"
         fig.update_traces(hovertemplate=h, text=None, texttemplate=None, textposition=None)
         fig.update_coloraxes(showscale=False)
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
-
 
     # filters applied to CAPEX
     grade_options = ["All", "A+", "A", "B", "C", "D"]
@@ -925,11 +910,12 @@ with tab_eda:
     if isinstance(sel_year_any, int):
         capx_eda = capx_eda[capx_eda["year"] == sel_year_any]
         
+    # Scale to $B
     capx_eda["capex"], capx_enriched["capex"] = capx_eda["capex"] / 1000.0, capx_enriched["capex"] / 1000.0
     
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
-        # Main KPI or trend
+        # Main KPI or trend — placed left, same kpi-box style as scoring
         if isinstance(sel_year_any, int):
             total_capex = float(capx_eda["capex"].sum()) if not capx_eda.empty else 0.0
             where_bits = []
@@ -946,8 +932,6 @@ with tab_eda:
                 title = (f"{sel_country} CAPEX Trend ($B)" if sel_country != "All"
                          else "Global CAPEX Trend ($B)")
                 _plotly_line_once(x_vals, y_vals, title, labels_x="", labels_y="", height=360)
-
-
 
     with e2:
         if isinstance(sel_year_any, int):
@@ -1010,9 +994,7 @@ with tab_eda:
                           .assign(grade=lambda d: d["grade"].astype(str))
                           .groupby("grade", as_index=False)["capex"].sum())
 
-                    # order bars by CAPEX high→low (top→bottom)
                     gb_sorted = gb.sort_values("capex", ascending=True)
-
                     nonzero = gb_sorted.loc[gb_sorted["capex"].fillna(0) != 0, ["grade", "capex"]]
                     if nonzero.shape[0] <= 1:
                         if nonzero.empty:
@@ -1038,15 +1020,12 @@ with tab_eda:
                         st.info("No CAPEX data for grade trend.")
                     else:
                         tg["year_str"] = tg["year"].astype(int).astype(str)
-
                         grades_present = tg["grade"].dropna().unique().tolist()
                         if len(grades_present) == 1:
                             x_vals = tg["year_str"].tolist()
                             y_vals = tg["capex"].astype(float).tolist()
                             sig = _series_key("LINE", x_vals, y_vals)
-                            if sig in shown_series_keys:
-                                pass
-                            else:
+                            if sig not in shown_series_keys:
                                 fig_single = px.line(
                                     tg, x="year_str", y="capex", color="grade",
                                     labels={"year_str": "", "capex": "", "grade": "Grade"},
@@ -1118,7 +1097,6 @@ with tab_eda:
 # SECTORS TAB — UNCHANGED
 # =============================================================================
 
-# ── Sectors constants ──
 SECTORS_CANON = [
     "Software & IT services","Business services","Communications","Financial services",
     "Transportation & Warehousing","Real estate","Consumer products","Food and Beverages",
@@ -1211,8 +1189,6 @@ def load_sectors_raw() -> pd.DataFrame:
     df["sector"]  = df["sector_raw"].astype(str).map(_canon_sector)
 
     df = df[df["sector"].isin(SECTORS_CANON)]
-    
-
     df = (df.groupby(["country", "sector"], as_index=False)[["companies","jobs_created","capex","projects"]]
             .sum(min_count=1))
     return df
@@ -1220,7 +1196,6 @@ def load_sectors_raw() -> pd.DataFrame:
 sectors_df = load_sectors_raw()
 
 with tab_sectors:
-    
     cap_left, cap_right = st.columns([20, 1], gap="small")
     with cap_left:
         st.caption("Sectors Analysis for 2021-2024")
@@ -1230,7 +1205,6 @@ with tab_sectors:
     sc1, sc2 = st.columns([1, 2], gap="small")
     with sc1:
         sector_opt = ["All"] + SECTORS_CANON
-
         sel_sector = st.selectbox("Sector", sector_opt, index=0, key="sector_sel")
     with sc2:
         countries = sorted(sectors_df["country"].dropna().unique().tolist())
@@ -1298,10 +1272,9 @@ with tab_sectors:
         )
 
 # =============================================================================
-# DESTINATIONS TAB — UNCHANGED (minor KPI duplicate fix)
+# DESTINATIONS TAB — minor KPI duplicate fix
 # =============================================================================
 
-# GCC members (canonical country names used in this app)
 GCC_MEMBERS = {"United Arab Emirates", "Bahrain", "Kuwait", "Saudi Arabia", "Qatar", "Oman"}
 
 def _style_geo_white(fig: go.Figure, height: int = 360) -> go.Figure:
@@ -1371,7 +1344,6 @@ def make_top_map(source_country: str, dest_list: list[str]) -> go.Figure:
 
     is_gcc = str(source_country).strip().lower() == "gcc"
     if is_gcc:
-        # Fill all GCC countries in red
         fig.add_trace(go.Choropleth(
             locations=list(GCC_MEMBERS),
             z=[1]*len(GCC_MEMBERS),
@@ -1385,7 +1357,6 @@ def make_top_map(source_country: str, dest_list: list[str]) -> go.Figure:
             hoverinfo="skip",
         ))
     else:
-        # Single-country source: keep your red pin
         fig.add_trace(go.Scattergeo(
             locationmode="country names",
             locations=[source_country],
@@ -1396,13 +1367,9 @@ def make_top_map(source_country: str, dest_list: list[str]) -> go.Figure:
             showlegend=False
         ))
     
-    # Keep the dummy trace so "Source" appears in legend as a red marker
-    fig.add_trace(go.Scattergeo(
-        lon=[None], lat=[None],
-        mode="markers",
-        marker=dict(symbol="circle", size=12, color="#e63946"),
-        name="Source"
-    ))
+    fig.add_trace(go.Scattergeo(lon=[None], lat=[None], mode="markers",
+                                marker=dict(symbol="circle", size=12, color="#e63946"),
+                                name="Source"))
     
     if dest_list:
         fig.add_trace(go.Scattergeo(
@@ -1415,7 +1382,7 @@ def make_top_map(source_country: str, dest_list: list[str]) -> go.Figure:
     return _style_geo_white(fig, height=420)
 
 def make_route_map(source_country: str, dest_country: str) -> go.Figure:
-    fig = go.Figure()   # NEW — prevents reusing a previous global `fig`
+    fig = go.Figure()
     is_gcc = str(source_country).strip().lower() == "gcc"
     if is_gcc:
         fig.add_trace(go.Choropleth(
@@ -1441,13 +1408,9 @@ def make_route_map(source_country: str, dest_country: str) -> go.Figure:
             showlegend=False
         ))
 
-    # Dummy legend entry (keep)
-    fig.add_trace(go.Scattergeo(
-        lon=[None], lat=[None],
-        mode="markers",
-        marker=dict(symbol="circle", size=12, color="#e63946"),
-        name="Source"
-    ))
+    fig.add_trace(go.Scattergeo(lon=[None], lat=[None], mode="markers",
+                                marker=dict(symbol="circle", size=12, color="#e63946"),
+                                name="Source"))
 
     fig.add_trace(go.Scattergeo(
         locationmode="country names",
@@ -1482,7 +1445,6 @@ with tab_dest:
             format_func=lambda s: "GCC" if str(s).strip().lower() == "gcc" else s
         )
         
-        # Use this label in every title (bar, map, KPI, route map)
         shown_src_label = "GCC" if str(sel_src_country).strip().lower() == "gcc" else sel_src_country
 
     dest_opts_all = sorted(
@@ -1491,7 +1453,6 @@ with tab_dest:
     )
     dest_opts_all = [d for d in dest_opts_all if str(d).strip().lower() != "total"]
 
-    # if source is GCC, exclude GCC members from destination options
     if sel_src_country.strip().lower() == "gcc":
         dest_opts_all = [d for d in dest_opts_all if d not in GCC_MEMBERS]
     
