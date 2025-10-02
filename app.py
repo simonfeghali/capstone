@@ -798,6 +798,21 @@ with tab_eda:
     with cap_right:
         info_button("capex_trend")
 
+        # --- Keep the Grade filter with the other filters (ABOVE charts) ---
+    grade_options = ["All", "A+", "A", "B", "C", "D"]
+    auto_grade = st.session_state.get("grade_eda", "All")
+    if sel_country != "All" and isinstance(sel_year_any, int):
+        g_rows = wb[(wb["year"] == sel_year_any) & (wb["country"] == sel_country)]
+        if not g_rows.empty and g_rows["grade"].notna().any():
+            gval = str(g_rows["grade"].dropna().iloc[0])
+            if gval in grade_options:
+                auto_grade = gval
+    sel_grade_eda = st.selectbox(
+        "Grade", grade_options,
+        index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
+        key="grade_eda"
+    )
+
     # ——— KPIs will render in a dedicated LEFT column beside the map ———
     # create the main two columns first so KPI slots can point to the left one
     e1, e2 = st.columns([1.2, 2], gap="large")
@@ -901,20 +916,6 @@ with tab_eda:
         with e1:
             st.plotly_chart(fig, use_container_width=True)
 
-    # filters applied to CAPEX
-    grade_options = ["All", "A+", "A", "B", "C", "D"]
-    auto_grade = st.session_state.get("grade_eda", "All")
-    sel_grade_eda = st.selectbox("Grade", grade_options,
-                                 index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
-                                 key="grade_eda")
-    if sel_country != "All" and isinstance(sel_year_any, int):
-        g_rows = wb[(wb["year"] == sel_year_any) & (wb["country"] == sel_country)]
-        if not g_rows.empty and g_rows["grade"].notna().any():
-            gval = str(g_rows["grade"].dropna().iloc[0])
-            if gval in grade_options:
-                auto_grade = gval
-    # A placeholder right under the Grade filter for the single KPI (kept for spacing if needed)
-    below_grade_kpi = st.empty()
 
     capx_eda = capx_enriched.copy()
     if sel_cont != "All":    capx_eda = capx_eda[capx_eda["continent"] == sel_cont]
