@@ -374,7 +374,7 @@ def _plot_forecast_unified(country: str,
                     x=[2023, 2024],
                     y=[float(actual.loc[2023]), y2024f],
                     mode="lines",
-                    line=dict(color="#2E8EF7", width=2.0, shape="linear"),
+                    line=dict(color="rgba(120,120,120,0.75)", width=2.0, shape="linear"),
                     showlegend=False,
                     hoverinfo="skip"  # suppress connector hover
                 )
