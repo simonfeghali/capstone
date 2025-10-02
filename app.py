@@ -1,4 +1,4 @@
-# app.py 
+# app.py
 import base64
 from pathlib import Path
 import numpy as np
@@ -464,14 +464,14 @@ tab_overview, tab_scoring, tab_eda, tab_sectors, tab_dest, tab_compare, tab_fore
 )
 
 # =============================================================================
-# OVERVIEW TAB 
+# OVERVIEW TAB
 # =============================================================================
 
 with tab_overview:
     render_overview_tab()
 
 # =============================================================================
-# SCORING TAB
+# SCORING TAB — with conditional hides you requested
 # =============================================================================
 with tab_scoring:
     sel_year_sc, sel_cont_sc, sel_country_sc = scoring_filters_block(wb)
@@ -677,32 +677,29 @@ with tab_scoring:
                 label = f"{ctry_cont} Average Score" if ctry_cont else "Continent Average Score"
                 st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
 
-        # LEFT: KPI only (no line) when a specific year is selected
+        # LEFT: KPI only when NO specific country is selected (your request)
         t1, t2 = st.columns([1, 2], gap="large")
         with t1:
-            year_i = int(sel_year_sc)
-            rows = wb[wb["year"] == year_i].copy()
-            if sel_cont_sc != "All":
-                rows = rows[rows["continent"] == sel_cont_sc]
-            if sel_country_sc != "All":
-                rows = rows[rows["country"] == sel_country_sc]
+            if sel_country_sc == "All":
+                year_i = int(sel_year_sc)
+                rows = wb[wb["year"] == year_i].copy()
+                if sel_cont_sc != "All":
+                    rows = rows[rows["continent"] == sel_cont_sc]
 
-            scope_label = (
-                sel_country_sc if sel_country_sc != "All"
-                else (sel_cont_sc if sel_cont_sc != "All" else "Global")
-            )
-            val = float(rows["score"].mean()) if not rows.empty else np.nan
+                scope_label = sel_cont_sc if sel_cont_sc != "All" else "Global"
+                val = float(rows["score"].mean()) if not rows.empty else np.nan
 
-            st.markdown(
-                f"""
-                <div class="kpi-box">
-                  <div class="kpi-title">{scope_label} — Viability Score • {year_i}</div>
-                  <div class="kpi-number">{'-' if np.isnan(val) else f'{val:,.3f}'}</div>
-                  <div class="kpi-sub"></div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+                st.markdown(
+                    f"""
+                    <div class="kpi-box">
+                      <div class="kpi-title">{scope_label} — Viability Score • {year_i}</div>
+                      <div class="kpi-number">{'-' if np.isnan(val) else f'{val:,.3f}'}</div>
+                      <div class="kpi-sub"></div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            # else: intentionally show nothing when a country is selected
 
         with t2:
             map_df = wb_scope[["country", "score"]].copy()
@@ -726,9 +723,16 @@ with tab_scoring:
                                       paper_bgcolor="white", plot_bgcolor="white")
                 st.plotly_chart(fig_map, use_container_width=True)
 
-        # Bottom row: keep ONLY when no specific country is selected
+        # Bottom row:
+        # - Keep when no specific country is selected (as before)
+        # - AND hide the continent bar when a continent is selected with a specific year (your request)
         if sel_country_sc == "All":
-            b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
+            show_cont_bar = not (sel_cont_sc != "All")
+            if show_cont_bar:
+                b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
+            else:
+                b1, b2 = st.columns([1.2, 1], gap="large")
+
             with b1:
                 base = wb_scope[["country", "score"]]
                 title_top = f"Top Performing Countries — {sel_year_sc}"
@@ -760,37 +764,38 @@ with tab_scoring:
                     fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
                     st.plotly_chart(fig_donut, use_container_width=True)
 
-            with b3:
-                cont_base = wb[wb["year"] == int(sel_year_sc)].copy()
-                if sel_cont_sc != "All":
-                    cont_base = cont_base[cont_base["continent"] == sel_cont_sc]
-                cont_bar = cont_base.groupby("continent", as_index=False)["score"].mean().sort_values("score", ascending=True)
-                if cont_bar.empty:
-                    st.info("No continent data for this selection.")
-                elif cont_bar.shape[0] == 1:
-                    label = str(cont_bar["continent"].iloc[0])
-                    val = float(cont_bar["score"].iloc[0])
-                    st.markdown(
-                        f"""
-                        <div class="kpi-box">
-                          <div class="kpi-title">Continent Viability Score — {sel_year_sc} — {label}</div>
-                          <div class="kpi-number">{val:,.3f}</div>
-                          <div class="kpi-sub"></div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    title_cont = f"Continent Viability Score — {sel_year_sc}"
-                    fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
-                                      color="score", color_continuous_scale="Blues",
-                                      labels={"score": "", "continent": ""}, title=title_cont)
-                    fig_cont.update_coloraxes(showscale=False)
-                    fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                    st.plotly_chart(fig_cont, use_container_width=True)
+            if show_cont_bar:
+                with b3:
+                    cont_base = wb[wb["year"] == int(sel_year_sc)].copy()
+                    if sel_cont_sc != "All":
+                        cont_base = cont_base[cont_base["continent"] == sel_cont_sc]
+                    cont_bar = cont_base.groupby("continent", as_index=False)["score"].mean().sort_values("score", ascending=True)
+                    if cont_bar.empty:
+                        st.info("No continent data for this selection.")
+                    elif cont_bar.shape[0] == 1:
+                        label = str(cont_bar["continent"].iloc[0])
+                        val = float(cont_bar["score"].iloc[0])
+                        st.markdown(
+                            f"""
+                            <div class="kpi-box">
+                              <div class="kpi-title">Continent Viability Score — {sel_year_sc} — {label}</div>
+                              <div class="kpi-number">{val:,.3f}</div>
+                              <div class="kpi-sub"></div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        title_cont = f"Continent Viability Score — {sel_year_sc}"
+                        fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
+                                          color="score", color_continuous_scale="Blues",
+                                          labels={"score": "", "continent": ""}, title=title_cont)
+                        fig_cont.update_coloraxes(showscale=False)
+                        fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+                        st.plotly_chart(fig_cont, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB — KPI placement mirrors scoring tab (left column)
+# CAPEX TAB — KPI row added ABOVE charts in same style
 # =============================================================================
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
@@ -806,7 +811,7 @@ with tab_eda:
     shown_series_keys: set = set()
 
     def _kpi_block(title: str, value: float, unit: str = ""):
-        key = ("KPI", round(float(value), 1))
+        key = ("KPI", title)
         if key in shown_kpi_keys:
             return
         shown_kpi_keys.add(key)
@@ -814,7 +819,7 @@ with tab_eda:
             f"""
             <div class="kpi-box">
               <div class="kpi-title">{title}</div>
-              <div class="kpi-number">{value:,.3f}</div>
+              <div class="kpi-number">{('-' if value is None or pd.isna(value) else f'{value:,.3f}')}</div>
               <div class="kpi-sub">{unit}</div>
             </div>
             """,
@@ -912,17 +917,26 @@ with tab_eda:
         
     # Scale to $B
     capx_eda["capex"], capx_enriched["capex"] = capx_eda["capex"] / 1000.0, capx_enriched["capex"] / 1000.0
-    
+
+    # ── NEW: KPI row ABOVE charts (same style as scoring) ─────────────────────
+    k1, k2, k3, k4 = st.columns(4, gap="large")
+    tot_capex = float(capx_eda["capex"].sum()) if not capx_eda.empty else 0.0
+    tot_comp  = float(capx_eda["companies"].sum()) if "companies" in capx_eda.columns else 0.0
+    tot_proj  = float(capx_eda["projects"].sum()) if "projects" in capx_eda.columns else 0.0
+    tot_jobs  = float(capx_eda["jobs_created"].sum()) if "jobs_created" in capx_eda.columns else 0.0
+    with k1: _kpi_block("Total CAPEX", tot_capex, "$B")
+    with k2: _kpi_block("Companies", tot_comp, "")
+    with k3: _kpi_block("Projects", tot_proj, "")
+    with k4: _kpi_block("Jobs Created", tot_jobs, "")
+
+    # ── Main 2-up area ────────────────────────────────────────────────────────
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
-        # Main KPI or trend — placed left, same kpi-box style as scoring
+        # Trend or (when year picked) a KPI stays here if you still want it;
+        # keeping previous behavior for continuity.
         if isinstance(sel_year_any, int):
-            total_capex = float(capx_eda["capex"].sum()) if not capx_eda.empty else 0.0
-            where_bits = []
-            if sel_country != "All": where_bits.append(sel_country)
-            if sel_cont != "All":    where_bits.append(sel_cont)
-            where_label = " • ".join(where_bits) if where_bits else "Global"
-            _kpi_block(f"{where_label} CAPEX — {sel_year_any}", total_capex, "$B")
+            # we already have the total KPI above; skip duplicating it here.
+            pass
         else:
             trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
             if trend.empty: st.info("No CAPEX data for the selected filters.")
