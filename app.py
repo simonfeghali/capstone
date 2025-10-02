@@ -537,21 +537,23 @@ with tab_scoring:
                 base = wb[wb["continent"] == sel_cont_sc]; title = f"Year-over-Year Viability Score — {sel_cont_sc}"
             else:
                 base = wb.copy(); title = "Year-over-Year Viability Score — Global"
+        
+            # Build yoy_df for this branch (you forgot this line before)
             yoy_df = base.groupby("year", as_index=False)["score"].mean().sort_values("year")
+        
             if yoy_df.empty:
                 st.info("No data for this selection.")
             else:
                 yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)
-                # after yoy_df is built and year_str added
                 y = yoy_df["score"].astype(float)
                 pad = max((y.max() - y.min()) * 0.12, 0.002)
-                
+        
                 fig_line = px.line(
                     yoy_df, x="year_str", y="score", markers=True,
                     labels={"year_str": "", "score": ""}, title=title
                 )
-                
-                # X-axis clean
+        
+                # X-axis formatting
                 fig_line.update_xaxes(
                     type="category",
                     categoryorder="array",
@@ -560,13 +562,13 @@ with tab_scoring:
                     ticks="",
                     title_text=""
                 )
-                
-                # Hide y-axis completely but keep range so labels fit
+        
+                # Hide y-axis but keep range so labels fit
                 fig_line.update_yaxes(
                     visible=False,
                     range=[float(y.min() - pad), float(y.max() + pad)]
                 )
-                
+        
                 # Labels above points
                 fig_line.update_traces(
                     mode="lines+markers+text",
@@ -575,15 +577,15 @@ with tab_scoring:
                     cliponaxis=False,
                     hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
                 )
-                
-                # Align baseline with map by matching height & bottom margin
+        
+                # Match map alignment
                 fig_line.update_layout(
-                    height=410,                         # match map height
-                    margin=dict(l=10, r=10, t=60, b=30) # push x-axis lower
+                    height=410,
+                    margin=dict(l=10, r=10, t=60, b=30)
                 )
-                
+        
                 st.plotly_chart(fig_line, use_container_width=True)
- 
+
 
         with t2:
             if avg_scope.empty:
