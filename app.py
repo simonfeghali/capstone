@@ -1259,12 +1259,13 @@ with tab_sectors:
             "capex":"Capex","projects":"Projects"
         }).to_csv(index=False).encode("utf-8")
         st.download_button(
-            label=f"Download {sel_sector_country} sectors CSV",
+            label=f"Download {display_country} sectors CSV",
             data=csv_bytes,
-            file_name=f"{sel_sector_country.lower().replace(' ','_')}_sectors_data.csv",
+            file_name=f"{display_country.lower().replace(' ','_')}_sectors_data.csv",
             mime="text/csv",
             key="dl_country_sectors_csv",
         )
+
 
     value_col = {
         "Companies":"companies",
@@ -1277,7 +1278,11 @@ with tab_sectors:
         bars = cdf[["sector", value_col]].copy()
         bars = bars.set_index("sector").reindex(SECTORS_CANON, fill_value=0).reset_index()
         bars = bars.sort_values(value_col, ascending=True)
-        title = f"Capex ($B) by Sector — {sel_sector_country}" if metric == "Capex" else f"{metric} by Sector — {sel_sector_country}"
+        title = (
+            f"Capex ($B) by Sector — {display_country}"
+            if metric == "Capex"
+            else f"{metric} by Sector — {display_country}"
+        )
         if bars[value_col].sum() == 0:
             st.info("No data for this selection.")
         else:
@@ -1295,7 +1300,7 @@ with tab_sectors:
         st.markdown(
             f"""
             <div class="kpi-box">
-              <div class="kpi-title">{sel_sector_country} — {sel_sector} • {metric}</div>
+              <div class="kpi-title">{display_country} — {sel_sector} • {metric}</div>
               <div class="kpi-number">{val:,.3f}</div>
               <div class="kpi-sub">{unit}</div>
             </div>
