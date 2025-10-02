@@ -531,7 +531,7 @@ with tab_scoring:
         # Trend + Map
         t1, t2 = st.columns([1, 2], gap="large")
         with t1:
-            # Decide the base dataframe and title
+            # Decide base and title
             if sel_country_sc != "All":
                 base = wb[wb["country"] == sel_country_sc]
                 title = f"Year-over-Year Viability Score — {sel_country_sc}"
@@ -542,10 +542,10 @@ with tab_scoring:
                 base = wb.copy()
                 title = "Year-over-Year Viability Score — Global"
         
-            # Build yoy_df (this was missing before)
+            # >>> BUILD yoy_df BEFORE USING IT <<<
             yoy_df = (base.groupby("year", as_index=False)["score"]
-                            .mean()
-                            .sort_values("year"))
+                           .mean()
+                           .sort_values("year"))
         
             if yoy_df.empty:
                 st.info("No data for this selection.")
@@ -559,23 +559,16 @@ with tab_scoring:
                     labels={"year_str": "", "score": ""}, title=title
                 )
         
-                # X-axis formatting
                 fig_line.update_xaxes(
                     type="category",
                     categoryorder="array",
                     categoryarray=yoy_df["year_str"].tolist(),
-                    showgrid=False,
-                    ticks="",
-                    title_text=""
+                    showgrid=False, ticks="", title_text=""
                 )
-        
-                # Hide y-axis but keep range for labels
                 fig_line.update_yaxes(
                     visible=False,
                     range=[float(y.min() - pad), float(y.max() + pad)]
                 )
-        
-                # Labels above points
                 fig_line.update_traces(
                     mode="lines+markers+text",
                     text=[f"{v:.3f}" for v in y],
@@ -583,13 +576,9 @@ with tab_scoring:
                     cliponaxis=False,
                     hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
                 )
-        
-                fig_line.update_layout(
-                    height=410,
-                    margin=dict(l=10, r=10, t=60, b=30)
-                )
-        
+                fig_line.update_layout(height=410, margin=dict(l=10, r=10, t=60, b=30))
                 st.plotly_chart(fig_line, use_container_width=True)
+
 
 
 
