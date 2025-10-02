@@ -918,16 +918,6 @@ with tab_eda:
     # Scale to $B
     capx_eda["capex"], capx_enriched["capex"] = capx_eda["capex"] / 1000.0, capx_enriched["capex"] / 1000.0
 
-    # ── NEW: KPI row ABOVE charts (same style as scoring) ─────────────────────
-    k1, k2, k3, k4 = st.columns(4, gap="large")
-    tot_capex = float(capx_eda["capex"].sum()) if not capx_eda.empty else 0.0
-    tot_comp  = float(capx_eda["companies"].sum()) if "companies" in capx_eda.columns else 0.0
-    tot_proj  = float(capx_eda["projects"].sum()) if "projects" in capx_eda.columns else 0.0
-    tot_jobs  = float(capx_eda["jobs_created"].sum()) if "jobs_created" in capx_eda.columns else 0.0
-    with k1: _kpi_block("Total CAPEX", tot_capex, "$B")
-    with k2: _kpi_block("Companies", tot_comp, "")
-    with k3: _kpi_block("Projects", tot_proj, "")
-    with k4: _kpi_block("Jobs Created", tot_jobs, "")
 
     # ── Main 2-up area ────────────────────────────────────────────────────────
     e1, e2 = st.columns([1.6, 2], gap="large")
