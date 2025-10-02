@@ -903,6 +903,9 @@ with tab_eda:
 
     # filters applied to CAPEX
     grade_options = ["All", "A+", "A", "B", "C", "D"]
+    sel_grade_eda = st.selectbox("Grade", grade_options,
+                                 index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
+                                 key="grade_eda")
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
         g_rows = wb[(wb["year"] == sel_year_any) & (wb["country"] == sel_country)]
@@ -910,9 +913,6 @@ with tab_eda:
             gval = str(g_rows["grade"].dropna().iloc[0])
             if gval in grade_options:
                 auto_grade = gval
-    sel_grade_eda = st.selectbox("Grade", grade_options,
-                                 index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
-                                 key="grade_eda")
     # A placeholder right under the Grade filter for the single KPI (kept for spacing if needed)
     below_grade_kpi = st.empty()
 
