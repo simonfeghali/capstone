@@ -787,7 +787,7 @@ with tab_scoring:
                     st.plotly_chart(fig_cont, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB — KPIs placed LEFT of map (instead of above)
+# CAPEX TAB — dynamic KPI placement (2 KPIs above charts, 1 KPI on the left)
 # =============================================================================
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
@@ -798,39 +798,48 @@ with tab_eda:
     with cap_right:
         info_button("capex_trend")
 
-    # ——— KPIs will render in a dedicated LEFT column beside the map ———
-    # create the main two columns first so KPI slots can point to the left one
+    # Build the two main columns where charts will live
     e1, e2 = st.columns([1.2, 2], gap="large")
 
-    # De-dup helpers (CAPEX tab only)
-    shown_kpi_keys: set = set()
+    # We’ll queue KPIs first, decide placement after we know how many we have.
+    kpi_queue: list[tuple[str, float, str]] = []  # (title, value, unit)
+
+    def _enqueue_kpi(title: str, value: float, unit: str = ""):
+        kpi_queue.append((title, value, unit))
+
+    def _render_kpi_box(title: str, value: float, unit: str = ""):
+        st.markdown(
+            f"""
+            <div class="kpi-box">
+              <div class="kpi-title">{title}</div>
+              <div class="kpi-number">{('-' if value is None or pd.isna(value) else f'{value:,.3f}')}</div>
+              <div class="kpi-sub">{unit}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    def _render_kpis_decided():
+        """Place KPIs based on how many we collected."""
+        n = len(kpi_queue)
+        if n == 2:
+            # Full-width row above both charts
+            c1, c2 = st.columns(2, gap="large")
+            with c1: _render_kpi_box(*kpi_queue[0])
+            with c2: _render_kpi_box(*kpi_queue[1])
+        elif n == 1:
+            # Single KPI in the left column
+            with e1:
+                _render_kpi_box(*kpi_queue[0])
+        else:
+            # 0 or >2 → render stacked in the left column (safe fallback)
+            if n > 0:
+                with e1:
+                    for item in kpi_queue:
+                        _render_kpi_box(*item)
+
+    # Series de-dup helpers
     shown_series_keys: set = set()
-
-    # KPI slots now target the left column (stacked)
-    _top_slots = [e1, e1]
-    _top_i = [0]  # mutable index
-
-    def _kpi_block(title: str, value: float, unit: str = ""):
-        """Render single-value KPIs *in the left column next to the map*."""
-        key = ("KPI", title)
-        if key in shown_kpi_keys:
-            return
-        shown_kpi_keys.add(key)
-
-        slot = _top_slots[_top_i[0] % len(_top_slots)]
-        with slot:
-            st.markdown(
-                f"""
-                <div class="kpi-box">
-                  <div class="kpi-title">{title}</div>
-                  <div class="kpi-number">{('-' if value is None or pd.isna(value) else f'{value:,.3f}')}</div>
-                  <div class="kpi-sub">{unit}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        _top_i[0] += 1
-
     def _series_key(kind: str, x, y):
         x_tuple = tuple([str(v) for v in x])
         y_tuple = tuple([None if pd.isna(v) else round(float(v), 4) for v in y])
@@ -851,7 +860,6 @@ with tab_eda:
         with e1:
             st.plotly_chart(fig, use_container_width=True)
 
-    # Contextual KPI title mapper
     def _pretty_kpi_title(orig_title: str, label: str) -> str:
         t = str(orig_title).strip()
         m = re.search(r"Top Countries by CAPEX Growth(.*)", t, flags=re.IGNORECASE)
@@ -878,7 +886,7 @@ with tab_eda:
             label = str(valid[name_col].iloc[0])
             val = float(valid[value_col].iloc[0])
             kpi_title = _pretty_kpi_title(title, label)
-            _kpi_block(kpi_title, val, unit)
+            _enqueue_kpi(kpi_title, val, unit)  # enqueue (placement decided later)
             return
     
         ordered = valid.sort_values(value_col, ascending=ascending_for_hbar)
@@ -901,7 +909,7 @@ with tab_eda:
         with e1:
             st.plotly_chart(fig, use_container_width=True)
 
-    # filters applied to CAPEX
+    # ── Filters applied to CAPEX data
     grade_options = ["All", "A+", "A", "B", "C", "D"]
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
@@ -913,8 +921,6 @@ with tab_eda:
     sel_grade_eda = st.selectbox("Grade", grade_options,
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
-    # A placeholder right under the Grade filter for the single KPI (kept for spacing if needed)
-    below_grade_kpi = st.empty()
 
     capx_eda = capx_enriched.copy()
     if sel_cont != "All":    capx_eda = capx_eda[capx_eda["continent"] == sel_cont]
@@ -927,12 +933,15 @@ with tab_eda:
     # Scale to $B
     capx_eda["capex"], capx_enriched["capex"] = capx_eda["capex"] / 1000.0, capx_enriched["capex"] / 1000.0
 
-    # --- Special rule: when Year + Country chosen, show ONLY this KPI (in LEFT column) ---
+    # Special rule: when Year + Country chosen, we always have a single KPI (likely)
     if isinstance(sel_year_any, int) and sel_country != "All":
         total_capex = float(capx_eda["capex"].sum()) if not capx_eda.empty else 0.0
-        _kpi_block(f"{sel_country} — Total CAPEX — {sel_year_any}", total_capex, "$B")
+        _enqueue_kpi(f"{sel_country} — Total CAPEX — {sel_year_any}", total_capex, "$B")
 
-    # ── LEFT column: Trend (only when Year is "All"); RIGHT column: Map ──
+    # ── Decide KPI placement now (before charts) ──
+    _render_kpis_decided()
+
+    # ── LEFT: Trend (only when Year is "All"); RIGHT: Map ──
     with e1:
         if not isinstance(sel_year_any, int):
             trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
@@ -968,12 +977,10 @@ with tab_eda:
                               paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig, use_container_width=True)
 
-    # Grade views
-    # Hide the entire grade view when Year + Country are chosen (per your instruction)
+    # Grade views (unchanged logic, but KPIs go to the queue)
     hide_grade_view = isinstance(sel_year_any, int) and sel_country != "All"
     show_grade_trend = (sel_grade_eda == "All") and (not hide_grade_view)
 
-    # Top-10 block: also skip when Year + Country chosen (it would collapse to 1 KPI)
     if not (isinstance(sel_year_any, int) and sel_country != "All"):
         if show_grade_trend:
             b1, b2, b3 = st.columns([1.2, 1.2, 1.6], gap="large")
@@ -1017,8 +1024,8 @@ with tab_eda:
                             if nonzero.empty:
                                 st.info("No CAPEX data for grade view.")
                             else:
-                                _kpi_block(f"CAPEX by Grade — {sel_year_any} — {nonzero['grade'].iloc[0]}",
-                                           float(nonzero["capex"].iloc[0]), "$B")
+                                _enqueue_kpi(f"CAPEX by Grade — {sel_year_any} — {nonzero['grade'].iloc[0]}",
+                                             float(nonzero["capex"].iloc[0]), "$B")
                         else:
                             fig = px.bar(gb_sorted, x="capex", y="grade", orientation="h",
                                          labels={"capex": "", "grade": ""},
@@ -1107,6 +1114,7 @@ with tab_eda:
                             height=420,
                             ascending_for_hbar=True
                         )
+
 
 # =============================================================================
 # SECTORS TAB — UNCHANGED
