@@ -1127,10 +1127,14 @@ def _canon_country(name: str) -> str:
     if not isinstance(name, str): return ""
     s = name.strip()
     swap = {
+        # existing mappings
         "usa":"United States","us":"United States","u.s.":"United States",
         "uk":"United Kingdom","u.k.":"United Kingdom",
         "south korea":"South Korea","republic of korea":"South Korea",
         "uae":"United Arab Emirates", "saudiarabia":"Saudi Arabia",
+
+        # NEW — ensure GCC stays uppercase everywhere
+        "gcc":"GCC", "g.c.c.":"GCC", "gulf cooperation council":"GCC",
     }
     low = s.lower()
     if low in swap: return swap[low]
@@ -1222,10 +1226,19 @@ with tab_sectors:
         sel_sector = st.selectbox("Sector", sector_opt, index=0, key="sector_sel")
     with sc2:
         countries = sorted(sectors_df["country"].dropna().unique().tolist())
-        default_c = st.session_state.get("sector_country", countries[0])
-        if default_c not in countries: default_c = countries[0]
-        sel_sector_country = st.selectbox("Source Country", countries,
-                                          index=countries.index(default_c), key="sector_country")
+        # Normalize whatever might be in session state (e.g., old "Gcc") to the canonical form
+        default_c = _canon_country(st.session_state.get("sector_country", countries[0]))
+        if default_c not in countries:
+            default_c = countries[0]
+    
+        # Display label fix: always show "GCC" (value stored remains canonical from the list)
+        sel_sector_country = st.selectbox(
+            "Source Country",
+            countries,
+            index=countries.index(default_c),
+            key="sector_country",
+            format_func=lambda s: "GCC" if str(s).strip().lower() == "gcc" else s
+        )
 
     metric = st.radio("Metric", ["Companies", "Jobs Created", "Capex", "Projects"],
                       horizontal=True, index=0, key="metric_sel")
