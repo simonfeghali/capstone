@@ -903,10 +903,10 @@ with tab_eda:
 
     # filters applied to CAPEX
     grade_options = ["All", "A+", "A", "B", "C", "D"]
+    auto_grade = st.session_state.get("grade_eda", "All")
     sel_grade_eda = st.selectbox("Grade", grade_options,
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
-    auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
         g_rows = wb[(wb["year"] == sel_year_any) & (wb["country"] == sel_country)]
         if not g_rows.empty and g_rows["grade"].notna().any():
