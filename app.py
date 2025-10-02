@@ -908,6 +908,8 @@ with tab_eda:
     sel_grade_eda = st.selectbox("Grade", grade_options,
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
+    # A placeholder right under the Grade filter for the single KPI
+    below_grade_kpi = st.empty()
 
     capx_eda = capx_enriched.copy()
     if sel_cont != "All":    capx_eda = capx_eda[capx_eda["continent"] == sel_cont]
