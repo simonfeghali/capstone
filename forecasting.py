@@ -410,7 +410,7 @@ def _plot_forecast_unified(country: str,
                     x=[anchor_year, 2025],
                     y=[anchor_val, f_vals_2528[0]],
                     mode="lines",
-                    line=dict(color="#0D2A52", width=2.4, shape="linear"),
+                    line=dict(color="#0077C8", width=2.4, shape="linear"),
                     showlegend=False,
                     hoverinfo="skip"  # avoid a second tooltip at 2024 or 2025
                 )
@@ -421,7 +421,7 @@ def _plot_forecast_unified(country: str,
             go.Scatter(
                 x=f_years_2528, y=f_vals_2528,
                 mode="lines",
-                line=dict(color="#0D2A52", width=2.4, shape="linear"),
+                line=dict(color="#0077C8", width=2.4, shape="linear"),
                 name="Forecast (2025–2028)",
                 hovertemplate="Year: %{x}<br>CAPEX (forecast): %{y:.4f} $B<extra></extra>",
                 showlegend=False,
