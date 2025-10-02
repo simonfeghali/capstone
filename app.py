@@ -531,53 +531,34 @@ with tab_scoring:
         # Trend + Map
         t1, t2 = st.columns([1, 2], gap="large")
         with t1:
-            # Decide base and title
+            # KPI (no line) when a specific year is selected
+            year_i = int(sel_year_sc)
+        
+            # Scope rows to selected year + current filters
+            rows = wb[wb["year"] == year_i].copy()
             if sel_country_sc != "All":
-                base = wb[wb["country"] == sel_country_sc]
-                title = f"Year-over-Year Viability Score — {sel_country_sc}"
+                rows = rows[rows["country"] == sel_country_sc]
+                scope_label = sel_country_sc
             elif sel_cont_sc != "All":
-                base = wb[wb["continent"] == sel_cont_sc]
-                title = f"Year-over-Year Viability Score — {sel_cont_sc}"
+                rows = rows[rows["continent"] == sel_cont_sc]
+                scope_label = sel_cont_sc
             else:
-                base = wb.copy()
-                title = "Year-over-Year Viability Score — Global"
+                scope_label = "Global"
         
-            # >>> BUILD yoy_df BEFORE USING IT <<<
-            yoy_df = (base.groupby("year", as_index=False)["score"]
-                           .mean()
-                           .sort_values("year"))
+            val = float(rows["score"].mean()) if not rows.empty else np.nan
         
-            if yoy_df.empty:
-                st.info("No data for this selection.")
-            else:
-                yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)
-                y = yoy_df["score"].astype(float)
-                pad = max((y.max() - y.min()) * 0.12, 0.002)
-        
-                fig_line = px.line(
-                    yoy_df, x="year_str", y="score", markers=True,
-                    labels={"year_str": "", "score": ""}, title=title
-                )
-        
-                fig_line.update_xaxes(
-                    type="category",
-                    categoryorder="array",
-                    categoryarray=yoy_df["year_str"].tolist(),
-                    showgrid=False, ticks="", title_text=""
-                )
-                fig_line.update_yaxes(
-                    visible=False,
-                    range=[float(y.min() - pad), float(y.max() + pad)]
-                )
-                fig_line.update_traces(
-                    mode="lines+markers+text",
-                    text=[f"{v:.3f}" for v in y],
-                    textposition="top center",
-                    cliponaxis=False,
-                    hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
-                )
-                fig_line.update_layout(height=410, margin=dict(l=10, r=10, t=60, b=30))
-                st.plotly_chart(fig_line, use_container_width=True)
+            # Single KPI card
+            st.markdown(
+                f"""
+                <div class="kpi-box">
+                  <div class="kpi-title">{scope_label} — Viability Score • {year_i}</div>
+                  <div class="kpi-number">{'-' if np.isnan(val) else f'{val:,.3f}'}</div>
+                  <div class="kpi-sub"></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
 
 
 
@@ -685,53 +666,34 @@ with tab_scoring:
 
         t1, t2 = st.columns([1, 2], gap="large")
         with t1:
-            # Decide base and title
+            # KPI (no line) when a specific year is selected
+            year_i = int(sel_year_sc)
+        
+            # Scope rows to selected year + current filters
+            rows = wb[wb["year"] == year_i].copy()
             if sel_country_sc != "All":
-                base = wb[wb["country"] == sel_country_sc]
-                title = f"Year-over-Year Viability Score — {sel_country_sc}"
+                rows = rows[rows["country"] == sel_country_sc]
+                scope_label = sel_country_sc
             elif sel_cont_sc != "All":
-                base = wb[wb["continent"] == sel_cont_sc]
-                title = f"Year-over-Year Viability Score — {sel_cont_sc}"
+                rows = rows[rows["continent"] == sel_cont_sc]
+                scope_label = sel_cont_sc
             else:
-                base = wb.copy()
-                title = "Year-over-Year Viability Score — Global"
+                scope_label = "Global"
         
-            # >>> BUILD yoy_df BEFORE USING IT <<<
-            yoy_df = (base.groupby("year", as_index=False)["score"]
-                           .mean()
-                           .sort_values("year"))
+            val = float(rows["score"].mean()) if not rows.empty else np.nan
         
-            if yoy_df.empty:
-                st.info("No data for this selection.")
-            else:
-                yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)
-                y = yoy_df["score"].astype(float)
-                pad = max((y.max() - y.min()) * 0.12, 0.002)
-        
-                fig_line = px.line(
-                    yoy_df, x="year_str", y="score", markers=True,
-                    labels={"year_str": "", "score": ""}, title=title
-                )
-        
-                fig_line.update_xaxes(
-                    type="category",
-                    categoryorder="array",
-                    categoryarray=yoy_df["year_str"].tolist(),
-                    showgrid=False, ticks="", title_text=""
-                )
-                fig_line.update_yaxes(
-                    visible=False,
-                    range=[float(y.min() - pad), float(y.max() + pad)]
-                )
-                fig_line.update_traces(
-                    mode="lines+markers+text",
-                    text=[f"{v:.3f}" for v in y],
-                    textposition="top center",
-                    cliponaxis=False,
-                    hovertemplate="Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
-                )
-                fig_line.update_layout(height=410, margin=dict(l=10, r=10, t=60, b=30))
-                st.plotly_chart(fig_line, use_container_width=True)
+            # Single KPI card
+            st.markdown(
+                f"""
+                <div class="kpi-box">
+                  <div class="kpi-title">{scope_label} — Viability Score • {year_i}</div>
+                  <div class="kpi-number">{'-' if np.isnan(val) else f'{val:,.3f}'}</div>
+                  <div class="kpi-sub"></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
 
 
         with t2:
