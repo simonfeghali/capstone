@@ -798,10 +798,6 @@ with tab_eda:
     with cap_right:
         info_button("capex_trend")
 
-    # --- TOP KPI slots (only the small KPIs you trigger will render here) ---
-    top_k1, top_k2 = st.columns([1, 1], gap="large")
-    _top_slots = [top_k1, top_k2]
-    _top_i = [0]  # mutable index
 
     # De-dup helpers (CAPEX tab only)
     shown_kpi_keys: set = set()
@@ -908,6 +904,11 @@ with tab_eda:
     sel_grade_eda = st.selectbox("Grade", grade_options,
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
+    
+    # --- TOP KPI slots (only the small KPIs you trigger will render here) ---
+    top_k1, top_k2 = st.columns([1, 1], gap="large")
+    _top_slots = [top_k1, top_k2]
+    _top_i = [0]  # mutable index
     # A placeholder right under the Grade filter for the single KPI
     below_grade_kpi = st.empty()
 
