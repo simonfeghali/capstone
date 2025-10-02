@@ -1243,7 +1243,12 @@ with tab_sectors:
     metric = st.radio("Metric", ["Companies", "Jobs Created", "Capex", "Projects"],
                       horizontal=True, index=0, key="metric_sel")
 
-    cdf = sectors_df[sectors_df["country"] == sel_sector_country].copy()
+    # Normalize the chosen country for data + display
+    sel_country_canon = _canon_country(sel_sector_country)         # e.g., "GCC"
+    display_country   = "GCC" if sel_country_canon == "GCC" else sel_country_canon
+
+
+    cdf = sectors_df[sectors_df["country"] == sel_country_canon].copy()
     if metric == "Capex": cdf["capex"] = cdf["capex"] / 1000.0
 
     if not cdf.empty:
