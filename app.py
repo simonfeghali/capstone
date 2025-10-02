@@ -844,7 +844,7 @@ with tab_eda:
         fig = px.line(pd.DataFrame({"x": x_vals, "y": y_vals}), x="x", y="y", markers=True, title=title)
         if color:
             fig.update_traces(line=dict(color=color))
-        fig.update_traces(hovertemplate="Year: %{x}<br>Capex: %{y:,.0f} $B<extra></extra>")
+        fig.update_traces(hovertemplate="Year: %{x}<br>Capex: %{y:,.3f} $B<extra></extra>")
         fig.update_xaxes(title=labels_x, type="category", showgrid=False)
         fig.update_yaxes(title=labels_y, showgrid=False)
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
@@ -954,7 +954,7 @@ with tab_eda:
         if map_df.empty: st.info("No CAPEX data for this selection.")
         else:
             fig = px.choropleth(map_df,locations="country",locationmode="country names",color="capex",color_continuous_scale="Blues",title=map_title,)
-            fig.update_traces(hovertemplate="Country: %{location}<br>Capex: %{z:,.0f} $B<extra></extra>")
+            fig.update_traces(hovertemplate="Country: %{location}<br>Capex: %{z:,.3f} $B<extra></extra>")
             fig.update_coloraxes(showscale=True)
             scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
                          "North America":"north america","South America":"south america",
@@ -1068,7 +1068,7 @@ with tab_eda:
                                     labels={"year_str": "", "capex": "", "grade": "Grade"},
                                     title="CAPEX Trend by Grade ($B)"
                                 )
-                                fig.update_traces(mode="lines+markers",hovertemplate="Year: %{x}<br>Capex: %{y:,.0f} $B<br>Grade: %{fullData.name}<extra></extra>")
+                                fig.update_traces(mode="lines+markers",hovertemplate="Year: %{x}<br>Capex: %{y:,.3f} $B<br>Grade: %{fullData.name}<extra></extra>")
                                 fig.update_xaxes(type="category",
                                                  categoryorder="array",
                                                  categoryarray=sorted(tg["year_str"].unique().tolist()),
