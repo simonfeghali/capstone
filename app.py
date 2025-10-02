@@ -1297,11 +1297,12 @@ with tab_sectors:
     else:
         val = float(cdf.loc[cdf["sector"] == sel_sector, value_col].sum()) if not cdf.empty else 0.0
         unit = {"Companies":"", "Jobs Created":"", "Capex":" (USD B)", "Projects":""}[metric]
+        fmt_val = f"{val:,.3f}" if metric == "Capex" else f"{int(val):,}"
         st.markdown(
             f"""
             <div class="kpi-box">
               <div class="kpi-title">{display_country} — {sel_sector} • {metric}</div>
-              <div class="kpi-number">{val:,.3f}</div>
+              <div class="kpi-number">{fmt_val}</div>
               <div class="kpi-sub">{unit}</div>
             </div>
             """,
@@ -1571,11 +1572,12 @@ with tab_dest:
         with left:
             val = float(ddf.loc[ddf["destination_country"] == sel_dest_country, value_col_dest].sum()) if not ddf.empty else 0.0
             unit = {"Companies":"", "Jobs Created":"", "Capex":" (USD B)", "Projects":""}[metric_dest]
+            fmt_val = f"{val:,.3f}" if metric_dest == "Capex" else f"{int(val):,}"
             st.markdown(
                 f"""
                 <div class="kpi-box">
                   <div class="kpi-title">{shown_src_label} → {sel_dest_country} • {metric_dest}</div>
-                  <div class="kpi-number">{val:,.3f}</div>
+                  <div class="kpi-number">{fmt_val}</div>
                   <div class="kpi-sub">{unit}</div>
                 </div>
                 """,
