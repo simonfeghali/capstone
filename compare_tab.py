@@ -372,32 +372,19 @@ def render_compare_tab():
         info_button("compare")
     emit_auto_jump_script()
 
-    # -------- Controls: Year & Entities (multiselect up to 6) --------
+    # -------- Entities (multiselect up to 6) --------
     wb_years  = sorted(wb["year"].dropna().astype(int).unique().tolist())
-    cap_years = sorted(cap["year"].dropna().astype(int).unique().tolist())
-    years_all = sorted(set(wb_years).union(cap_years))
-
-    c1, c2 = st.columns([1, 3], gap="small")
-    with c1:
-        year_opts = ["All"] + years_all
-        year_any = st.selectbox("Year", year_opts, index=0, key="cmp_year")
-
     latest_wb_year = max(wb_years) if wb_years else None
     all_countries = sorted(wb.loc[wb["year"] == latest_wb_year, "country"].dropna().unique().tolist()) if latest_wb_year else []
     continents = sorted(wb["continent"].dropna().unique().tolist())
     options_labels, label_map = _build_selection_lists(all_countries, continents)
 
-    with c2:
-        default_candidates = ["United States", "France"]
-        default_labels = [c for c in default_candidates if c in label_map][:2]
-        if not default_labels:
-            default_labels = [c for c in options_labels if c not in HEADERS][:2]
-        sel_labels = st.multiselect(
-            "Select countries/continents (up to 6)",
-            options=options_labels,
-            default=default_labels,
-            max_selections=6
-        )
+    sel_labels = st.multiselect(
+        "Select countries/continents (up to 6)",
+        options=options_labels,
+        default=[c for c in ["United States", "France"] if c in label_map][:2] or [c for c in options_labels if c not in HEADERS][:2],
+        max_selections=6
+    )
 
     if len(sel_labels) == 0:
         st.info("Pick at least one country or continent.")
