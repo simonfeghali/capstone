@@ -18,6 +18,7 @@ FILES = {
     "destinations": "merged_destinations_data.csv",
 }
 
+# Countries we have complete Sectors/Destinations drilldowns for
 SECT_DEST_ALLOWED = {
     "Canada","China","France","Germany","Japan","Netherlands",
     "South Korea","United Arab Emirates","United Kingdom","United States"
@@ -266,7 +267,6 @@ def load_destinations():
             errors="coerce"
         )
 
-    # canonicalize both source and destination country names
     df["source_country"]      = df["source_raw"].astype(str).str.strip().map(_canon_country)
     df["destination_country"] = df["dest_raw"].astype(str).str.strip().map(_canon_country)
 
@@ -346,10 +346,16 @@ def _expand_capex_series(cap, wb, kind, name, disp):
     c["ys"] = c["year"].astype(int).astype(str)
     return c[["entity","year","ys","capex"]]
 
+def _responsive_columns(n, max_per_row=4):
+    """Yield Streamlit columns in rows of up to max_per_row."""
+    for i in range(0, n, max_per_row):
+        cols = st.columns(min(max_per_row, n - i), gap="large")
+        yield cols, i
+
 # ================= Public entrypoint =================
 def render_compare_tab():
     wb      = load_wb()
-    wb_avg  = load_wb_avg()
+    load_wb_avg()  # kept cached (not used directly here but may be useful later)
     cap     = load_capex()
     sec     = load_sectors()
     dst     = load_destinations()
@@ -400,11 +406,8 @@ def render_compare_tab():
     # Parse selection into structured list, skipping headers
     sel_entities = [label_map[lbl] for lbl in sel_labels if lbl in label_map]  # (kind, name, display)
 
-    # For sectors/destinations we only consider first two selected countries (not continents)
-    only_countries = [disp for kind,name,disp in sel_entities if kind == "country"]
-    a = only_countries[0] if len(only_countries) >= 1 else None
-    b = only_countries[1] if len(only_countries) >= 2 else None
-    allowed_pair = bool(a and b and (a in SECT_DEST_ALLOWED) and (b in SECT_DEST_ALLOWED))
+    # Country-only list for Sectors/Destinations (and also filtered to allowed)
+    sel_countries_allowed = [disp for (kind, name, disp) in sel_entities if kind == "country" and disp in SECT_DEST_ALLOWED]
 
     st.markdown("---")
 
@@ -466,60 +469,67 @@ def render_compare_tab():
     else:
         st.info("No CAPEX data for selection.")
 
-    # ======================= Sectors (first two selections that are countries only) =======================
-    if a and b and allowed_pair:
-        st.markdown("---")
-        st.subheader("Sectors")
-        sec = load_sectors()
-        if sec.empty:
-            st.caption("No sectors data available.")
+    # ======================= Sectors — show for ALL eligible selected countries =======================
+    st.markdown("---")
+    st.subheader("Sectors")
+
+    if not sel_countries_allowed:
+        st.caption("Select one or more **top**/allowed countries to see sector KPIs.")
+    elif sec.empty:
+        st.caption("No sectors data available.")
+    else:
+        sectors_list = sorted(sec["sector"].dropna().unique().tolist())
+        c1, c2 = st.columns([1, 1], gap="small")
+        with c1:
+            sector_opt = st.selectbox("Sector", sectors_list, index=0, key="cmp_sector")
+        with c2:
+            sector_metric = st.selectbox("Metric", ["Companies","Jobs Created","Capex","Projects"], index=0, key="cmp_sector_metric")
+        metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
+        col = metric_map[sector_metric]
+
+        # Display KPIs for all selected eligible countries
+        n = len(sel_countries_allowed)
+        for cols, i in _responsive_columns(n, max_per_row=4):
+            for j, country in enumerate(sel_countries_allowed[i:i+len(cols)]):
+                with cols[j]:
+                    val = float(sec.loc[(sec["country"] == country) & (sec["sector"] == sector_opt), col].sum())
+                    st.markdown(f"**{country}**")
+                    _kpi(f"{sector_opt} • {sector_metric}", val, "USD m" if col == "capex" else "")
+
+    # ======================= Destinations — show for ALL eligible selected countries =======================
+    st.markdown("---")
+    st.subheader("Destinations")
+
+    if not sel_countries_allowed:
+        st.caption("Select one or more **top**/allowed countries to see destination KPIs.")
+    elif dst.empty:
+        st.caption("No destinations data available.")
+    else:
+        # Union of destinations for the selected allowed sources
+        all_dests = set()
+        for src_cty in sel_countries_allowed:
+            all_dests.update(dst.loc[dst["source_country"] == src_cty, "destination_country"].dropna().unique().tolist())
+        union_dests = sorted(all_dests)
+
+        c1, c2 = st.columns([1, 1], gap="small")
+        with c1:
+            dest_country = st.selectbox("Destination country", union_dests, index=0 if union_dests else None, key="cmp_dest_country")
+        with c2:
+            dest_metric = st.selectbox("Metric", ["Companies","Jobs Created","Capex","Projects"], index=0, key="cmp_dest_metric")
+
+        metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
+        col = metric_map[dest_metric]
+
+        if not union_dests:
+            st.caption("No destination options for the current selection.")
         else:
-            sectors_list = sorted(sec["sector"].dropna().unique().tolist())
-            c1, c2 = st.columns([1, 1], gap="small")
-            with c1:
-                sector_opt = st.selectbox("Sector", sectors_list, index=0, key="cmp_sector")
-            with c2:
-                sector_metric = st.selectbox("Metric", ["Companies","Jobs Created","Capex","Projects"], index=0, key="cmp_sector_metric")
-            metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
-            col = metric_map[sector_metric]
-            valA = float(sec.loc[(sec["country"] == a) & (sec["sector"] == sector_opt), col].sum())
-            valB = float(sec.loc[(sec["country"] == b) & (sec["sector"] == sector_opt), col].sum())
-
-            left, right = st.columns(2, gap="large")
-            with left:
-                st.markdown(f"**{a}**")
-                _kpi(f"{sector_opt} • {sector_metric}", valA, "USD m" if col == "capex" else "")
-            with right:
-                st.markdown(f"**{b}**")
-                _kpi(f"{sector_opt} • {sector_metric}", valB, "USD m" if col == "capex" else "")
-
-    # ======================= Destinations (first two selections that are countries only) =======================
-    if a and b and allowed_pair:
-        st.markdown("---")
-        st.subheader("Destinations")
-        dst = load_destinations()
-        if dst.empty:
-            st.caption("No destinations data available.")
-        else:
-            destsA = sorted(dst.loc[dst["source_country"] == a, "destination_country"].dropna().unique().tolist())
-            destsB = sorted(dst.loc[dst["source_country"] == b, "destination_country"].dropna().unique().tolist())
-            union_dests = sorted(set(destsA).union(destsB))
-
-            c1, c2 = st.columns([1, 1], gap="small")
-            with c1:
-                dest_country = st.selectbox("Destination country", union_dests, index=0 if union_dests else None, key="cmp_dest_country")
-            with c2:
-                dest_metric = st.selectbox("Metric", ["Companies","Jobs Created","Capex","Projects"], index=0, key="cmp_dest_metric")
-
-            metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
-            col = metric_map[dest_metric]
-            valA = float(dst.loc[(dst["source_country"] == a) & (dst["destination_country"] == dest_country), col].sum()) if union_dests else np.nan
-            valB = float(dst.loc[(dst["source_country"] == b) & (dst["destination_country"] == dest_country), col].sum()) if union_dests else np.nan
-
-            left, right = st.columns(2, gap="large")
-            with left:
-                st.markdown(f"**{a}**")
-                _kpi(f"{a} → {dest_country} • {dest_metric}", valA, "USD m" if col == "capex" else "")
-            with right:
-                st.markdown(f"**{b}**")
-                _kpi(f"{b} → {dest_country} • {dest_metric}", valB, "USD m" if col == "capex" else "")
+            n = len(sel_countries_allowed)
+            for cols, i in _responsive_columns(n, max_per_row=4):
+                for j, country in enumerate(sel_countries_allowed[i:i+len(cols)]):
+                    with cols[j]:
+                        val = float(dst.loc[
+                            (dst["source_country"] == country) &
+                            (dst["destination_country"] == dest_country), col
+                        ].sum())
+                        st.markdown(f"**{country}**")
+                        _kpi(f"{country} → {dest_country} • {dest_metric}", val, "USD m" if col == "capex" else "")
