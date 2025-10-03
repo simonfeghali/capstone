@@ -41,12 +41,12 @@ def _raw(fname: str) -> str:
 def _find_col(cols, *cands):
     low = {str(c).lower(): c for c in cols}
     for c in cands:
-      if c.lower() in low:
-        return low[c.lower()]
+        if c.lower() in low:
+            return low[c.lower()]
     for cand in cands:
-      for col in cols:
-        if cand.lower() in str(col).lower():
-          return col
+        for col in cols:
+            if cand.lower() in str(col).lower():
+                return col
     return None
 
 def _style_compare_line(fig, unit: str | None = None):
@@ -332,7 +332,6 @@ def _expand_score_series(wb, kind, name, disp):
     if kind == "country":
         s = wb[wb["country"] == name].groupby(["year"], as_index=False)["score"].mean()
     else:
-        # continent aggregate = mean score across countries in that continent
         s = (wb[wb["continent"] == name]
              .groupby(["year"], as_index=False)["score"].mean())
     if s.empty:
@@ -345,7 +344,6 @@ def _expand_capex_series(cap, wb, kind, name, disp):
     if kind == "country":
         c = cap[cap["country"] == name].groupby(["year"], as_index=False)["capex"].sum()
     else:
-        # for continent: sum CAPEX of all countries in that continent
         countries_in = wb[wb["continent"] == name]["country"].unique().tolist()
         c = cap[cap["country"].isin(countries_in)].groupby(["year"], as_index=False)["capex"].sum()
     if c.empty:
@@ -417,226 +415,122 @@ def render_compare_tab():
 
     st.markdown("---")
 
-    # ======================= SCORE =======================
+    # ======================= SCORE — LINE ONLY =======================
     st.subheader("Score & Grade")
-
-    # View options
-    col_vm, col_lb = st.columns([1,1])
-    with col_vm:
-        view_mode = st.radio("View", options=["Overlay", "Heatmap table"], index=0, horizontal=True)
-    with col_lb:
-        show_all_labels = st.checkbox("Show labels on every point", value=(len(sel_entities) <= 3))
+    show_all_labels = st.checkbox("Show labels on every point", value=(len(sel_entities) <= 3), key="cmp_score_labels")
 
     # Build combined score df
     score_parts = [_expand_score_series(wb, kind, name, disp) for (kind,name,disp) in sel_entities]
     score_df = pd.concat(score_parts, ignore_index=True) if score_parts else pd.DataFrame(columns=["entity","year","ys","score"])
 
     if not score_df.empty:
-        if view_mode == "Overlay":
-            last_year = score_df["year"].max()
-            score_df["label"] = np.where(score_df["year"].eq(last_year),
-                                         score_df["score"].map(lambda v: f"{v:.3f}"), "")
+        last_year = score_df["year"].max()
+        score_df["label"] = np.where(score_df["year"].eq(last_year),
+                                     score_df["score"].map(lambda v: f"{v:.3f}"), "")
 
-            fig_score = px.line(
-                score_df, x="ys", y="score", color="entity", markers=True,
-                text=("score" if show_all_labels else "label"),
-                color_discrete_sequence=px.colors.qualitative.Safe,
-                title="Viability Score Trend"
-            )
+        fig_score = px.line(
+            score_df, x="ys", y="score", color="entity", markers=True,
+            text=("score" if show_all_labels else "label"),
+            color_discrete_sequence=px.colors.qualitative.Safe,
+            title="Viability Score Trend"
+        )
 
-            if len(sel_entities) >= 6:
-                dash_seq = ["solid","dot","dash","longdash","dashdot","longdashdot"]
-                dash_map = {e[2]: dash_seq[i % len(dash_seq)] for i, e in enumerate(sel_entities)}
-                for disp, d in dash_map.items():
-                    fig_score.for_each_trace(lambda tr: tr.update(line=dict(dash=d)) if tr.name == disp else ())
+        if len(sel_entities) >= 6:
+            dash_seq = ["solid","dot","dash","longdash","dashdot","longdashdot"]
+            dash_map = {e[2]: dash_seq[i % len(dash_seq)] for i, e in enumerate(sel_entities)}
+            for disp, d in dash_map.items():
+                fig_score.for_each_trace(lambda tr: tr.update(line=dict(dash=d)) if tr.name == disp else ())
 
-            fig_score.update_xaxes(type="category", showgrid=False, title=None)
-            yvals = score_df["score"].astype(float)
-            pad = max((yvals.max() - yvals.min()) * 0.12, 0.002)
-            fig_score.update_yaxes(visible=False, range=[float(yvals.min()-pad), float(yvals.max()+pad)])
-            fig_score.update_traces(
-                textposition=("top center" if show_all_labels else "middle right"),
-                cliponaxis=False,
-                hovertemplate="Series: %{fullData.name}<br>Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
-            )
-            fig_score.update_layout(
-                legend=dict(orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.02),
-                margin=dict(l=10, r=200, t=60, b=30),
-                height=380,
-                legend_title_text=None
-            )
+        fig_score.update_xaxes(type="category", showgrid=False, title=None)
+        yvals = score_df["score"].astype(float)
+        pad = max((yvals.max() - yvals.min()) * 0.12, 0.002)
+        fig_score.update_yaxes(visible=False, range=[float(yvals.min()-pad), float(yvals.max()+pad)])
+        fig_score.update_traces(
+            textposition=("top center" if show_all_labels else "middle right"),
+            cliponaxis=False,
+            hovertemplate="Series: %{fullData.name}<br>Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
+        )
+        fig_score.update_layout(
+            legend=dict(orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.02),
+            margin=dict(l=10, r=200, t=60, b=30),
+            height=380,
+            legend_title_text=None
+        )
 
-            # KPI stack at right (latest available year per series)
-            plot_col, kpi_col = st.columns([5, 1.8], gap="large")
-            with plot_col:
-                st.plotly_chart(fig_score, use_container_width=True)
-            with kpi_col:
-                kyear = last_year
-                for i, (kind, name, disp) in enumerate(sel_entities):
-                    if kind == "country":
-                        row = wb[(wb["country"] == name) & (wb["year"] == kyear)]
-                        sc = row["score"].mean() if not row.empty else np.nan
-                        gr = (row["grade"].dropna().astype(str).iloc[0]
-                              if (not row.empty and row["grade"].notna().any()) else "-")
-                        cont = (row["continent"].dropna().iloc[0]
-                                if (not row.empty and row["continent"].notna().any()) else "-")
-                    else:
-                        sc = wb.loc[(wb["continent"] == name) & (wb["year"] == kyear), "score"].mean()
-                        gr = "-"  # undefined for continent aggregate
-                        cont = name
-                    st.markdown(f"**{disp}**")
-                    st.markdown(f"**Score:** {sc:.3f} &nbsp;&nbsp; **Grade:** {gr}" if pd.notna(sc) else "**Score:** –")
-                    st.markdown(f"**Continent:** {cont}")
-                    if i < len(sel_entities)-1:
-                        st.markdown("<hr style='margin:8px 0; opacity:.25'>", unsafe_allow_html=True)
-
-        else:
-            # ---------- Score & Grade: Heatmap table ----------
-            s_list = []
-            for kind, name, disp in sel_entities:
+        # KPI stack at right (latest available year per series)
+        plot_col, kpi_col = st.columns([5, 1.8], gap="large")
+        with plot_col:
+            st.plotly_chart(fig_score, use_container_width=True)
+        with kpi_col:
+            kyear = last_year
+            for i, (kind, name, disp) in enumerate(sel_entities):
                 if kind == "country":
-                    s = (wb[wb["country"] == name]
-                         .groupby(["year"], as_index=False)
-                         .agg(score=("score","mean"),
-                              grade=("grade", lambda x: x.dropna().astype(str).iloc[0] if x.notna().any() else "-")))
+                    row = wb[(wb["country"] == name) & (wb["year"] == kyear)]
+                    sc = row["score"].mean() if not row.empty else np.nan
+                    gr = (row["grade"].dropna().astype(str).iloc[0]
+                          if (not row.empty and row["grade"].notna().any()) else "-")
+                    cont = (row["continent"].dropna().iloc[0]
+                            if (not row.empty and row["continent"].notna().any()) else "-")
                 else:
-                    s = (wb[wb["continent"] == name]
-                         .groupby(["year"], as_index=False)
-                         .agg(score=("score","mean")))
-                    s["grade"] = "-"  # no grade for continents
-                s["entity"] = disp
-                s_list.append(s)
-
-            s = pd.concat(s_list, ignore_index=True) if s_list else pd.DataFrame(columns=["entity","year","score","grade"])
-            if s.empty:
-                st.info("No score data for the selection.")
-            else:
-                s["year"] = s["year"].astype(int)
-                years = sorted(s["year"].unique().tolist())
-
-                p_score = s.pivot(index="entity", columns="year", values="score").reindex(index=[e[2] for e in sel_entities])
-                text_map = (s
-                            .assign(txt=lambda d: d["score"].map(lambda v: f"{v:.3f}") + " (" + d["grade"].astype(str) + ")")
-                            .pivot(index="entity", columns="year", values="txt")
-                            .reindex(index=[e[2] for e in sel_entities]))
-
-                fig_hm = px.imshow(
-                    p_score.to_numpy(),
-                    x=years,
-                    y=p_score.index.tolist(),
-                    color_continuous_scale="Blues",
-                    aspect="auto",
-                    origin="lower"
-                )
-                fig_hm.update_traces(
-                    text=text_map.to_numpy(),
-                    texttemplate="%{text}",
-                    hovertemplate="Series: %{y}<br>Year: %{x}<br>Score: %{z:.3f}<extra></extra>"
-                )
-                fig_hm.update_layout(
-                    title="Score & Grade (Heatmap)",
-                    margin=dict(l=10, r=10, t=60, b=10),
-                    height=140 + 40 * len(sel_entities),
-                    xaxis=dict(side="top", showgrid=False, title=None),
-                    yaxis=dict(showgrid=False, title=None),
-                    coloraxis_colorbar=dict(title="")
-                )
-                fig_hm.update_xaxes(showgrid=False, type="category")
-                fig_hm.update_yaxes(showgrid=False)
-                st.plotly_chart(fig_hm, use_container_width=True)
+                    sc = wb.loc[(wb["continent"] == name) & (wb["year"] == kyear), "score"].mean()
+                    gr = "-"  # undefined for continent aggregate
+                    cont = name
+                st.markdown(f"**{disp}**")
+                st.markdown(f"**Score:** {sc:.3f} &nbsp;&nbsp; **Grade:** {gr}" if pd.notna(sc) else "**Score:** –")
+                st.markdown(f"**Continent:** {cont}")
+                if i < len(sel_entities)-1:
+                    st.markdown("<hr style='margin:8px 0; opacity:.25'>", unsafe_allow_html=True)
     else:
         st.info("No score data for selection.")
 
     st.markdown("---")
 
-    # ======================= CAPEX =======================
+    # ======================= CAPEX — LINE ONLY =======================
     st.subheader("CAPEX")
+    scale = st.radio("Scale", options=["Absolute ($B)", "Index (base=100)", "Log"],
+                     index=0, horizontal=True, key="cmp_cap_scale")
 
     cap_parts = [_expand_capex_series(cap, wb, kind, name, disp) for (kind,name,disp) in sel_entities]
     cap_df = pd.concat(cap_parts, ignore_index=True) if cap_parts else pd.DataFrame(columns=["entity","year","ys","capex"])
 
     if not cap_df.empty:
-        scale = st.radio("Scale", options=["Absolute ($B)", "Index (base=100)", "Log"],
-                         index=0, horizontal=True)
-
         plot_df = cap_df.copy()
         if scale == "Index (base=100)":
             plot_df["capex"] = (plot_df.sort_values("year")
                                 .groupby("entity")["capex"]
                                 .transform(lambda s: (s / s.iloc[0])*100 if s.iloc[0] else np.nan))
             title_suffix = "Index=100"
+            hover_suffix = ""
         elif scale == "Log":
             plot_df["capex"] = np.log10(plot_df["capex"].clip(lower=1e-6))
             title_suffix = "log10"
+            hover_suffix = " (log10)"
         else:
             title_suffix = "$B"
+            hover_suffix = " $B"
 
-        if view_mode == "Overlay":
-            fig_cap = px.line(
-                plot_df, x="ys", y="capex", color="entity", markers=True,
-                color_discrete_sequence=px.colors.qualitative.Safe,
-                title=f"CAPEX Trend ({title_suffix})"
-            )
-            if len(sel_entities) >= 6:
-                dash_seq = ["solid","dot","dash","longdash","dashdot","longdashdot"]
-                dash_map = {e[2]: dash_seq[i % len(dash_seq)] for i, e in enumerate(sel_entities)}
-                for disp, d in dash_map.items():
-                    fig_cap.for_each_trace(lambda tr: tr.update(line=dict(dash=d)) if tr.name == disp else ())
+        fig_cap = px.line(
+            plot_df, x="ys", y="capex", color="entity", markers=True,
+            color_discrete_sequence=px.colors.qualitative.Safe,
+            title=f"CAPEX Trend ({title_suffix})"
+        )
 
-            fig_cap.update_xaxes(type="category", showgrid=False, title=None)
-            fig_cap.update_yaxes(showgrid=False, title=None)
-            fig_cap.update_traces(hovertemplate="Series: %{fullData.name}<br>Year: %{x}<br>Value: %{y:.2f}<extra></extra>")
-            fig_cap.update_layout(
-                legend=dict(orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.02),
-                margin=dict(l=10, r=200, t=60, b=30),
-                height=380,
-                legend_title_text=None
-            )
-            st.plotly_chart(fig_cap, use_container_width=True)
+        if len(sel_entities) >= 6:
+            dash_seq = ["solid","dot","dash","longdash","dashdot","longdashdot"]
+            dash_map = {e[2]: dash_seq[i % len(dash_seq)] for i, e in enumerate(sel_entities)}
+            for disp, d in dash_map.items():
+                fig_cap.for_each_trace(lambda tr: tr.update(line=dict(dash=d)) if tr.name == disp else ())
 
-        else:
-            c = plot_df.copy()
-            if c.empty:
-                st.info("No CAPEX data for the selection.")
-            else:
-                c["year"] = c["year"].astype(int)
-                years = sorted(c["year"].unique().tolist())
-
-                p_cap = c.pivot(index="entity", columns="year", values="capex").reindex(index=[e[2] for e in sel_entities])
-
-                def fmt_val(v):
-                    if pd.isna(v): return "–"
-                    if scale == "Absolute ($B)":
-                        return f"{v:,.2f}"
-                    if scale.startswith("Index"):
-                        return f"{v:,.0f}"
-                    return f"{v:.2f}"  # log
-
-                text_cap = p_cap.applymap(fmt_val)
-
-                fig_cap_hm = px.imshow(
-                    p_cap.to_numpy(),
-                    x=years,
-                    y=p_cap.index.tolist(),
-                    color_continuous_scale="Blues",
-                    aspect="auto",
-                    origin="lower"
-                )
-                fig_cap_hm.update_traces(
-                    text=text_cap.to_numpy(),
-                    texttemplate="%{text}",
-                    hovertemplate="Series: %{y}<br>Year: %{x}<br>Value: %{z:.2f}<extra></extra>"
-                )
-                fig_cap_hm.update_layout(
-                    title=f"CAPEX Heatmap ({'log10' if scale=='Log' else ('Index=100' if scale.startswith('Index') else '$B')})",
-                    xaxis_title="Year",
-                    yaxis_title=None,
-                    margin=dict(l=10, r=10, t=60, b=10),
-                    height=140 + 40 * len(sel_entities)
-                )
-                fig_cap_hm.update_xaxes(showgrid=False, type="category")
-                fig_cap_hm.update_yaxes(showgrid=False)
-                st.plotly_chart(fig_cap_hm, use_container_width=True)
+        fig_cap.update_xaxes(type="category", showgrid=False, title=None)
+        fig_cap.update_yaxes(showgrid=False, title=None)
+        fig_cap.update_traces(hovertemplate=f"Series: %{{fullData.name}}<br>Year: %{{x}}<br>Value: %{{y:.2f}}{hover_suffix}<extra></extra>")
+        fig_cap.update_layout(
+            legend=dict(orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.02),
+            margin=dict(l=10, r=200, t=60, b=30),
+            height=380,
+            legend_title_text=None
+        )
+        st.plotly_chart(fig_cap, use_container_width=True)
     else:
         st.info("No CAPEX data for selection.")
 
