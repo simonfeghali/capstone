@@ -463,7 +463,7 @@ def _plot_forecast_unified(country: str,
         },
         hovermode="x",
         hoverlabel=dict(bgcolor="white", font_size=12, font_color="black"),
-        margin=dict(l=120, r=10, t=90, b=10),  # increase left margin so axis and title line up
+        margin=dict(l=10, r=10, t=90, b=10),  # increase left margin so axis and title line up
         height=520,
         xaxis=dict(tickfont=dict(size=12),automargin=True),
         yaxis=dict(tickfont=dict(size=12), automargin=True),
