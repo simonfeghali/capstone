@@ -399,7 +399,7 @@ def render_compare_tab():
     st.markdown("---")
 
     # ======================= SCORE — LINE (labels always) =======================
-    st.subheader("Score & Grade")
+    st.subheader("Score")
 
     score_parts = [_expand_score_series(wb, kind, name, disp) for (kind,name,disp) in sel_entities]
     score_df = pd.concat(score_parts, ignore_index=True) if score_parts else pd.DataFrame(columns=["entity","year","ys","score"])
