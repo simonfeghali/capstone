@@ -504,9 +504,9 @@ def render_compare_tab():
         # 3) Build dynamic parts
         metric_label_map = {
             "Companies": "number of companies",
-            "Jobs Created": "jobs created",
+            "Jobs Created": "number of jobs created",
             "Capex": "capex (USD m)",
-            "Projects": "projects",
+            "Projects": "number of projects",
         }
         # Countries list like “A”, “A and B”, or “A, B, and C”
         if len(sel_countries_allowed) == 0:
@@ -541,7 +541,6 @@ def render_compare_tab():
 
     # ======================= Destinations — show for ALL eligible selected countries =======================
     st.markdown("---")
-    
 
     if not sel_countries_allowed:
         st.caption("Select one or more **top**/allowed countries to see destination KPIs.")
