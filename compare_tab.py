@@ -56,7 +56,7 @@ def _style_compare_line(fig, unit: str | None = None):
         htmpl = "Series: %{fullData.name}<br>Year: %{x}<br>Value: %{y:.2f} $B<extra></extra>"
     else:
         htmpl = "Series: %{fullData.name}<br>Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
-    fig.update_traces(hovertemplate=htmpl)
+    fig.update_traces(mode="lines+markers", hovertemplate=htmpl, texttemplate=None, textposition=None)
     fig.update_xaxes(type="category", showgrid=False, title=None)
     fig.update_yaxes(showgrid=False, title=None)
     fig.update_layout(hovermode="closest")
@@ -355,7 +355,7 @@ def _responsive_columns(n, max_per_row=4):
 # ================= Public entrypoint =================
 def render_compare_tab():
     wb      = load_wb()
-    load_wb_avg()  # cached
+    load_wb_avg()  # kept cached (not used directly here but may be useful later)
     cap     = load_capex()
     sec     = load_sectors()
     dst     = load_destinations()
@@ -405,11 +405,13 @@ def render_compare_tab():
 
     # Parse selection into structured list, skipping headers
     sel_entities = [label_map[lbl] for lbl in sel_labels if lbl in label_map]  # (kind, name, display)
+
+    # Country-only list for Sectors/Destinations (and also filtered to allowed)
     sel_countries_allowed = [disp for (kind, name, disp) in sel_entities if kind == "country" and disp in SECT_DEST_ALLOWED]
 
     st.markdown("---")
 
-    # ======================= SCORE — LINE (labels ON the lines) =======================
+    # ======================= SCORE — LINE (labels always) =======================
     st.subheader("Score & Grade")
 
     score_parts = [_expand_score_series(wb, kind, name, disp) for (kind,name,disp) in sel_entities]
@@ -419,16 +421,10 @@ def render_compare_tab():
         score_df["txt"] = score_df["score"].map(lambda v: f"{v:.3f}")
 
         fig_score = px.line(
-            score_df, x="ys", y="score", color="entity",
+            score_df, x="ys", y="score", color="entity", markers=True,
+            text="txt",
             color_discrete_sequence=px.colors.qualitative.Safe,
             title="Viability Score Trend"
-        )
-        # put numbers ON the lines
-        fig_score.update_traces(
-            mode="lines+markers+text",
-            text=score_df["txt"],
-            textposition="middle center",
-            cliponaxis=False
         )
 
         if len(sel_entities) >= 6:
@@ -441,6 +437,7 @@ def render_compare_tab():
         pad = max((yvals.max() - yvals.min()) * 0.12, 0.002)
         fig_score.update_xaxes(type="category", showgrid=False, title=None)
         fig_score.update_yaxes(visible=False, range=[float(yvals.min()-pad), float(yvals.max()+pad)])
+        fig_score.update_traces(textposition="top center", cliponaxis=False)
         _style_compare_line(fig_score, unit=None)
         st.plotly_chart(fig_score, use_container_width=True)
     else:
@@ -472,7 +469,7 @@ def render_compare_tab():
     else:
         st.info("No CAPEX data for selection.")
 
-    # ======================= Sectors — ALL eligible selected countries =======================
+    # ======================= Sectors — show for ALL eligible selected countries =======================
     st.markdown("---")
     st.subheader("Sectors")
 
@@ -490,6 +487,7 @@ def render_compare_tab():
         metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
         col = metric_map[sector_metric]
 
+        # Display KPIs for all selected eligible countries
         n = len(sel_countries_allowed)
         for cols, i in _responsive_columns(n, max_per_row=4):
             for j, country in enumerate(sel_countries_allowed[i:i+len(cols)]):
@@ -498,7 +496,7 @@ def render_compare_tab():
                     st.markdown(f"**{country}**")
                     _kpi(f"{sector_opt} • {sector_metric}", val, "USD m" if col == "capex" else "")
 
-    # ======================= Destinations — ALL eligible selected countries =======================
+    # ======================= Destinations — show for ALL eligible selected countries =======================
     st.markdown("---")
     st.subheader("Destinations")
 
@@ -507,6 +505,7 @@ def render_compare_tab():
     elif dst.empty:
         st.caption("No destinations data available.")
     else:
+        # Union of destinations for the selected allowed sources
         all_dests = set()
         for src_cty in sel_countries_allowed:
             all_dests.update(dst.loc[dst["source_country"] == src_cty, "destination_country"].dropna().unique().tolist())
