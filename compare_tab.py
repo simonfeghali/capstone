@@ -411,21 +411,34 @@ def render_compare_tab():
             score_df, x="ys", y="score", color="entity", markers=True,
             text="txt",
             color_discrete_sequence=px.colors.qualitative.Safe,
-            title="Viability Score Trend"
+            title="(will be overridden)"
         )
-
+        
         if len(sel_entities) >= 6:
             dash_seq = ["solid","dot","dash","longdash","dashdot","longdashdot"]
             dash_map = {e[2]: dash_seq[i % len(dash_seq)] for i, e in enumerate(sel_entities)}
             for disp, d in dash_map.items():
                 fig_score.for_each_trace(lambda tr: tr.update(line=dict(dash=d)) if tr.name == disp else ())
-
+        
         yvals = score_df["score"].astype(float)
         pad = max((yvals.max() - yvals.min()) * 0.12, 0.002)
         fig_score.update_xaxes(type="category", showgrid=False, title=None)
         fig_score.update_yaxes(visible=False, range=[float(yvals.min()-pad), float(yvals.max()+pad)])
         fig_score.update_traces(textposition="top center", cliponaxis=False)
         _style_compare_line(fig_score, unit=None)
+        
+        # Title + subtitle LEFT, aligned with y-axis via automargin
+        fig_score.update_layout(
+            title={
+                "text": "Comparative Viability Score Trends (2021–2023)"
+                        "<br><sup>Tracks year-over-year FDI viability scores for selected countries/continents.</sup>",
+                "x": 0.0, "xanchor": "left"
+            },
+            margin=dict(l=10, r=10, t=90, b=10),
+            yaxis=dict(automargin=True),
+            xaxis=dict(automargin=True)
+        )
+        
         st.plotly_chart(fig_score, use_container_width=True)
     else:
         st.info("No score data for selection.")
@@ -442,23 +455,35 @@ def render_compare_tab():
         fig_cap = px.line(
             cap_df, x="ys", y="capex", color="entity", markers=True,
             color_discrete_sequence=px.colors.qualitative.Safe,
-            title="CAPEX Trend ($B)"
+            title="(will be overridden)"
         )
-
+        
         if len(sel_entities) >= 6:
             dash_seq = ["solid","dot","dash","longdash","dashdot","longdashdot"]
             dash_map = {e[2]: dash_seq[i % len(dash_seq)] for i, e in enumerate(sel_entities)}
             for disp, d in dash_map.items():
                 fig_cap.for_each_trace(lambda tr: tr.update(line=dict(dash=d)) if tr.name == disp else ())
-
+        
         _style_compare_line(fig_cap, unit="$B")
+        
+        # Title + subtitle LEFT, aligned with y-axis via automargin
+        fig_cap.update_layout(
+            title={
+                "text": "Comparative Capex trends (2021-2024)"
+                        "<br><sup>Tracks year-over-year CAPEX for selected countries.</sup>",
+                "x": 0.0, "xanchor": "left"
+            },
+            margin=dict(l=10, r=10, t=90, b=10),
+            yaxis=dict(automargin=True),
+            xaxis=dict(automargin=True)
+        )
+        
         st.plotly_chart(fig_cap, use_container_width=True)
     else:
         st.info("No CAPEX data for selection.")
 
     # ======================= Sectors — show for ALL eligible selected countries =======================
     st.markdown("---")
-    st.subheader("Sectors")
 
     if not sel_countries_allowed:
         st.caption("Select one or more **top**/allowed countries to see sector KPIs.")
@@ -474,6 +499,20 @@ def render_compare_tab():
         metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
         col = metric_map[sector_metric]
 
+        desc_map = {
+            "Companies": "number of companies",
+            "Jobs Created": "jobs created",
+            "Capex": "capex (USD m)",
+            "Projects": "projects",
+        }
+        st.markdown(
+            "<h3 style='margin:0'>Sectoral Benchmarking</h3>"
+            f"<div style='opacity:.75; margin:.25rem 0 .75rem'>"
+            f"Compares the {desc_map.get(sector_metric, sector_metric.lower())} in a chosen sector across the selected countries."
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
         # Display KPIs for all selected eligible countries
         n = len(sel_countries_allowed)
         for cols, i in _responsive_columns(n, max_per_row=4):
@@ -485,13 +524,30 @@ def render_compare_tab():
 
     # ======================= Destinations — show for ALL eligible selected countries =======================
     st.markdown("---")
-    st.subheader("Destinations")
+    
 
     if not sel_countries_allowed:
         st.caption("Select one or more **top**/allowed countries to see destination KPIs.")
     elif dst.empty:
         st.caption("No destinations data available.")
     else:
+        if sel_countries_allowed:
+            if len(sel_countries_allowed) == 1:
+                sources_text = sel_countries_allowed[0]
+            elif len(sel_countries_allowed) == 2:
+                sources_text = f"{sel_countries_allowed[0]} and {sel_countries_allowed[1]}"
+            else:
+                sources_text = ", ".join(sel_countries_allowed[:-1]) + f", and {sel_countries_allowed[-1]}"
+        else:
+            sources_text = "the selected countries"
+    
+        st.markdown(
+            "<h3 style='margin:0'>Outbound FDI Destinations</h3>"
+            f"<div style='opacity:.75; margin:.25rem 0 .75rem'>"
+            f"Benchmarks top outward investment destinations from {sources_text}."
+            f"</div>",
+            unsafe_allow_html=True
+        )
         # Union of destinations for the selected allowed sources
         all_dests = set()
         for src_cty in sel_countries_allowed:
