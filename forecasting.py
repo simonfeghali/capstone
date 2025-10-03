@@ -531,15 +531,6 @@ def render_forecasting_tab():
     
         start_year = int(st.session_state.hist_range_locked[0])
     
-        # (Optional) visually disable the right thumb so it looks locked
-        st.markdown("""
-        <style>
-          /* Targets the right thumb of range sliders; affects all range sliders on the page */
-          div[data-baseweb="slider"] div[role="slider"]:last-child{
-            pointer-events:none; opacity:0.6;
-          }
-        </style>
-        """, unsafe_allow_html=True)
     
     else:
         start_year = 2015
