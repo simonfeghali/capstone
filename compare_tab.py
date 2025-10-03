@@ -490,30 +490,47 @@ def render_compare_tab():
     elif sec.empty:
         st.caption("No sectors data available.")
     else:
+        # 1) Reserve a spot ABOVE the filters for the title/subtitle
+        sectors_title_ph = st.empty()
+    
+        # 2) Filters (render below the placeholder)
         sectors_list = sorted(sec["sector"].dropna().unique().tolist())
         c1, c2 = st.columns([1, 1], gap="small")
         with c1:
             sector_opt = st.selectbox("Sector", sectors_list, index=0, key="cmp_sector")
         with c2:
             sector_metric = st.selectbox("Metric", ["Companies","Jobs Created","Capex","Projects"], index=0, key="cmp_sector_metric")
-        metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
-        col = metric_map[sector_metric]
-
-        desc_map = {
+    
+        # 3) Build dynamic parts
+        metric_label_map = {
             "Companies": "number of companies",
             "Jobs Created": "jobs created",
             "Capex": "capex (USD m)",
             "Projects": "projects",
         }
-        st.markdown(
+        # Countries list like “A”, “A and B”, or “A, B, and C”
+        if len(sel_countries_allowed) == 0:
+            countries_text = "the selected countries"
+        elif len(sel_countries_allowed) == 1:
+            countries_text = sel_countries_allowed[0]
+        elif len(sel_countries_allowed) == 2:
+            countries_text = f"{sel_countries_allowed[0]} and {sel_countries_allowed[1]}"
+        else:
+            countries_text = ", ".join(sel_countries_allowed[:-1]) + f", and {sel_countries_allowed[-1]}"
+    
+        # 4) Fill the placeholder (appears ABOVE filters)
+        sectors_title_ph.markdown(
             "<h3 style='margin:0'>Sectoral Benchmarking</h3>"
             f"<div style='opacity:.75; margin:.25rem 0 .75rem'>"
-            f"Compares the {desc_map.get(sector_metric, sector_metric.lower())} in a chosen sector across the selected countries."
+            f"Compares the {metric_label_map.get(sector_metric, sector_metric.lower())} in a chosen sector across {countries_text}."
             f"</div>",
             unsafe_allow_html=True
         )
-
-        # Display KPIs for all selected eligible countries
+    
+        # 5) KPIs
+        metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
+        col = metric_map[sector_metric]
+    
         n = len(sel_countries_allowed)
         for cols, i in _responsive_columns(n, max_per_row=4):
             for j, country in enumerate(sel_countries_allowed[i:i+len(cols)]):
