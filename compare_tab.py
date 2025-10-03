@@ -52,10 +52,10 @@ def _find_col(cols, *cands):
 def _style_compare_line(fig, unit: str | None = None):
     """Apply consistent styling/hover to compare tab line charts."""
     if unit == "$B":
-        htmpl = "Year: %{x}<br>FDI: %{y:.4f} $B<extra></extra>"
+        htmpl = "Series: %{fullData.name}<br>Year: %{x}<br>Value: %{y:.2f} $B<extra></extra>"
     else:
-        htmpl = "Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
-    fig.update_traces(mode="lines+markers", hovertemplate=htmpl, text=None, texttemplate=None, textposition=None)
+        htmpl = "Series: %{fullData.name}<br>Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
+    fig.update_traces(mode="lines+markers", hovertemplate=htmpl, texttemplate=None, textposition=None)
     fig.update_xaxes(type="category", showgrid=False, title=None)
     fig.update_yaxes(showgrid=False, title=None)
     fig.update_layout(hovermode="closest")
@@ -188,7 +188,7 @@ def load_capex():
 
     m["year"]   = pd.to_numeric(m["year"], errors="coerce").astype("Int64")
     m["capex"]  = m["capex"].map(_numify)
-    # Convert CAPEX from millions to billions
+    # Convert CAPEX from millions to billions (absolute scale only)
     m["capex"] = m["capex"] / 1000.0
     m["country"] = m["country"].astype(str).str.strip().map(_canon_country)
 
@@ -311,13 +311,9 @@ def _grade_pill(g: str) -> str:
 
 # ---------- Entity helpers (country vs continent) ----------
 def _build_selection_lists(all_countries, continents):
-    # Compose options with headers. Headers are included in the options but ignored on read.
     top = [c for c in TOP_COUNTRIES if c in all_countries]
     others = [c for c in all_countries if c not in top]
-
     options = [HDR_TOP] + top + [HDR_CONT] + continents + [HDR_OTHER] + others
-
-    # mapping label -> (kind, name, display)
     m = {}
     for c in top:
         m[c] = ("country", c, c)
@@ -325,15 +321,13 @@ def _build_selection_lists(all_countries, continents):
         m[ct] = ("continent", ct, f"{ct} (aggregate)")
     for c in others:
         m[c] = ("country", c, c)
-
     return options, m
 
 def _expand_score_series(wb, kind, name, disp):
     if kind == "country":
         s = wb[wb["country"] == name].groupby(["year"], as_index=False)["score"].mean()
     else:
-        s = (wb[wb["continent"] == name]
-             .groupby(["year"], as_index=False)["score"].mean())
+        s = (wb[wb["continent"] == name].groupby(["year"], as_index=False)["score"].mean())
     if s.empty:
         return pd.DataFrame(columns=["entity","year","score","ys"])
     s["entity"] = disp
@@ -388,7 +382,6 @@ def render_compare_tab():
     options_labels, label_map = _build_selection_lists(all_countries, continents)
 
     with c2:
-        # defaults: United States, France if available
         default_candidates = ["United States", "France"]
         default_labels = [c for c in default_candidates if c in label_map][:2]
         if not default_labels:
@@ -405,7 +398,7 @@ def render_compare_tab():
         st.stop()
 
     # Parse selection into structured list, skipping headers
-    sel_entities = [label_map[lbl] for lbl in sel_labels if lbl in label_map]  # tuples (kind, name, display)
+    sel_entities = [label_map[lbl] for lbl in sel_labels if lbl in label_map]  # (kind, name, display)
 
     # For sectors/destinations we only consider first two selected countries (not continents)
     only_countries = [disp for kind,name,disp in sel_entities if kind == "country"]
@@ -415,22 +408,18 @@ def render_compare_tab():
 
     st.markdown("---")
 
-    # ======================= SCORE — LINE ONLY =======================
+    # ======================= SCORE — LINE (labels always) =======================
     st.subheader("Score & Grade")
-    show_all_labels = st.checkbox("Show labels on every point", value=(len(sel_entities) <= 3), key="cmp_score_labels")
 
-    # Build combined score df
     score_parts = [_expand_score_series(wb, kind, name, disp) for (kind,name,disp) in sel_entities]
     score_df = pd.concat(score_parts, ignore_index=True) if score_parts else pd.DataFrame(columns=["entity","year","ys","score"])
 
     if not score_df.empty:
-        last_year = score_df["year"].max()
-        score_df["label"] = np.where(score_df["year"].eq(last_year),
-                                     score_df["score"].map(lambda v: f"{v:.3f}"), "")
+        score_df["txt"] = score_df["score"].map(lambda v: f"{v:.3f}")
 
         fig_score = px.line(
             score_df, x="ys", y="score", color="entity", markers=True,
-            text=("score" if show_all_labels else "label"),
+            text="txt",
             color_discrete_sequence=px.colors.qualitative.Safe,
             title="Viability Score Trend"
         )
@@ -441,78 +430,29 @@ def render_compare_tab():
             for disp, d in dash_map.items():
                 fig_score.for_each_trace(lambda tr: tr.update(line=dict(dash=d)) if tr.name == disp else ())
 
-        fig_score.update_xaxes(type="category", showgrid=False, title=None)
         yvals = score_df["score"].astype(float)
         pad = max((yvals.max() - yvals.min()) * 0.12, 0.002)
+        fig_score.update_xaxes(type="category", showgrid=False, title=None)
         fig_score.update_yaxes(visible=False, range=[float(yvals.min()-pad), float(yvals.max()+pad)])
-        fig_score.update_traces(
-            textposition=("top center" if show_all_labels else "middle right"),
-            cliponaxis=False,
-            hovertemplate="Series: %{fullData.name}<br>Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
-        )
-        fig_score.update_layout(
-            legend=dict(orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.02),
-            margin=dict(l=10, r=200, t=60, b=30),
-            height=380,
-            legend_title_text=None
-        )
-
-        # KPI stack at right (latest available year per series)
-        plot_col, kpi_col = st.columns([5, 1.8], gap="large")
-        with plot_col:
-            st.plotly_chart(fig_score, use_container_width=True)
-        with kpi_col:
-            kyear = last_year
-            for i, (kind, name, disp) in enumerate(sel_entities):
-                if kind == "country":
-                    row = wb[(wb["country"] == name) & (wb["year"] == kyear)]
-                    sc = row["score"].mean() if not row.empty else np.nan
-                    gr = (row["grade"].dropna().astype(str).iloc[0]
-                          if (not row.empty and row["grade"].notna().any()) else "-")
-                    cont = (row["continent"].dropna().iloc[0]
-                            if (not row.empty and row["continent"].notna().any()) else "-")
-                else:
-                    sc = wb.loc[(wb["continent"] == name) & (wb["year"] == kyear), "score"].mean()
-                    gr = "-"  # undefined for continent aggregate
-                    cont = name
-                st.markdown(f"**{disp}**")
-                st.markdown(f"**Score:** {sc:.3f} &nbsp;&nbsp; **Grade:** {gr}" if pd.notna(sc) else "**Score:** –")
-                st.markdown(f"**Continent:** {cont}")
-                if i < len(sel_entities)-1:
-                    st.markdown("<hr style='margin:8px 0; opacity:.25'>", unsafe_allow_html=True)
+        fig_score.update_traces(textposition="top center", cliponaxis=False)
+        _style_compare_line(fig_score, unit=None)
+        st.plotly_chart(fig_score, use_container_width=True)
     else:
         st.info("No score data for selection.")
 
     st.markdown("---")
 
-    # ======================= CAPEX — LINE ONLY =======================
+    # ======================= CAPEX — LINE (absolute only) =======================
     st.subheader("CAPEX")
-    scale = st.radio("Scale", options=["Absolute ($B)", "Index (base=100)", "Log"],
-                     index=0, horizontal=True, key="cmp_cap_scale")
 
     cap_parts = [_expand_capex_series(cap, wb, kind, name, disp) for (kind,name,disp) in sel_entities]
     cap_df = pd.concat(cap_parts, ignore_index=True) if cap_parts else pd.DataFrame(columns=["entity","year","ys","capex"])
 
     if not cap_df.empty:
-        plot_df = cap_df.copy()
-        if scale == "Index (base=100)":
-            plot_df["capex"] = (plot_df.sort_values("year")
-                                .groupby("entity")["capex"]
-                                .transform(lambda s: (s / s.iloc[0])*100 if s.iloc[0] else np.nan))
-            title_suffix = "Index=100"
-            hover_suffix = ""
-        elif scale == "Log":
-            plot_df["capex"] = np.log10(plot_df["capex"].clip(lower=1e-6))
-            title_suffix = "log10"
-            hover_suffix = " (log10)"
-        else:
-            title_suffix = "$B"
-            hover_suffix = " $B"
-
         fig_cap = px.line(
-            plot_df, x="ys", y="capex", color="entity", markers=True,
+            cap_df, x="ys", y="capex", color="entity", markers=True,
             color_discrete_sequence=px.colors.qualitative.Safe,
-            title=f"CAPEX Trend ({title_suffix})"
+            title="CAPEX Trend ($B)"
         )
 
         if len(sel_entities) >= 6:
@@ -521,15 +461,7 @@ def render_compare_tab():
             for disp, d in dash_map.items():
                 fig_cap.for_each_trace(lambda tr: tr.update(line=dict(dash=d)) if tr.name == disp else ())
 
-        fig_cap.update_xaxes(type="category", showgrid=False, title=None)
-        fig_cap.update_yaxes(showgrid=False, title=None)
-        fig_cap.update_traces(hovertemplate=f"Series: %{{fullData.name}}<br>Year: %{{x}}<br>Value: %{{y:.2f}}{hover_suffix}<extra></extra>")
-        fig_cap.update_layout(
-            legend=dict(orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.02),
-            margin=dict(l=10, r=200, t=60, b=30),
-            height=380,
-            legend_title_text=None
-        )
+        _style_compare_line(fig_cap, unit="$B")
         st.plotly_chart(fig_cap, use_container_width=True)
     else:
         st.info("No CAPEX data for selection.")
@@ -538,6 +470,7 @@ def render_compare_tab():
     if a and b and allowed_pair:
         st.markdown("---")
         st.subheader("Sectors")
+        sec = load_sectors()
         if sec.empty:
             st.caption("No sectors data available.")
         else:
@@ -564,6 +497,7 @@ def render_compare_tab():
     if a and b and allowed_pair:
         st.markdown("---")
         st.subheader("Destinations")
+        dst = load_destinations()
         if dst.empty:
             st.caption("No destinations data available.")
         else:
