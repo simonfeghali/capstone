@@ -456,7 +456,7 @@ def _plot_forecast_unified(country: str,
     fig.update_layout(
         title={
             "text": f"{title_main}<br><sup>{subtitle_text}</sup>",
-            "x": 0.0,           # center the title
+            "x": 0.5,           # center the title
             "xanchor": "center",
         },
         hovermode="x",
