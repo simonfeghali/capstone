@@ -456,13 +456,14 @@ def _plot_forecast_unified(country: str,
     fig.update_layout(
         title={
             "text": f"{title_main}<br><sup>{subtitle_text}</sup>",
-            "x": 0.5,           # center the title
-            "xanchor": "center",
+            "x": 0.0,            # align to the left
+            "xanchor": "left",   # anchor on the left
+            "y": 0.98,           # slightly below the top
+            "yanchor": "top",
         },
         hovermode="x",
         hoverlabel=dict(bgcolor="white", font_size=12, font_color="black"),
-        # give a bit more top padding to fit the subtitle
-        margin=dict(l=10, r=10, t=90, b=10),
+        margin=dict(l=80, r=10, t=90, b=10),  # increase left margin so axis and title line up
         height=520,
         xaxis=dict(tickfont=dict(size=12)),
         yaxis=dict(tickfont=dict(size=12)),
