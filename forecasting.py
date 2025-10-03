@@ -450,11 +450,19 @@ def _plot_forecast_unified(country: str,
         title_text=""
     )
 
+    title_main = "FDI Forecast (2024–2028) — Country-Level Projections"
+    subtitle_text = f"{country} | Modeled using {best_name} | Forecast horizon: 2024–2028 | Error metric: RMSE (Test)"
+    
     fig.update_layout(
-        title=f"{best_name} Forecast for {country} | RMSE: {rmse:.2f} $B",
+        title={
+            "text": f"{title_main}<br><sup>{subtitle_text}</sup>",
+            "x": 0.0,           # center the title
+            "xanchor": "center",
+        },
         hovermode="x",
         hoverlabel=dict(bgcolor="white", font_size=12, font_color="black"),
-        margin=dict(l=10, r=10, t=60, b=10),
+        # give a bit more top padding to fit the subtitle
+        margin=dict(l=10, r=10, t=90, b=10),
         height=520,
         xaxis=dict(tickfont=dict(size=12)),
         yaxis=dict(tickfont=dict(size=12)),
