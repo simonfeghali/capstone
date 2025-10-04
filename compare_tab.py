@@ -13,7 +13,7 @@ from overview import info_button, emit_auto_jump_script
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
     "wb":       "world_bank_data_with_scores_and_continent.csv",
-    "wb_avg":   "world_bank_data_average_scores_and_grades.csv",  # used when Year = All
+    "wb_avg":   "world_bank_data_average_scores_and_grades.csv",  # used for KPI panel
     "cap":      "capex_EDA_cleaned_filled.csv",
     "sectors":  "merged_sectors_data.csv",
     "destinations": "merged_destinations_data.csv",
@@ -126,7 +126,7 @@ def load_wb():
 
 @st.cache_data(show_spinner=False)
 def load_wb_avg():
-    """Averages file used when Year = All."""
+    """Averages file used for the KPI panel."""
     try:
         df = pd.read_csv(_raw(FILES["wb_avg"]))
     except (URLError, HTTPError, FileNotFoundError) as e:
@@ -262,7 +262,7 @@ def load_destinations():
     })
     for c in ["companies","jobs_created","capex","projects"]:
         df[c] = pd.to_numeric(
-            pd.Series(df[c]).astype str()
+            pd.Series(df[c]).astype(str)
             .str.replace(",", "", regex=False)
             .str.replace(r"[^\d\.\-]", "", regex=True),
             errors="coerce"
@@ -332,7 +332,7 @@ def _expand_score_series(wb, kind, name, disp):
     if s.empty:
         return pd.DataFrame(columns=["entity","year","score","ys"])
     s["entity"] = disp
-    s["ys"] = s["year"].astype(int).astype str()
+    s["ys"] = s["year"].astype(int).astype(str)
     return s[["entity","year","ys","score"]]
 
 def _expand_capex_series(cap, wb, kind, name, disp):
@@ -344,7 +344,7 @@ def _expand_capex_series(cap, wb, kind, name, disp):
     if c.empty:
         return pd.DataFrame(columns=["entity","year","capex","ys"])
     c["entity"] = disp
-    c["ys"] = c["year"].astype(int).astype str()
+    c["ys"] = c["year"].astype(int).astype(str)
     return c[["entity","year","ys","capex"]]
 
 def _responsive_columns(n, max_per_row=4):
@@ -445,7 +445,7 @@ def render_compare_tab():
             legend_title_text=None
         )
 
-        # Plot + KPI panel (Avg Score, Grade, Continent) — arranged in up to 2 columns, 3 rows each
+        # Plot + KPI panel (Avg Score, Grade, Continent) — up to 2 cols, 3 rows each
         plot_col, kpi_col = st.columns([5, 1.8], gap="large")
         with plot_col:
             st.plotly_chart(fig_score, use_container_width=True)
@@ -473,7 +473,6 @@ def render_compare_tab():
                     st.markdown(f"**Avg Score:** {sc:.3f} &nbsp;&nbsp; **Grade:** {gr}" if pd.notna(sc) else "**Avg Score:** –")
                     st.markdown(f"**Continent:** {cont}")
 
-                    # add a divider unless it's the last item in that column
                     within_col_idx = i % rows_per_col
                     is_last_item = (i == len(sel_entities) - 1)
                     if (within_col_idx < rows_per_col - 1) and not is_last_item:
