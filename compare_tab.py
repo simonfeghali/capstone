@@ -319,7 +319,8 @@ def _build_selection_lists(all_countries, continents):
     for c in top:
         m[c] = ("country", c, c)
     for ct in continents:
-        m[ct] = ("continent", ct)
+        # Display just the continent name; do not append "(aggregate)"
+        m[ct] = ("continent", ct, ct)
     for c in others:
         m[c] = ("country", c, c)
     return options, m
@@ -464,14 +465,14 @@ def render_compare_tab():
                               if (not avg_row.empty and avg_row["grade"].notna().any()) else "-")
                         cont_series = wb.loc[wb["country"] == name, "continent"].dropna()
                         cont = cont_series.iloc[-1] if not cont_series.empty else "-"
+                        st.markdown(f"**{disp}**")
+                        st.markdown(f"**Avg Score:** {sc:.3f} &nbsp;&nbsp; **Grade:** {gr}" if pd.notna(sc) else "**Avg Score:** –")
+                        st.markdown(f"**Continent:** {cont}")
                     else:
+                        # Continent selected: show ONLY Avg Score
                         sc = float(wb.loc[wb["continent"] == name, "score"].mean())
-                        gr = "-"  # undefined for continent aggregate
-                        cont = name
-
-                    st.markdown(f"**{disp}**")
-                    st.markdown(f"**Avg Score:** {sc:.3f} &nbsp;&nbsp; **Grade:** {gr}" if pd.notna(sc) else "**Avg Score:** –")
-                    st.markdown(f"**Continent:** {cont}")
+                        st.markdown(f"**{disp}**")
+                        st.markdown(f"**Avg Score:** {sc:.3f}" if pd.notna(sc) else "**Avg Score:** –")
 
                     within_col_idx = i % rows_per_col
                     is_last_item = (i == len(sel_entities) - 1)
