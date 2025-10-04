@@ -319,7 +319,7 @@ def _build_selection_lists(all_countries, continents):
     for c in top:
         m[c] = ("country", c, c)
     for ct in continents:
-        m[ct] = ("continent", ct, f"{ct} (aggregate)")
+        m[ct] = ("continent", ct)
     for c in others:
         m[c] = ("country", c, c)
     return options, m
