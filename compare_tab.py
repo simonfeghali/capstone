@@ -569,16 +569,16 @@ def render_compare_tab():
 
         sectors_title_ph.markdown(
             f"""
-            <div style="font-size:28px; font-weight:800; line-height:1.2; margin:0;">
-              <b>Sectoral Benchmarking</b>
-            </div>
+            <h3 style="margin:0; font-weight:800 !important; line-height:1.2; font-size:28px;">
+              Sectoral Benchmarking
+            </h3>
             <div style="color:#6b7280; margin:.35rem 0 1rem;">
               Compares the {metric_label_map.get(sector_metric, sector_metric.lower())} in a chosen sector across {countries_text}.
             </div>
             """,
             unsafe_allow_html=True
         )
-
+        
         metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
         col = metric_map[sector_metric]
 
@@ -610,15 +610,16 @@ def render_compare_tab():
 
         st.markdown(
             f"""
-            <div style="font-size:28px; font-weight:800; line-height:1.2; margin:0;">
-              <b>Outbound FDI Destinations</b>
-            </div>
+            <h3 style="margin:0; font-weight:800 !important; line-height:1.2; font-size:28px;">
+              Outbound FDI Destinations
+            </h3>
             <div style="color:#6b7280; margin:.35rem 0 1rem;">
-              Benchmarks top outward investment destinations from {countries_text}.
+              Benchmarks top outward investment destinations from {sources_text}.
             </div>
             """,
             unsafe_allow_html=True
         )
+        
         # Union of destinations for the selected allowed sources
         all_dests = set()
         for src_cty in sel_countries_allowed:
