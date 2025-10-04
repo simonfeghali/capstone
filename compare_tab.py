@@ -6,6 +6,7 @@ import plotly.express as px
 from urllib.parse import quote
 from urllib.error import URLError, HTTPError
 import re
+import math
 from overview import info_button, emit_auto_jump_script
 
 # ================= Config =================
@@ -261,7 +262,7 @@ def load_destinations():
     })
     for c in ["companies","jobs_created","capex","projects"]:
         df[c] = pd.to_numeric(
-            pd.Series(df[c]).astype(str)
+            pd.Series(df[c]).astype str()
             .str.replace(",", "", regex=False)
             .str.replace(r"[^\d\.\-]", "", regex=True),
             errors="coerce"
@@ -331,7 +332,7 @@ def _expand_score_series(wb, kind, name, disp):
     if s.empty:
         return pd.DataFrame(columns=["entity","year","score","ys"])
     s["entity"] = disp
-    s["ys"] = s["year"].astype(int).astype(str)
+    s["ys"] = s["year"].astype(int).astype str()
     return s[["entity","year","ys","score"]]
 
 def _expand_capex_series(cap, wb, kind, name, disp):
@@ -343,7 +344,7 @@ def _expand_capex_series(cap, wb, kind, name, disp):
     if c.empty:
         return pd.DataFrame(columns=["entity","year","capex","ys"])
     c["entity"] = disp
-    c["ys"] = c["year"].astype(int).astype(str)
+    c["ys"] = c["year"].astype(int).astype str()
     return c[["entity","year","ys","capex"]]
 
 def _responsive_columns(n, max_per_row=4):
@@ -444,28 +445,39 @@ def render_compare_tab():
             legend_title_text=None
         )
 
-        # Plot + KPI panel (Avg Score, Grade, Continent)
+        # Plot + KPI panel (Avg Score, Grade, Continent) — arranged in up to 2 columns, 3 rows each
         plot_col, kpi_col = st.columns([5, 1.8], gap="large")
         with plot_col:
             st.plotly_chart(fig_score, use_container_width=True)
         with kpi_col:
+            rows_per_col = 3
+            num_cols = max(1, min(2, math.ceil(len(sel_entities) / rows_per_col)))
+            cols = st.columns(num_cols, gap="large")
+
             for i, (kind, name, disp) in enumerate(sel_entities):
-                if kind == "country":
-                    avg_row = wb_avg[wb_avg["country"] == name]
-                    sc = float(avg_row["avg_score"].mean()) if not avg_row.empty else np.nan
-                    gr = (avg_row["grade"].dropna().astype(str).iloc[0]
-                          if (not avg_row.empty and avg_row["grade"].notna().any()) else "-")
-                    cont_series = wb.loc[wb["country"] == name, "continent"].dropna()
-                    cont = cont_series.iloc[-1] if not cont_series.empty else "-"
-                else:
-                    sc = float(wb.loc[wb["continent"] == name, "score"].mean())
-                    gr = "-"  # undefined for continent aggregate
-                    cont = name
-                st.markdown(f"**{disp}**")
-                st.markdown(f"**Avg Score:** {sc:.3f} &nbsp;&nbsp; **Grade:** {gr}" if pd.notna(sc) else "**Avg Score:** –")
-                st.markdown(f"**Continent:** {cont}")
-                if i < len(sel_entities)-1:
-                    st.markdown("<hr style='margin:8px 0; opacity:.25'>", unsafe_allow_html=True)
+                target = cols[min(i // rows_per_col, num_cols - 1)]
+                with target:
+                    if kind == "country":
+                        avg_row = wb_avg[wb_avg["country"] == name]
+                        sc = float(avg_row["avg_score"].mean()) if not avg_row.empty else np.nan
+                        gr = (avg_row["grade"].dropna().astype(str).iloc[0]
+                              if (not avg_row.empty and avg_row["grade"].notna().any()) else "-")
+                        cont_series = wb.loc[wb["country"] == name, "continent"].dropna()
+                        cont = cont_series.iloc[-1] if not cont_series.empty else "-"
+                    else:
+                        sc = float(wb.loc[wb["continent"] == name, "score"].mean())
+                        gr = "-"  # undefined for continent aggregate
+                        cont = name
+
+                    st.markdown(f"**{disp}**")
+                    st.markdown(f"**Avg Score:** {sc:.3f} &nbsp;&nbsp; **Grade:** {gr}" if pd.notna(sc) else "**Avg Score:** –")
+                    st.markdown(f"**Continent:** {cont}")
+
+                    # add a divider unless it's the last item in that column
+                    within_col_idx = i % rows_per_col
+                    is_last_item = (i == len(sel_entities) - 1)
+                    if (within_col_idx < rows_per_col - 1) and not is_last_item:
+                        st.markdown("<hr style='margin:8px 0; opacity:.25'>", unsafe_allow_html=True)
     else:
         st.info("No score data for selection.")
 
