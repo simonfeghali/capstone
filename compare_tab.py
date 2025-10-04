@@ -319,8 +319,7 @@ def _build_selection_lists(all_countries, continents):
     for c in top:
         m[c] = ("country", c, c)
     for ct in continents:
-        # Display just the continent name; do not append "(aggregate)"
-        m[ct] = ("continent", ct, ct)
+        m[ct] = ("continent", ct, ct)  # no " (aggregate)" in the label
     for c in others:
         m[c] = ("country", c, c)
     return options, m
@@ -353,6 +352,49 @@ def _responsive_columns(n, max_per_row=4):
     for i in range(0, n, max_per_row):
         cols = st.columns(min(max_per_row, n - i), gap="large")
         yield cols, i
+
+# ===== Helper to add de-overlapped 2023 labels =====
+def _add_2023_annotations(fig, data_2023):
+    """
+    Add right-aligned annotations at x='2023' for each entity with vertical staggering
+    to avoid overlap when values are close.
+    """
+    if data_2023.empty:
+        return fig
+
+    # Sort by score to assign staggered yshifts
+    d = data_2023.sort_values("score").reset_index(drop=True).copy()
+    n = len(d)
+    # yshift sequence: spread labels up and down around the line
+    base = 12  # px step
+    seq = []
+    for i in range(n):
+        # 0, +1, -1, +2, -2, ...
+        k = (i // 2) + 0
+        seq.append((+1 if i % 2 else -1) * k * base)
+    d["yshift"] = seq
+
+    # Map entity -> color from traces if available
+    color_map = {tr.name: (tr.line.color if tr.line and tr.line.color else None) for tr in fig.data}
+
+    for _, row in d.iterrows():
+        color = color_map.get(row["entity"], None)
+        fig.add_annotation(
+            x="2023", y=float(row["score"]),
+            xref="x", yref="y",
+            text=f"{row['score']:.3f}",
+            showarrow=False,
+            xanchor="left",
+            align="left",
+            xshift=6,            # nudge to the right of the point
+            yshift=int(row["yshift"]),
+            font=dict(size=12, color=color) if color else dict(size=12),
+            bgcolor="rgba(255,255,255,0.7)",  # subtle background to keep readable
+            bordercolor="rgba(0,0,0,0)",
+            borderwidth=0,
+            captureevents=True
+        )
+    return fig
 
 # ================= Public entrypoint =================
 def render_compare_tab():
@@ -400,31 +442,17 @@ def render_compare_tab():
 
     st.markdown("---")
 
-    # ======================= SCORE — LINE (2023 labels on the RIGHT) + KPI panel =======================
+    # ======================= SCORE — LINE (2023 labels) + KPI panel =======================
     st.subheader("Score")
 
     score_parts = [_expand_score_series(wb, kind, name, disp) for (kind,name,disp) in sel_entities]
     score_df = pd.concat(score_parts, ignore_index=True) if score_parts else pd.DataFrame(columns=["entity","year","ys","score"])
 
     if not score_df.empty:
-        # Label only for year 2023, positioned on the right
-        score_df["label_2023"] = np.where(
-            score_df["year"].eq(2023),
-            score_df["score"].map(lambda v: f"{v:.3f}"),
-            ""
-        )
-
         fig_score = px.line(
             score_df, x="ys", y="score", color="entity",
             color_discrete_sequence=px.colors.qualitative.Safe,
             title="Comparative Viability Score Trends (2021–2023)<br><sup>Tracks year-over-year FDI viability scores for selected countries/continents.</sup>"
-        )
-        # add markers + right-side labels for 2023
-        fig_score.update_traces(
-            mode="lines+markers+text",
-            text=score_df["label_2023"],
-            textposition="middle right",
-            cliponaxis=False
         )
 
         if len(sel_entities) >= 6:
@@ -439,10 +467,14 @@ def render_compare_tab():
         fig_score.update_yaxes(visible=False, range=[float(yvals.min()-pad), float(yvals.max()+pad)])
         _style_compare_line(fig_score, unit=None)
 
+        # Add de-overlapped 2023 annotations on the right of each series
+        score_2023 = score_df.loc[score_df["year"].eq(2023), ["entity", "score"]].dropna()
+        fig_score = _add_2023_annotations(fig_score, score_2023)
+
         # Title left-align, add room for right labels and KPI
         fig_score.update_layout(
             title_x=0.0, title_xanchor="left",
-            margin=dict(l=10, r=200, t=90, b=10),
+            margin=dict(l=10, r=220, t=90, b=10),  # a little extra right space for labels
             legend_title_text=None
         )
 
