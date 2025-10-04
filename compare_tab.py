@@ -401,7 +401,6 @@ def render_compare_tab():
     st.markdown("---")
 
     # ======================= SCORE — LINE (2023 labels on the RIGHT) + KPI panel =======================
-    st.subheader("Score")
 
     score_parts = [_expand_score_series(wb, kind, name, disp) for (kind,name,disp) in sel_entities]
     score_df = pd.concat(score_parts, ignore_index=True) if score_parts else pd.DataFrame(columns=["entity","year","ys","score"])
@@ -414,10 +413,22 @@ def render_compare_tab():
             ""
         )
 
+        st.markdown(
+            """
+            <div style="font-size:28px; font-weight:800; line-height:1.2; margin:0;">
+              Comparative Viability Score Trends (2021–2023)
+            </div>
+            <div style="color:#6b7280; margin:.35rem 0 1rem;">
+              Tracks year-over-year FDI viability scores for selected countries/continents.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
         fig_score = px.line(
             score_df, x="ys", y="score", color="entity",
             color_discrete_sequence=px.colors.qualitative.Safe,
-            title="Comparative Viability Score Trends (2021–2023)<br><sup>Tracks year-over-year FDI viability scores for selected countries/continents.</sup>"
+    
         )
         # add markers + right-side labels for 2023
         fig_score.update_traces(
@@ -441,11 +452,12 @@ def render_compare_tab():
 
         # Title left-align, add room for right labels and KPI
         fig_score.update_layout(
-            title_x=0.0, title_xanchor="left",
-            margin=dict(l=10, r=200, t=90, b=10),
-            legend_title_text=None
+            title_text="",
+            margin=dict(l=10, r=10, t=10, b=10),
+            yaxis=dict(automargin=True),
+            xaxis=dict(automargin=True),
         )
-
+        
         # Plot + KPI panel (Avg Score, Grade, Continent) — up to 2 cols, 3 rows each
         plot_col, kpi_col = st.columns([5, 1.8], gap="large")
         with plot_col:
