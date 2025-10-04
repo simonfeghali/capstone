@@ -496,16 +496,26 @@ def render_compare_tab():
     st.markdown("---")
 
     # ======================= CAPEX — LINE (absolute only) =======================
-    st.subheader("CAPEX")
 
     cap_parts = [_expand_capex_series(cap, wb, kind, name, disp) for (kind,name,disp) in sel_entities]
     cap_df = pd.concat(cap_parts, ignore_index=True) if cap_parts else pd.DataFrame(columns=["entity","year","ys","capex"])
 
     if not cap_df.empty:
+        st.markdown(
+            """
+            <div style="font-size:28px; font-weight:800; line-height:1.2; margin:0;">
+              Comparative Capex trends (2021–2024)
+            </div>
+            <div style="color:#6b7280; margin:.35rem 0 1rem;">
+              Tracks year-over-year CAPEX for selected countries.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        
         fig_cap = px.line(
             cap_df, x="ys", y="capex", color="entity", markers=True,
             color_discrete_sequence=px.colors.qualitative.Safe,
-            title="Comparative Capex trends (2021-2024)<br><sup>Tracks year-over-year CAPEX for selected countries.</sup>"
         )
 
         if len(sel_entities) >= 6:
@@ -516,9 +526,10 @@ def render_compare_tab():
 
         _style_compare_line(fig_cap, unit="$B")
         fig_cap.update_layout(
-            title_x=0.0, title_xanchor="left",
-            margin=dict(l=10, r=200, t=90, b=10),
-            legend_title_text=None
+            title_text="",
+            margin=dict(l=10, r=10, t=10, b=10),
+            yaxis=dict(automargin=True),
+            xaxis=dict(automargin=True),
         )
         st.plotly_chart(fig_cap, use_container_width=True)
     else:
