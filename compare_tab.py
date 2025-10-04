@@ -504,7 +504,7 @@ def render_compare_tab():
         st.markdown(
             """
             <div style="font-size:28px; font-weight:800; line-height:1.2; margin:0;">
-              Comparative Capex trends (2021–2024)
+              Comparative Capex Trends (2021–2024)
             </div>
             <div style="color:#6b7280; margin:.35rem 0 1rem;">
               Tracks year-over-year CAPEX for selected countries.
@@ -568,10 +568,14 @@ def render_compare_tab():
             countries_text = ", ".join(sel_countries_allowed[:-1]) + f", and {sel_countries_allowed[-1]}"
 
         sectors_title_ph.markdown(
-            "<h3 style='margin:0'>Sectoral Benchmarking</h3>"
-            f"<div style='opacity:.75; margin:.25rem 0 .75rem'>"
-            f"Compares the {metric_label_map.get(sector_metric, sector_metric.lower())} in a chosen sector across {countries_text}."
-            f"</div>",
+            f"""
+            <div style="font-size:28px; font-weight:800; line-height:1.2; margin:0;">
+              <b>Sectoral Benchmarking</b>
+            </div>
+            <div style="color:#6b7280; margin:.35rem 0 1rem;">
+              Compares the {metric_label_map.get(sector_metric, sector_metric.lower())} in a chosen sector across {countries_text}.
+            </div>
+            """,
             unsafe_allow_html=True
         )
 
@@ -605,10 +609,14 @@ def render_compare_tab():
             sources_text = "the selected countries"
 
         st.markdown(
-            "<h3 style='margin:0'>Outbound FDI Destinations</h3>"
-            f"<div style='opacity:.75; margin:.25rem 0 .75rem'>"
-            f"Benchmarks top outward investment destinations from {sources_text}."
-            f"</div>",
+            f"""
+            <div style="font-size:28px; font-weight:800; line-height:1.2; margin:0;">
+              <b>Outbound FDI Destinations</b>
+            </div>
+            <div style="color:#6b7280; margin:.35rem 0 1rem;">
+              Benchmarks top outward investment destinations from {countries_text}.
+            </div>
+            """,
             unsafe_allow_html=True
         )
         # Union of destinations for the selected allowed sources
