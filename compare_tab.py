@@ -12,7 +12,7 @@ from overview import info_button, emit_auto_jump_script
 RAW_BASE = "https://raw.githubusercontent.com/simonfeghali/capstone/main"
 FILES = {
     "wb":       "world_bank_data_with_scores_and_continent.csv",
-    "wb_avg":   "world_bank_data_average_scores_and_grades.csv",  # used for Avg Score/Grade (countries)
+    "wb_avg":   "world_bank_data_average_scores_and_grades.csv",  # used when Year = All
     "cap":      "capex_EDA_cleaned_filled.csv",
     "sectors":  "merged_sectors_data.csv",
     "destinations": "merged_destinations_data.csv",
@@ -56,7 +56,7 @@ def _style_compare_line(fig, unit: str | None = None):
         htmpl = "Series: %{fullData.name}<br>Year: %{x}<br>Value: %{y:.2f} $B<extra></extra>"
     else:
         htmpl = "Series: %{fullData.name}<br>Year: %{x}<br>Score: %{y:.3f}<extra></extra>"
-    fig.update_traces(hovertemplate=htmpl)
+    fig.update_traces(mode="lines+markers", hovertemplate=htmpl, texttemplate=None, textposition=None)
     fig.update_xaxes(type="category", showgrid=False, title=None)
     fig.update_yaxes(showgrid=False, title=None)
     fig.update_layout(hovermode="closest")
@@ -125,7 +125,7 @@ def load_wb():
 
 @st.cache_data(show_spinner=False)
 def load_wb_avg():
-    """Country averages/grades used for the KPI panel."""
+    """Averages file used when Year = All."""
     try:
         df = pd.read_csv(_raw(FILES["wb_avg"]))
     except (URLError, HTTPError, FileNotFoundError) as e:
@@ -350,7 +350,7 @@ def _responsive_columns(n, max_per_row=4):
 # ================= Public entrypoint =================
 def render_compare_tab():
     wb      = load_wb()
-    wb_avg  = load_wb_avg()   # for KPI panel
+    wb_avg  = load_wb_avg()  # used for KPI panel
     cap     = load_capex()
     sec     = load_sectors()
     dst     = load_destinations()
@@ -385,7 +385,6 @@ def render_compare_tab():
         st.info("Pick at least one country or continent.")
         st.stop()
 
-    # Parse selection into structured list, skipping headers
     sel_entities = [label_map[lbl] for lbl in sel_labels if lbl in label_map]  # (kind, name, display)
     sel_countries_allowed = [disp for (kind, name, disp) in sel_entities if kind == "country" and disp in SECT_DEST_ALLOWED]
 
@@ -398,7 +397,7 @@ def render_compare_tab():
     score_df = pd.concat(score_parts, ignore_index=True) if score_parts else pd.DataFrame(columns=["entity","year","ys","score"])
 
     if not score_df.empty:
-        # Label only for year 2023, placed on the right side of the points
+        # Label only for year 2023, positioned on the right
         score_df["label_2023"] = np.where(
             score_df["year"].eq(2023),
             score_df["score"].map(lambda v: f"{v:.3f}"),
@@ -408,9 +407,8 @@ def render_compare_tab():
         fig_score = px.line(
             score_df, x="ys", y="score", color="entity",
             color_discrete_sequence=px.colors.qualitative.Safe,
-            title="Viability Score Trend"
+            title="(will be overridden)"
         )
-        # add markers and the right-side labels for 2023
         fig_score.update_traces(
             mode="lines+markers+text",
             text=score_df["label_2023"],
@@ -430,10 +428,10 @@ def render_compare_tab():
         fig_score.update_yaxes(visible=False, range=[float(yvals.min()-pad), float(yvals.max()+pad)])
         _style_compare_line(fig_score, unit=None)
 
-        # give room on the right for the labels
+        # leave title alone; just give room on the right for labels
         fig_score.update_layout(margin=dict(l=10, r=200, t=60, b=20), legend_title_text=None)
 
-        # plot + KPI panel (Avg Score, Grade, Continent)
+        # Plot + KPI panel (Avg Score, Grade, Continent)
         plot_col, kpi_col = st.columns([5, 1.8], gap="large")
         with plot_col:
             st.plotly_chart(fig_score, use_container_width=True)
@@ -470,7 +468,7 @@ def render_compare_tab():
         fig_cap = px.line(
             cap_df, x="ys", y="capex", color="entity", markers=True,
             color_discrete_sequence=px.colors.qualitative.Safe,
-            title="Comparative Capex trends"
+            title="(will be overridden)"
         )
 
         if len(sel_entities) >= 6:
@@ -485,7 +483,7 @@ def render_compare_tab():
     else:
         st.info("No CAPEX data for selection.")
 
-    # ======================= Sectors — show for ALL eligible selected countries =======================
+    # ======================= Sectors — ALL eligible selected countries =======================
     st.markdown("---")
 
     if not sel_countries_allowed:
@@ -536,7 +534,7 @@ def render_compare_tab():
                     st.markdown(f"**{country}**")
                     _kpi(f"{sector_opt} • {sector_metric}", val, "USD m" if col == "capex" else "")
 
-    # ======================= Destinations — show for ALL eligible selected countries =======================
+    # ======================= Destinations — ALL eligible selected countries =======================
     st.markdown("---")
 
     if not sel_countries_allowed:
