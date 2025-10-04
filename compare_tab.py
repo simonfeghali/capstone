@@ -355,7 +355,7 @@ def _responsive_columns(n, max_per_row=4):
 # ================= Public entrypoint =================
 def render_compare_tab():
     wb      = load_wb()
-    wb_avg  = load_wb_avg()  # kept cached & used for KPI panel
+    wb_avg  = load_wb_avg()  # used for KPI panel
     cap     = load_capex()
     sec     = load_sectors()
     dst     = load_destinations()
@@ -398,14 +398,14 @@ def render_compare_tab():
 
     st.markdown("---")
 
-    # ======================= SCORE — LINE (labels only for 2023 at right) + KPI panel =======================
+    # ======================= SCORE — LINE (2023 labels on the RIGHT) + KPI panel =======================
     st.subheader("Score")
 
     score_parts = [_expand_score_series(wb, kind, name, disp) for (kind,name,disp) in sel_entities]
     score_df = pd.concat(score_parts, ignore_index=True) if score_parts else pd.DataFrame(columns=["entity","year","ys","score"])
 
     if not score_df.empty:
-        # Only show labels for year 2023 and push them to the right of each point
+        # Label only for year 2023, positioned on the right
         score_df["label_2023"] = np.where(
             score_df["year"].eq(2023),
             score_df["score"].map(lambda v: f"{v:.3f}"),
@@ -415,13 +415,8 @@ def render_compare_tab():
         fig_score = px.line(
             score_df, x="ys", y="score", color="entity",
             color_discrete_sequence=px.colors.qualitative.Safe,
-            title={
-                "text": "Comparative Viability Score Trends (2021–2023)"
-                        "<br><sup>Tracks year-over-year FDI viability scores for selected countries/continents.</sup>",
-                "x": 0.0, "xanchor": "left"
-            }
+            title="Comparative Viability Score Trends (2021–2023)<br><sup>Tracks year-over-year FDI viability scores for selected countries/continents.</sup>"
         )
-
         # add markers + right-side labels for 2023
         fig_score.update_traces(
             mode="lines+markers+text",
@@ -442,10 +437,14 @@ def render_compare_tab():
         fig_score.update_yaxes(visible=False, range=[float(yvals.min()-pad), float(yvals.max()+pad)])
         _style_compare_line(fig_score, unit=None)
 
-        # leave room for right-side labels and the KPI panel
-        fig_score.update_layout(margin=dict(l=10, r=200, t=90, b=10), legend_title_text=None)
+        # Title left-align, add room for right labels and KPI
+        fig_score.update_layout(
+            title_x=0.0, title_xanchor="left",
+            margin=dict(l=10, r=200, t=90, b=10),
+            legend_title_text=None
+        )
 
-        # plot + KPI panel (Avg Score, Grade, Continent)
+        # Plot + KPI panel (Avg Score, Grade, Continent)
         plot_col, kpi_col = st.columns([5, 1.8], gap="large")
         with plot_col:
             st.plotly_chart(fig_score, use_container_width=True)
@@ -482,11 +481,7 @@ def render_compare_tab():
         fig_cap = px.line(
             cap_df, x="ys", y="capex", color="entity", markers=True,
             color_discrete_sequence=px.colors.qualitative.Safe,
-            title={
-                "text": "Comparative Capex trends (2021-2024)"
-                        "<br><sup>Tracks year-over-year CAPEX for selected countries.</sup>",
-                "x": 0.0, "xanchor": "left"
-            }
+            title="Comparative Capex trends (2021-2024)<br><sup>Tracks year-over-year CAPEX for selected countries.</sup>"
         )
 
         if len(sel_entities) >= 6:
@@ -496,12 +491,16 @@ def render_compare_tab():
                 fig_cap.for_each_trace(lambda tr: tr.update(line=dict(dash=d)) if tr.name == disp else ())
 
         _style_compare_line(fig_cap, unit="$B")
-        fig_cap.update_layout(margin=dict(l=10, r=200, t=90, b=10), legend_title_text=None)
+        fig_cap.update_layout(
+            title_x=0.0, title_xanchor="left",
+            margin=dict(l=10, r=200, t=90, b=10),
+            legend_title_text=None
+        )
         st.plotly_chart(fig_cap, use_container_width=True)
     else:
         st.info("No CAPEX data for selection.")
 
-    # ======================= Sectors — show for ALL eligible selected countries =======================
+    # ======================= Sectors — ALL eligible selected countries =======================
     st.markdown("---")
 
     if not sel_countries_allowed:
@@ -509,10 +508,8 @@ def render_compare_tab():
     elif sec.empty:
         st.caption("No sectors data available.")
     else:
-        # 1) Reserve a spot ABOVE the filters for the title/subtitle
-        sectors_title_ph = st.empty()
+        sectors_title_ph = st.empty()  # title/subtitle above filters
 
-        # 2) Filters (render below the placeholder)
         sectors_list = sorted(sec["sector"].dropna().unique().tolist())
         c1, c2 = st.columns([1, 1], gap="small")
         with c1:
@@ -520,14 +517,12 @@ def render_compare_tab():
         with c2:
             sector_metric = st.selectbox("Metric", ["Companies","Jobs Created","Capex","Projects"], index=0, key="cmp_sector_metric")
 
-        # 3) Build dynamic parts
         metric_label_map = {
             "Companies": "number of companies",
             "Jobs Created": "number of jobs created",
             "Capex": "capex (USD m)",
             "Projects": "number of projects",
         }
-        # Countries list like “A”, “A and B”, or “A, B, and C”
         if len(sel_countries_allowed) == 0:
             countries_text = "the selected countries"
         elif len(sel_countries_allowed) == 1:
@@ -537,7 +532,6 @@ def render_compare_tab():
         else:
             countries_text = ", ".join(sel_countries_allowed[:-1]) + f", and {sel_countries_allowed[-1]}"
 
-        # 4) Fill the placeholder (appears ABOVE filters)
         sectors_title_ph.markdown(
             "<h3 style='margin:0'>Sectoral Benchmarking</h3>"
             f"<div style='opacity:.75; margin:.25rem 0 .75rem'>"
@@ -546,7 +540,6 @@ def render_compare_tab():
             unsafe_allow_html=True
         )
 
-        # 5) KPIs
         metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
         col = metric_map[sector_metric]
 
@@ -558,7 +551,7 @@ def render_compare_tab():
                     st.markdown(f"**{country}**")
                     _kpi(f"{sector_opt} • {sector_metric}", val, "USD m" if col == "capex" else "")
 
-    # ======================= Destinations — show for ALL eligible selected countries =======================
+    # ======================= Destinations — ALL eligible selected countries =======================
     st.markdown("---")
 
     if not sel_countries_allowed:
