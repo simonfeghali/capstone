@@ -474,7 +474,7 @@ def _where_clause(cont, country):
     return "Worldwide"
 
 def _subtitle_suffix(year_any):
-    return "(averaged across 2021–2023)" if year_any == "All" else f"(for {_year_token(year_any)})"
+    return "" if year_any == "All" else f"(for {_year_token(year_any)})"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Tabs
