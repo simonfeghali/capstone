@@ -1606,10 +1606,10 @@ with tab_dest:
 
     # Phrase used in titles per metric
     metric_phrase = {
-        "Companies": "number of companies",
-        "Jobs Created": "jobs created",
-        "Capex": "capex (USD B)",
-        "Projects": "number of projects",
+        "Companies": "Number of Companies",
+        "Jobs Created": "Jobs Created",
+        "Capex": "Capex (USD B)",
+        "Projects": "Number of Projects",
     }[metric_dest]
     
     # Use the label you already show in the UI (GCC stays "GCC")
