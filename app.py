@@ -1142,6 +1142,28 @@ def _canon_country(name: str) -> str:
     t = t.replace("Of", "of")
     return t
 
+def _flag_emoji(country: str) -> str:
+    m = {
+        "United States": "🇺🇸",
+        "United Kingdom": "🇬🇧",
+        "Germany": "🇩🇪",
+        "France": "🇫🇷",
+        "China": "🇨🇳",
+        "Japan": "🇯🇵",
+        "South Korea": "🇰🇷",
+        "Canada": "🇨🇦",
+        "Netherlands": "🇳🇱",
+        "United Arab Emirates": "🇦🇪",
+        "Bahrain": "🇧🇭",
+        "Kuwait": "🇰🇼",
+        "Qatar": "🇶🇦",
+        "Oman": "🇴🇲",
+        "Saudi Arabia": "🇸🇦",
+        # No official emoji flag for GCC – use a neutral globe
+        "GCC": "🌍",
+    }
+    return m.get(country, "🌍")
+
 def _canon_sector(sector: str) -> str:
     if not isinstance(sector, str): return ""
     s = sector.strip().lower()
@@ -1274,26 +1296,41 @@ with tab_sectors:
         "Projects":"projects",
     }[metric]
 
+    metric_display = {
+        "Companies": "Companies",
+        "Jobs Created": "Jobs Created",
+        "Capex": "Capex (USD B)",
+        "Projects": "Projects",
+    }[metric]
+    
+    flag = _flag_emoji(display_country)
+    dynamic_title = f"{flag} Sectoral Distribution of {metric_display} in {display_country}"
+
     if sel_sector == "All":
-        bars = cdf[["sector", value_col]].copy()
-        bars = bars.set_index("sector").reindex(SECTORS_CANON, fill_value=0).reset_index()
-        bars = bars.sort_values(value_col, ascending=True)
-        title = (
-            f"Capex ($B) by Sector — {display_country}"
-            if metric == "Capex"
-            else f"{metric} by Sector — {display_country}"
+    bars = cdf[["sector", value_col]].copy()
+    bars = bars.set_index("sector").reindex(SECTORS_CANON, fill_value=0).reset_index()
+    bars = bars.sort_values(value_col, ascending=True)
+
+    if bars[value_col].sum() == 0:
+        st.info("No data for this selection.")
+    else:
+        fig = px.bar(
+            bars, x=value_col, y="sector", orientation="h",
+            labels={value_col:"", "sector":""},
+            color=value_col, color_continuous_scale="Blues"
         )
-        if bars[value_col].sum() == 0:
-            st.info("No data for this selection.")
-        else:
-            fig = px.bar(
-                bars, x=value_col, y="sector", orientation="h",
-                title=title, labels={value_col:"", "sector":""},
-                color=value_col, color_continuous_scale="Blues"
-            )
-            fig.update_coloraxes(showscale=False)
-            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
-            st.plotly_chart(fig, use_container_width=True)
+        fig.update_coloraxes(showscale=False)
+
+        fig.update_layout(
+            title={
+                "text": dynamic_title,
+                "x": 0.0,            # left
+                "xanchor": "left",
+            },
+            margin=dict(l=10, r=10, t=60, b=10),
+            height=520,
+        )
+        st.plotly_chart(fig, use_container_width=True)
     else:
         val = float(cdf.loc[cdf["sector"] == sel_sector, value_col].sum()) if not cdf.empty else 0.0
         unit = {"Companies":"", "Jobs Created":"", "Capex":" (USD B)", "Projects":""}[metric]
