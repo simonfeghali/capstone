@@ -456,6 +456,27 @@ def filt_wb_scoping(df: pd.DataFrame, year_any, cont, country):
     return out
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Helper: Title tokens for the Scoring tab (centralized)
+# ──────────────────────────────────────────────────────────────────────────────
+def _year_token(year_any):
+    return "2021–2023" if year_any == "All" else str(int(year_any))
+
+def _scope_token(cont, country):
+    if country != "All":
+        return country
+    return cont if cont != "All" else "Global"
+
+def _where_clause(cont, country):
+    if country != "All":
+        return country
+    if cont != "All":
+        return cont
+    return "Worldwide"
+
+def _subtitle_suffix(year_any):
+    return "(averaged across 2021–2023)" if year_any == "All" else f"(for {_year_token(year_any)})"
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Tabs
 # ──────────────────────────────────────────────────────────────────────────────
 from compare_tab import render_compare_tab
@@ -471,7 +492,7 @@ with tab_overview:
     render_overview_tab()
 
 # =============================================================================
-# SCORING TAB
+# SCORING TAB (Country Attractiveness) — TITLES FULLY DYNAMIC BY YEAR/FILTER
 # =============================================================================
 with tab_scoring:
     sel_year_sc, sel_cont_sc, sel_country_sc = scoring_filters_block(wb)
@@ -479,33 +500,26 @@ with tab_scoring:
     # Caption + info button side by side
     col1, col2 = st.columns([20,1])
     with col1:
-        st.caption("Scoring 2021–2023 • (World Bank–based)")
+        st.caption(f"Country Attractiveness (World Bank–based) • {_year_token(sel_year_sc)}")
     with col2:
         info_button("score_trend")
 
-    # ── NEW: Dynamic titles/subtitles per your spec (titles only; no logic/layout changes)
-    if sel_country_sc == "All" and sel_cont_sc == "All":
-        # 🌍 Global View (All countries)
-        main_title = "🌍 Global Top 10 Country Rankings by Overall Investment Attractiveness (2021–2023)"
-        subtitle = (
-            "Average annual scores reflecting economic, governance, and infrastructure indicators "
-            "for all countries combined."
-        )
-    elif sel_country_sc != "All":
-        # 🇸🇦 Country-Specific View (uses the country's true continent if available)
-        ctry_cont_series = wb_cc.loc[wb_cc["country"] == sel_country_sc, "continent"]
-        ctry_cont = ctry_cont_series.dropna().iloc[0] if not ctry_cont_series.empty else (sel_cont_sc if sel_cont_sc != "All" else "Regional")
-        flag = "🇸🇦 " if sel_country_sc == "Saudi Arabia" else ""
-        main_title = f"{flag}{sel_country_sc}’s 2021–2023 Investment Attractiveness vs. {ctry_cont} and Global Averages"
-        subtitle = (
-            f"Shows {sel_country_sc}’s average viability score, its assigned letter grade, "
-            "and how it compares to regional and global benchmarks."
-        )
+    # ── Dynamic main title + subtitle, fully reflecting Year/Scope
+    scope_txt = _scope_token(sel_cont_sc, sel_country_sc)
+    year_txt  = _year_token(sel_year_sc)
+
+    if sel_country_sc != "All":
+        # Country-focused
+        main_title = f"{sel_country_sc} — Investment Attractiveness {_subtitle_suffix(sel_year_sc)}"
+        subtitle   = f"Viability score, grade, and comparison to {wb_cc.loc[wb_cc['country']==sel_country_sc,'continent'].dropna().iloc[0] if not wb_cc.loc[wb_cc['country']==sel_country_sc].empty else 'regional'} and global averages."
+    elif sel_cont_sc != "All":
+        # Continent-focused
+        main_title = f"{sel_cont_sc} — Investment Attractiveness Overview {_subtitle_suffix(sel_year_sc)}"
+        subtitle   = "Scores summarising economic, governance, and infrastructure indicators across countries in the region."
     else:
-        # (Continent selected, no single country) — keep a simple, neutral header
-        where_title = sel_cont_sc if sel_cont_sc != "All" else "Worldwide"
-        main_title = f"{where_title} — Investment Attractiveness Overview (2021–2023)"
-        subtitle = ""
+        # Global
+        main_title = f"Global Country Attractiveness Rankings {_subtitle_suffix(sel_year_sc)}"
+        subtitle   = "Cross-country comparison of the composite viability score."
 
     st.markdown(
         f"""
@@ -518,6 +532,7 @@ with tab_scoring:
     use_avg = (sel_year_sc == "All")
 
     if use_avg:
+        # =============== ALL YEARS (2021–2023) ===============
         avg_scope = wb_avg_enriched.copy()
         if sel_cont_sc != "All":
             avg_scope = avg_scope[avg_scope["continent"] == sel_cont_sc]
@@ -539,22 +554,22 @@ with tab_scoring:
 
             k1, k2, k3 = st.columns(3, gap="large")
             with k1:
-                st.metric("Average Country Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
+                st.metric(f"{sel_country_sc} — Average Score ({year_txt})", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
             with k2:
                 st.metric("Overall Grade", country_grade)
             with k3:
-                label = f"{ctry_cont} Average Score" if ctry_cont else "Continent Average Score"
+                label = f"{ctry_cont} Average ({year_txt})" if ctry_cont else f"Continent Average ({year_txt})"
                 st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
 
         # Trend + Map
         t1, t2 = st.columns([1, 2], gap="large")
         with t1:
             if sel_country_sc != "All":
-                base = wb[wb["country"] == sel_country_sc]; title = f"Year-over-Year Viability Score — {sel_country_sc}"
+                base = wb[wb["country"] == sel_country_sc]; title = f"Viability Score Trend — {sel_country_sc} ({year_txt})"
             elif sel_cont_sc != "All":
-                base = wb[wb["continent"] == sel_cont_sc]; title = f"Year-over-Year Viability Score — {sel_cont_sc}"
+                base = wb[wb["continent"] == sel_cont_sc]; title = f"Viability Score Trend — {sel_cont_sc} ({year_txt})"
             else:
-                base = wb.copy(); title = "Year-over-Year Viability Score — Global"
+                base = wb.copy(); title = f"Viability Score Trend — Global ({year_txt})"
 
             yoy_df = base.groupby("year", as_index=False)["score"].mean().sort_values("year")
             if yoy_df.empty:
@@ -598,7 +613,7 @@ with tab_scoring:
                 fig_map = px.choropleth(
                     map_df, locations="country", locationmode="country names",
                     color="score", color_continuous_scale="Blues",
-                    title="Global Performance Map — All Years",
+                    title=f"Country Scores Map — {scope_txt} ({year_txt})",
                 )
                 fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{z:.3f}<extra></extra>")
                 fig_map.update_coloraxes(showscale=True)
@@ -620,12 +635,9 @@ with tab_scoring:
             b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
             with b1:
                 base = avg_scope[["country", "avg_score"]].rename(columns={"avg_score": "score"})
-                # 🔁 NEW global comparative insights title (Top 10)
                 title_top = (
-                    "Top 10 Countries by Combined Investment Attractiveness Score"
-                    "<br><span style='font-size:0.9em;color:#555;'>"
-                    "These nations ranked highest globally from 2021 to 2023 based on economic, governance, and infrastructure metrics."
-                    "</span>"
+                    f"Top 10 Countries by Investment Attractiveness — {year_txt}"
+                    "<br><span style='font-size:0.9em;color:#555;'>Average composite scores based on economic, governance, and infrastructure metrics.</span>"
                 )
                 top10 = base.dropna().sort_values("score", ascending=False).head(10)
                 if top10.empty:
@@ -652,12 +664,9 @@ with tab_scoring:
                             ).set_index("grade").reindex(grades, fill_value=0).reset_index()
                     shades = [px.colors.sequential.Blues[-1-i] for i in range(5)]
                     cmap = {g:c for g, c in zip(grades, shades)}
-                    # 🔁 NEW global comparative insights title (Distribution)
                     donut_title = (
-                        "Distribution of Country Grades in the Global Index"
-                        "<br><span style='font-size:0.9em;color:#555;'>"
-                        "The pie chart shows how all countries are distributed across A+ to D grades, indicating overall global attractiveness rankings."
-                        "</span>"
+                        f"Grade Distribution — {year_txt}"
+                        "<br><span style='font-size:0.9em;color:#555;'>Share of countries by letter grade (A+ to D).</span>"
                     )
                     fig_donut = px.pie(donut, names="grade", values="count", hole=0.55,
                                        title=donut_title,
@@ -680,7 +689,7 @@ with tab_scoring:
                     st.markdown(
                         f"""
                         <div class="kpi-box">
-                          <div class="kpi-title">Continent Viability Score — All Years — {label}</div>
+                          <div class="kpi-title">Average Score by Continent — {label} ({year_txt})</div>
                           <div class="kpi-number">{val:,.3f}</div>
                           <div class="kpi-sub"></div>
                         </div>
@@ -688,12 +697,9 @@ with tab_scoring:
                         unsafe_allow_html=True,
                     )
                 else:
-                    # 🔁 NEW global comparative insights title (Regional comparison)
                     title_cont = (
-                        "Regional Comparison of Average Attractiveness Scores"
-                        "<br><span style='font-size:0.9em;color:#555;'>"
-                        "Bar chart comparing average scores across continents, with Europe leading and Africa trailing."
-                        "</span>"
+                        f"Average Score by Continent — {year_txt}"
+                        "<br><span style='font-size:0.9em;color:#555;'>Regional comparison of mean attractiveness scores.</span>"
                     )
                     fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
                                       color="score", color_continuous_scale="Blues",
@@ -705,6 +711,7 @@ with tab_scoring:
                     st.plotly_chart(fig_cont, use_container_width=True)
 
     else:
+        # =============== SINGLE YEAR ===============
         wb_scope = filt_wb_scoping(wb, sel_year_sc, sel_cont_sc, sel_country_sc)
 
         if sel_country_sc != "All":
@@ -718,11 +725,11 @@ with tab_scoring:
 
             k1, k2, k3 = st.columns(3, gap="large")
             with k1:
-                st.metric("Country Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
+                st.metric(f"{sel_country_sc} — Score ({year_txt})", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
             with k2:
                 st.metric("Grade", country_grade)
             with k3:
-                label = f"{ctry_cont} Average Score" if ctry_cont else "Continent Average Score"
+                label = f"{ctry_cont} Average ({year_txt})" if ctry_cont else f"Continent Average ({year_txt})"
                 st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
 
         # LEFT: KPI only when NO specific country is selected
@@ -740,7 +747,7 @@ with tab_scoring:
                 st.markdown(
                     f"""
                     <div class="kpi-box">
-                      <div class="kpi-title">{scope_label} — Viability Score • {year_i}</div>
+                      <div class="kpi-title">{scope_label} — Mean Score ({year_txt})</div>
                       <div class="kpi-number">{'-' if np.isnan(val) else f'{val:,.3f}'}</div>
                       <div class="kpi-sub"></div>
                     </div>
@@ -751,7 +758,7 @@ with tab_scoring:
 
         with t2:
             map_df = wb_scope[["country", "score"]].copy()
-            map_title = f"Global Performance Map — {sel_year_sc}"
+            map_title = f"Country Scores Map — {scope_txt} ({year_txt})"
             if map_df.empty:
                 st.info("No data for this selection.")
             else:
@@ -776,7 +783,7 @@ with tab_scoring:
             b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
             with b1:
                 base = wb_scope[["country", "score"]]
-                title_top = f"Top Performing Countries — {sel_year_sc}"
+                title_top = f"Top 10 Countries by Investment Attractiveness — {year_txt}"
                 top10 = base.dropna().sort_values("score", ascending=False).head(10)
                 if top10.empty: st.info("No countries available for Top 10 with this filter.")
                 else:
@@ -800,7 +807,7 @@ with tab_scoring:
                     shades = [px.colors.sequential.Blues[-1-i] for i in range(5)]
                     cmap = {g:c for g, c in zip(grades, shades)}
                     fig_donut = px.pie(donut, names="grade", values="count", hole=0.55,
-                                       title=f"Grade Distribution — {sel_year_sc}",
+                                       title=f"Grade Distribution — {year_txt}",
                                        color="grade", color_discrete_map=cmap)
                     fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
                     st.plotly_chart(fig_donut, use_container_width=True)
@@ -818,7 +825,7 @@ with tab_scoring:
                     st.markdown(
                         f"""
                         <div class="kpi-box">
-                          <div class="kpi-title">Continent Viability Score — {sel_year_sc} — {label}</div>
+                          <div class="kpi-title">Average Score by Continent — {label} ({year_txt})</div>
                           <div class="kpi-number">{val:,.3f}</div>
                           <div class="kpi-sub"></div>
                         </div>
@@ -826,7 +833,7 @@ with tab_scoring:
                         unsafe_allow_html=True,
                     )
                 else:
-                    title_cont = f"Continent Viability Score — {sel_year_sc}"
+                    title_cont = f"Average Score by Continent — {year_txt}"
                     fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
                                       color="score", color_continuous_scale="Blues",
                                       labels={"score": "", "continent": ""}, title=title_cont)
@@ -1062,8 +1069,6 @@ with tab_eda:
                             if nonzero.empty:
                                 st.info("No CAPEX data for grade view.")
                             else:
-                                # previously this produced "CAPEX by Grade — YEAR — GRADE" KPI.
-                                # we won't hit this path anymore because we hide_grade_view when year+country chosen.
                                 _kpi_block(f"CAPEX by Grade — {sel_year_any} — {nonzero['grade'].iloc[0]}",
                                            float(nonzero["capex"].iloc[0]), "$B")
                         else:
