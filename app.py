@@ -1411,6 +1411,16 @@ def _demonym(country: str) -> str:
     }
     return m.get(country, country)
 
+def _metric_phrase(metric: str) -> str:
+    """Return a readable phrase for each metric for chart titles."""
+    return {
+        "Companies": "number of companies",
+        "Jobs Created": "number of jobs created",
+        "Capex": "capex (USD B)",
+        "Projects": "number of projects",
+    }.get(metric, metric.lower())
+
+
 def _style_geo_white(fig: go.Figure, height: int = 360) -> go.Figure:
     fig.update_geos(
         projection_type="natural earth",
@@ -1690,7 +1700,7 @@ with tab_dest:
             st.markdown(
                 f"""
                 <div class="kpi-box">
-                  <div class="kpi-title">{shown_src_label} → {sel_dest_country} • {metric_dest}</div>
+                  <div class="kpi-title">{_demonym(shown_src_label)} Investments in {sel_dest_country} by {_metric_phrase(metric_dest)}</div>
                   <div class="kpi-number">{fmt_val}</div>
                   <div class="kpi-sub">{unit}</div>
                 </div>
@@ -1700,7 +1710,10 @@ with tab_dest:
 
         with right:
             fig_route = make_route_map(sel_src_country, sel_dest_country)
-            fig_route.update_layout(title=f"Route Map — {shown_src_label} → {sel_dest_country}")
+            fig_route.update_layout(title={
+                "text": f"Geographic Route of {_demonym(shown_src_label)} Expansions toward {sel_dest_country}",
+                "x": 0.0, "xanchor": "left"
+            })
             st.plotly_chart(fig_route, use_container_width=True)
 
 with tab_compare:
