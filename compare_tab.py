@@ -382,7 +382,7 @@ def render_compare_tab():
     options_labels, label_map = _build_selection_lists(all_countries, continents)
 
     sel_labels = st.multiselect(
-        "Select countries/continents (up to 6)",
+        "Select up to 6 countries or continents",
         options=options_labels,
         default=[c for c in ["United States", "France"] if c in label_map][:2] or [c for c in options_labels if c not in HEADERS][:2],
         max_selections=6
