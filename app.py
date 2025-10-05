@@ -1142,27 +1142,23 @@ def _canon_country(name: str) -> str:
     t = t.replace("Of", "of")
     return t
 
-def _flag_emoji(country: str) -> str:
+def _country_iso2(country: str) -> str | None:
     m = {
-        "United States": "🇺🇸",
-        "United Kingdom": "🇬🇧",
-        "Germany": "🇩🇪",
-        "France": "🇫🇷",
-        "China": "🇨🇳",
-        "Japan": "🇯🇵",
-        "South Korea": "🇰🇷",
-        "Canada": "🇨🇦",
-        "Netherlands": "🇳🇱",
-        "United Arab Emirates": "🇦🇪",
-        "Bahrain": "🇧🇭",
-        "Kuwait": "🇰🇼",
-        "Qatar": "🇶🇦",
-        "Oman": "🇴🇲",
-        "Saudi Arabia": "🇸🇦",
-        # No official emoji flag for GCC – use a neutral globe
-        "GCC": "🌍",
+        "United States":"US","United Kingdom":"GB","Germany":"DE","France":"FR","China":"CN",
+        "Japan":"JP","South Korea":"KR","Canada":"CA","Netherlands":"NL","United Arab Emirates":"AE",
+        "Bahrain":"BH","Kuwait":"KW","Qatar":"QA","Oman":"OM","Saudi Arabia":"SA",
+        "GCC":"",  # no flag image
     }
-    return m.get(country, "🌍")
+    return m.get(country)
+
+def _twemoji_url_from_iso2(iso2: str | None) -> str | None:
+    if not iso2:
+        return None
+    iso2 = iso2.upper()
+    # Convert ISO2 -> regional indicator codepoints (e.g., BH -> 1f1e7-1f1ed)
+    def cp(ch): return format(0x1F1E6 + (ord(ch) - ord('A')), 'x')
+    code = f"{cp(iso2[0])}-{cp(iso2[1])}"
+    return f"https://twemoji.maxcdn.com/v/latest/svg/{code}.svg"
 
 def _canon_sector(sector: str) -> str:
     if not isinstance(sector, str): return ""
@@ -1296,15 +1292,15 @@ with tab_sectors:
         "Projects":"projects",
     }[metric]
 
-    metric_display = {
-        "Companies": "Companies",
-        "Jobs Created": "Jobs Created",
-        "Capex": "Capex (USD B)",
-        "Projects": "Projects",
+    metric_title = {
+        "Companies": "number of companies",
+        "Jobs Created": "jobs created",
+        "Capex": "capex (USD B)",
+        "Projects": "number of projects",
     }[metric]
     
-    flag = _flag_emoji(display_country)
-    dynamic_title = f"{flag} Sectoral Distribution of {metric_display} in {display_country}"
+    title_text_only = f"Sectoral Distribution of {metric_title} in {display_country}"
+    flag_url = _twemoji_url_from_iso2(_country_iso2(display_country))
 
     if sel_sector == "All":
         bars = cdf[["sector", value_col]].copy()
@@ -1323,13 +1319,25 @@ with tab_sectors:
     
             fig.update_layout(
                 title={
-                    "text": dynamic_title,
-                    "x": 0.0,            # left
+                    "text": title_text_only,
+                    "x": 0.0,
                     "xanchor": "left",
+                    "font": {"size": 22, "family": "Arial", "color": "#111827"},
                 },
                 margin=dict(l=10, r=10, t=60, b=10),
                 height=520,
             )
+            
+            # Add the flag image to the title area (only if we have one)
+            if flag_url:
+                fig.update_layout(images=[dict(
+                    source=flag_url,
+                    xref="paper", yref="paper",
+                    x=-0.02, y=1.12,      # a bit to the left of the title, tweak if needed
+                    sizex=0.06, sizey=0.12,
+                    xanchor="left", yanchor="top",
+                    layer="above"
+                )])
             st.plotly_chart(fig, use_container_width=True)
     else:
         val = float(cdf.loc[cdf["sector"] == sel_sector, value_col].sum()) if not cdf.empty else 0.0
