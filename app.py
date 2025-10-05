@@ -1335,10 +1335,10 @@ with tab_sectors:
     }[metric]
 
     metric_display = {
-            "Companies": "number of companies",
-            "Jobs Created": "number of jobs created",
+            "Companies": "Number of Companies",
+            "Jobs Created": "Number of Jobs Created",
             "Capex": "Capex (USD B)",
-            "Projects": "number of projects",
+            "Projects": "Number of Projects",
         }[metric]
         
     dynamic_title = f"Sectoral Distribution by {metric_display} in {display_country}"
