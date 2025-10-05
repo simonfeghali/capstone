@@ -482,9 +482,38 @@ with tab_scoring:
         st.caption("Scoring 2021–2023 • (World Bank–based)")
     with col2:
         info_button("score_trend")
-        
-    where_title = sel_country_sc if sel_country_sc != "All" else (sel_cont_sc if sel_cont_sc != "All" else "Worldwide")
-    st.markdown(f"<h3 style='text-align:center; margin:0; font-weight:800'>{where_title}</h3>", unsafe_allow_html=True)
+
+    # ── NEW: Dynamic titles/subtitles per your spec (titles only; no logic/layout changes)
+    if sel_country_sc == "All" and sel_cont_sc == "All":
+        # 🌍 Global View (All countries)
+        main_title = "🌍 Global Top 10 Country Rankings by Overall Investment Attractiveness (2021–2023)"
+        subtitle = (
+            "Average annual scores reflecting economic, governance, and infrastructure indicators "
+            "for all countries combined."
+        )
+    elif sel_country_sc != "All":
+        # 🇸🇦 Country-Specific View (uses the country's true continent if available)
+        ctry_cont_series = wb_cc.loc[wb_cc["country"] == sel_country_sc, "continent"]
+        ctry_cont = ctry_cont_series.dropna().iloc[0] if not ctry_cont_series.empty else (sel_cont_sc if sel_cont_sc != "All" else "Regional")
+        flag = "🇸🇦 " if sel_country_sc == "Saudi Arabia" else ""
+        main_title = f"{flag}{sel_country_sc}’s 2021–2023 Investment Attractiveness vs. {ctry_cont} and Global Averages"
+        subtitle = (
+            f"Shows {sel_country_sc}’s average viability score, its assigned letter grade, "
+            "and how it compares to regional and global benchmarks."
+        )
+    else:
+        # (Continent selected, no single country) — keep a simple, neutral header
+        where_title = sel_cont_sc if sel_cont_sc != "All" else "Worldwide"
+        main_title = f"{where_title} — Investment Attractiveness Overview (2021–2023)"
+        subtitle = ""
+
+    st.markdown(
+        f"""
+        <h3 style='text-align:center; margin-bottom:4px; font-weight:800'>{main_title}</h3>
+        <p style='text-align:center; font-size:0.95rem; color:#555;'>{subtitle}</p>
+        """,
+        unsafe_allow_html=True,
+    )
 
     use_avg = (sel_year_sc == "All")
 
@@ -591,7 +620,13 @@ with tab_scoring:
             b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
             with b1:
                 base = avg_scope[["country", "avg_score"]].rename(columns={"avg_score": "score"})
-                title_top = "Top 10 Performing Countries"
+                # 🔁 NEW global comparative insights title (Top 10)
+                title_top = (
+                    "Top 10 Countries by Combined Investment Attractiveness Score"
+                    "<br><span style='font-size:0.9em;color:#555;'>"
+                    "These nations ranked highest globally from 2021 to 2023 based on economic, governance, and infrastructure metrics."
+                    "</span>"
+                )
                 top10 = base.dropna().sort_values("score", ascending=False).head(10)
                 if top10.empty:
                     st.info("No countries available for Top 10 with this filter.")
@@ -617,8 +652,15 @@ with tab_scoring:
                             ).set_index("grade").reindex(grades, fill_value=0).reset_index()
                     shades = [px.colors.sequential.Blues[-1-i] for i in range(5)]
                     cmap = {g:c for g, c in zip(grades, shades)}
+                    # 🔁 NEW global comparative insights title (Distribution)
+                    donut_title = (
+                        "Distribution of Country Grades in the Global Index"
+                        "<br><span style='font-size:0.9em;color:#555;'>"
+                        "The pie chart shows how all countries are distributed across A+ to D grades, indicating overall global attractiveness rankings."
+                        "</span>"
+                    )
                     fig_donut = px.pie(donut, names="grade", values="count", hole=0.55,
-                                       title="Grade Distribution — All Years",
+                                       title=donut_title,
                                        color="grade", color_discrete_map=cmap)
                     fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
                     fig_donut.update_traces(hovertemplate="Grade: %{label}<br>Countries: %{value} (%{percent:.1%})<extra></extra>")
@@ -646,7 +688,13 @@ with tab_scoring:
                         unsafe_allow_html=True,
                     )
                 else:
-                    title_cont = "Continent Viability Score — All Years"
+                    # 🔁 NEW global comparative insights title (Regional comparison)
+                    title_cont = (
+                        "Regional Comparison of Average Attractiveness Scores"
+                        "<br><span style='font-size:0.9em;color:#555;'>"
+                        "Bar chart comparing average scores across continents, with Europe leading and Africa trailing."
+                        "</span>"
+                    )
                     fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
                                       color="score", color_continuous_scale="Blues",
                                       labels={"score": "", "continent": ""}, title=title_cont)
@@ -1049,7 +1097,7 @@ with tab_eda:
                                     )
                                     fig_single.update_xaxes(type="category",
                                                             categoryorder="array",
-                                                            categoryarray=sorted(tg["year_str"].unique().tolist()),
+                                                            categoryarray=sorted(tg["year_str"].unique().tolist() ),
                                                             showgrid=False)
                                     fig_single.update_yaxes(showgrid=False)
                                     fig_single.update_layout(margin=dict(l=10, r=10, t=60, b=10),
