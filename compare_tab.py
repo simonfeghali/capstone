@@ -415,9 +415,9 @@ def render_compare_tab():
 
         st.markdown(
             """
-            <div style="font-size:28px; font-weight:400; line-height:1.2; margin:0;">
-              Comparative Viability Score Trends (2021–2023)
-            </div>
+            <h3 style="margin:0; font-weight:800 !important; line-height:1.2; font-size:28px;">
+              Comparative Viability Score Trends
+            </h3>
             <div style="color:#6b7280; margin:.35rem 0 1rem;">
               Tracks year-over-year FDI viability scores for selected countries/continents.
             </div>
@@ -504,9 +504,9 @@ def render_compare_tab():
     if not cap_df.empty:
         st.markdown(
             """
-            <div style="font-size:28px; font-weight:400; line-height:1.2; margin:0;">
+            <h3 style="margin:0; font-weight:800 !important; line-height:1.2; font-size:28px;">
               Comparative Capex Trends (2021–2024)
-            </div>
+            </h3>
             <div style="color:#6b7280; margin:.35rem 0 1rem;">
               Tracks year-over-year CAPEX for selected countries.
             </div>
