@@ -637,7 +637,7 @@ with tab_scoring:
                 base = avg_scope[["country", "avg_score"]].rename(columns={"avg_score": "score"})
                 title_top = (
                     f"Top 10 Countries by Investment Attractiveness — {year_txt}"
-                    "<br><span style='font-size:0.9em;color:#555;'>Average composite scores based on economic, governance, and infrastructure metrics.</span>"
+                    "<br><span style='font-size:0.9em;color:#555;'>Average scores across key investment factors.</span>"
                 )
                 top10 = base.dropna().sort_values("score", ascending=False).head(10)
                 if top10.empty:
