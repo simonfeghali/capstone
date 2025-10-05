@@ -492,13 +492,13 @@ with tab_overview:
     render_overview_tab()
 
 # =============================================================================
-# SCORING TAB (Country Attractiveness) — TITLES FULLY DYNAMIC BY YEAR/FILTER
+# SCORING TAB (Country Attractiveness) — TITLES CLEANED (no year ranges)
 # =============================================================================
 with tab_scoring:
     # Caption + info button ABOVE the filters
     cap1, cap2 = st.columns([20, 1])
     with cap1:
-        # Use the current session value (defaults to "All" on first run)
+        # Keep the year token in the small caption only (not in big titles below)
         st.caption(
             f"Country Attractiveness (World Bank–based) • "
             f"{_year_token(st.session_state.get('sc_year', 'All'))}"
@@ -509,28 +509,27 @@ with tab_scoring:
     # Now render the filters
     sel_year_sc, sel_cont_sc, sel_country_sc = scoring_filters_block(wb)
 
-
-    # ── Dynamic main title + subtitle, fully reflecting Year/Scope
+    # ── Dynamic main title + subtitle (section-style) ──
     scope_txt = _scope_token(sel_cont_sc, sel_country_sc)
-    year_txt  = _year_token(sel_year_sc)
 
     if sel_country_sc != "All":
-        # Country-focused
-        main_title = f"{sel_country_sc} — Investment Attractiveness {_subtitle_suffix(sel_year_sc)}"
-        subtitle   = f"Viability score, grade, and comparison to {wb_cc.loc[wb_cc['country']==sel_country_sc,'continent'].dropna().iloc[0] if not wb_cc.loc[wb_cc['country']==sel_country_sc].empty else 'regional'} and global averages."
+        main_title = f"{sel_country_sc} — Investment Attractiveness"
+        subtitle   = (
+            "Viability score, grade, and comparison to "
+            f"{wb_cc.loc[wb_cc['country']==sel_country_sc,'continent'].dropna().iloc[0] if not wb_cc.loc[wb_cc['country']==sel_country_sc].empty else 'regional'} "
+            "and global averages."
+        )
     elif sel_cont_sc != "All":
-        # Continent-focused
-        main_title = f"{sel_cont_sc} — Investment Attractiveness Overview {_subtitle_suffix(sel_year_sc)}"
+        main_title = f"{sel_cont_sc} — Investment Attractiveness Overview"
         subtitle   = "Scores summarising economic, governance, and infrastructure indicators across countries in the region."
     else:
-        # Global
-        main_title = f"Global Country Attractiveness Rankings {_subtitle_suffix(sel_year_sc)}"
+        main_title = "Global Country Attractiveness Rankings"
         subtitle   = "Cross-country comparison of the composite viability score."
 
     st.markdown(
         f"""
         <h3 style='text-align:center; margin-bottom:4px; font-weight:800'>{main_title}</h3>
-        <p style='text-align:center; font-size:0.95rem; color:#555;'>{subtitle}</p>
+        <p style='text-align:center; font-size:0.95rem; color:#6b7280; margin-top:.25rem;'>{subtitle}</p>
         """,
         unsafe_allow_html=True,
     )
@@ -545,12 +544,14 @@ with tab_scoring:
         if sel_country_sc != "All":
             avg_scope = avg_scope[avg_scope["country"] == sel_country_sc]
 
-        # KPIs
+        # KPIs (no year token in KPI titles)
         if sel_country_sc != "All":
             country_row = avg_scope[avg_scope["country"] == sel_country_sc]
             country_score = float(country_row["avg_score"].mean()) if not country_row.empty else np.nan
-            country_grade = country_row["grade"].astype(str).dropna().iloc[0] if not country_row.empty and country_row["grade"].notna().any() else "-"
-
+            country_grade = (
+                country_row["grade"].astype(str).dropna().iloc[0]
+                if (not country_row.empty and country_row["grade"].notna().any()) else "-"
+            )
             ctry_cont = wb_cc.loc[wb_cc["country"] == sel_country_sc, "continent"]
             ctry_cont = ctry_cont.dropna().iloc[0] if not ctry_cont.empty else None
             cont_rows = wb_avg_enriched[wb_avg_enriched["continent"] == ctry_cont] if ctry_cont else pd.DataFrame()
@@ -560,22 +561,22 @@ with tab_scoring:
 
             k1, k2, k3 = st.columns(3, gap="large")
             with k1:
-                st.metric(f"{sel_country_sc} — Average Score ({year_txt})", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
+                st.metric(f"{sel_country_sc} — Average Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
             with k2:
                 st.metric("Overall Grade", country_grade)
             with k3:
-                label = f"{ctry_cont} Average ({year_txt})" if ctry_cont else f"Continent Average ({year_txt})"
+                label = f"{ctry_cont} Average" if ctry_cont else "Continent Average"
                 st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
 
-        # Trend + Map
+        # Trend + Map (titles without year token)
         t1, t2 = st.columns([1, 2], gap="large")
         with t1:
             if sel_country_sc != "All":
-                base = wb[wb["country"] == sel_country_sc]; title = f"Viability Score Trend — {sel_country_sc} ({year_txt})"
+                base = wb[wb["country"] == sel_country_sc]; title = f"Viability Score Trend — {sel_country_sc}"
             elif sel_cont_sc != "All":
-                base = wb[wb["continent"] == sel_cont_sc]; title = f"Viability Score Trend — {sel_cont_sc} ({year_txt})"
+                base = wb[wb["continent"] == sel_cont_sc]; title = f"Viability Score Trend — {sel_cont_sc}"
             else:
-                base = wb.copy(); title = f"Viability Score Trend — Global ({year_txt})"
+                base = wb.copy(); title = "Viability Score Trend — Global"
 
             yoy_df = base.groupby("year", as_index=False)["score"].mean().sort_values("year")
             if yoy_df.empty:
@@ -584,7 +585,7 @@ with tab_scoring:
                 yoy_df["year_str"] = yoy_df["year"].astype(int).astype(str)
                 y = yoy_df["score"].astype(float)
                 pad = max((y.max() - y.min()) * 0.12, 0.002)
-                
+
                 fig_line = px.line(
                     yoy_df, x="year_str", y="score", markers=True,
                     labels={"year_str": "", "score": ""}, title=title
@@ -593,14 +594,9 @@ with tab_scoring:
                     type="category",
                     categoryorder="array",
                     categoryarray=yoy_df["year_str"].tolist(),
-                    showgrid=False,
-                    ticks="",
-                    title_text=""
+                    showgrid=False, ticks="", title_text=""
                 )
-                fig_line.update_yaxes(
-                    visible=False,
-                    range=[float(y.min() - pad), float(y.max() + pad)]
-                )
+                fig_line.update_yaxes(visible=False, range=[float(y.min() - pad), float(y.max() + pad)])
                 fig_line.update_traces(
                     mode="lines+markers+text",
                     text=[f"{v:.3f}" for v in y],
@@ -619,7 +615,7 @@ with tab_scoring:
                 fig_map = px.choropleth(
                     map_df, locations="country", locationmode="country names",
                     color="score", color_continuous_scale="Blues",
-                    title=f"Country Scores Map — {scope_txt} ({year_txt})",
+                    title=f"Country Scores Map — {scope_txt}",
                 )
                 fig_map.update_traces(hovertemplate="Country: %{location}<br>Score: %{z:.3f}<extra></extra>")
                 fig_map.update_coloraxes(showscale=True)
@@ -642,8 +638,8 @@ with tab_scoring:
             with b1:
                 base = avg_scope[["country", "avg_score"]].rename(columns={"avg_score": "score"})
                 title_top = (
-                    f"Top 10 Countries by Investment Attractiveness — {year_txt}"
-                    "<br><span style='font-size:0.9em;color:#555;'>Average scores across key investment factors.</span>"
+                    "Top 10 Countries by Investment Attractiveness"
+                    "<br><span style='font-size:0.9em;color:#6b7280;'>Average scores across key investment factors.</span>"
                 )
                 top10 = base.dropna().sort_values("score", ascending=False).head(10)
                 if top10.empty:
@@ -654,7 +650,7 @@ with tab_scoring:
                                      labels={"score": "", "country": ""}, title=title_top)
                     fig_top.update_coloraxes(showscale=False)
                     fig_top.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                    fig_top.update_traces(hovertemplate="%{y}: %{x:.3f}<extra></extra>",text=None, texttemplate=None, textposition=None)
+                    fig_top.update_traces(hovertemplate="%{y}: %{x:.3f}<extra></extra>")
                     st.plotly_chart(fig_top, use_container_width=True)
 
             with b2:
@@ -671,8 +667,8 @@ with tab_scoring:
                     shades = [px.colors.sequential.Blues[-1-i] for i in range(5)]
                     cmap = {g:c for g, c in zip(grades, shades)}
                     donut_title = (
-                        f"Grade Distribution — {year_txt}"
-                        "<br><span style='font-size:0.9em;color:#555;'>Share of countries by letter grade (A+ to D).</span>"
+                        "Grade Distribution"
+                        "<br><span style='font-size:0.9em;color:#6b7280;'>Share of countries by letter grade (A+ to D).</span>"
                     )
                     fig_donut = px.pie(donut, names="grade", values="count", hole=0.55,
                                        title=donut_title,
@@ -695,7 +691,7 @@ with tab_scoring:
                     st.markdown(
                         f"""
                         <div class="kpi-box">
-                          <div class="kpi-title">Average Score by Continent — {label} ({year_txt})</div>
+                          <div class="kpi-title">Average Score by Continent — {label}</div>
                           <div class="kpi-number">{val:,.3f}</div>
                           <div class="kpi-sub"></div>
                         </div>
@@ -704,16 +700,15 @@ with tab_scoring:
                     )
                 else:
                     title_cont = (
-                        f"Average Score by Continent — {year_txt}"
-                        "<br><span style='font-size:0.9em;color:#555;'>Regional comparison of mean attractiveness scores.</span>"
+                        "Average Score by Continent"
+                        "<br><span style='font-size:0.9em;color:#6b7280;'>Regional comparison of mean attractiveness scores.</span>"
                     )
                     fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
                                       color="score", color_continuous_scale="Blues",
                                       labels={"score": "", "continent": ""}, title=title_cont)
                     fig_cont.update_coloraxes(showscale=False)
                     fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
-                    fig_cont.update_traces(hovertemplate="%{y}: %{x:.3f}<extra></extra>",
-                                           text=None, texttemplate=None, textposition=None)
+                    fig_cont.update_traces(hovertemplate="%{y}: %{x:.3f}<extra></extra>")
                     st.plotly_chart(fig_cont, use_container_width=True)
 
     else:
@@ -731,11 +726,11 @@ with tab_scoring:
 
             k1, k2, k3 = st.columns(3, gap="large")
             with k1:
-                st.metric(f"{sel_country_sc} — Score ({year_txt})", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
+                st.metric(f"{sel_country_sc} — Score", "-" if np.isnan(country_score) else f"{country_score:,.3f}")
             with k2:
                 st.metric("Grade", country_grade)
             with k3:
-                label = f"{ctry_cont} Average ({year_txt})" if ctry_cont else f"Continent Average ({year_txt})"
+                label = f"{ctry_cont} Average" if ctry_cont else "Continent Average"
                 st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
 
         # LEFT: KPI only when NO specific country is selected
@@ -753,18 +748,17 @@ with tab_scoring:
                 st.markdown(
                     f"""
                     <div class="kpi-box">
-                      <div class="kpi-title">{scope_label} — Mean Score ({year_txt})</div>
+                      <div class="kpi-title">{scope_label} — Mean Score</div>
                       <div class="kpi-number">{'-' if np.isnan(val) else f'{val:,.3f}'}</div>
                       <div class="kpi-sub"></div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
-            # else: intentionally show nothing when a country is selected
 
         with t2:
             map_df = wb_scope[["country", "score"]].copy()
-            map_title = f"Country Scores Map — {scope_txt} ({year_txt})"
+            map_title = f"Country Scores Map — {scope_txt}"
             if map_df.empty:
                 st.info("No data for this selection.")
             else:
@@ -789,9 +783,10 @@ with tab_scoring:
             b1, b2, b3 = st.columns([1.2, 1, 1.2], gap="large")
             with b1:
                 base = wb_scope[["country", "score"]]
-                title_top = f"Top 10 Countries by Investment Attractiveness — {year_txt}"
+                title_top = "Top 10 Countries by Investment Attractiveness"
                 top10 = base.dropna().sort_values("score", ascending=False).head(10)
-                if top10.empty: st.info("No countries available for Top 10 with this filter.")
+                if top10.empty:
+                    st.info("No countries available for Top 10 with this filter.")
                 else:
                     fig_top = px.bar(top10.sort_values("score"), x="score", y="country", orientation="h",
                                      color="score", color_continuous_scale="Blues",
@@ -802,7 +797,8 @@ with tab_scoring:
 
             with b2:
                 donut_base = wb_scope.copy()
-                if donut_base.empty or donut_base["grade"].isna().all(): st.info("No grade data for this selection.")
+                if donut_base.empty or donut_base["grade"].isna().all():
+                    st.info("No grade data for this selection.")
                 else:
                     grades = ["A+", "A", "B", "C", "D"]
                     donut = (donut_base.assign(grade=donut_base["grade"].astype(str))
@@ -813,7 +809,7 @@ with tab_scoring:
                     shades = [px.colors.sequential.Blues[-1-i] for i in range(5)]
                     cmap = {g:c for g, c in zip(grades, shades)}
                     fig_donut = px.pie(donut, names="grade", values="count", hole=0.55,
-                                       title=f"Grade Distribution — {year_txt}",
+                                       title="Grade Distribution",
                                        color="grade", color_discrete_map=cmap)
                     fig_donut.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420, showlegend=True)
                     st.plotly_chart(fig_donut, use_container_width=True)
@@ -831,7 +827,7 @@ with tab_scoring:
                     st.markdown(
                         f"""
                         <div class="kpi-box">
-                          <div class="kpi-title">Average Score by Continent — {label} ({year_txt})</div>
+                          <div class="kpi-title">Average Score by Continent — {label}</div>
                           <div class="kpi-number">{val:,.3f}</div>
                           <div class="kpi-sub"></div>
                         </div>
@@ -839,13 +835,14 @@ with tab_scoring:
                         unsafe_allow_html=True,
                     )
                 else:
-                    title_cont = f"Average Score by Continent — {year_txt}"
+                    title_cont = "Average Score by Continent"
                     fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
                                       color="score", color_continuous_scale="Blues",
                                       labels={"score": "", "continent": ""}, title=title_cont)
                     fig_cont.update_coloraxes(showscale=False)
                     fig_cont.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                     st.plotly_chart(fig_cont, use_container_width=True)
+
 
 # =============================================================================
 # CAPEX TAB — show only your requested KPIs on TOP; suppress grade KPI when year+country chosen
