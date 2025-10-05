@@ -415,7 +415,7 @@ def render_compare_tab():
 
         st.markdown(
             """
-            <div style="font-size:28px; font-weight:800; line-height:1.2; margin:0;">
+            <div style="font-size:28px; line-height:1.2; margin:0;">
               Comparative Viability Score Trends (2021–2023)
             </div>
             <div style="color:#6b7280; margin:.35rem 0 1rem;">
@@ -503,7 +503,7 @@ def render_compare_tab():
     if not cap_df.empty:
         st.markdown(
             """
-            <div style="font-size:28px; font-weight:800; line-height:1.2; margin:0;">
+            <div style="font-size:28px; line-height:1.2; margin:0;">
               Comparative Capex Trends (2021–2024)
             </div>
             <div style="color:#6b7280; margin:.35rem 0 1rem;">
