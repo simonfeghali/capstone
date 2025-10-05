@@ -5,7 +5,7 @@
 # - 2024 is FORECASTED but drawn in light grey (with a single "CAPEX:" hover)
 # - 2025–2028 forecasts = dark blue
 # - Clean axis (every year tick), no gridlines, continuous line
-# - Section title/subtitle rendered ABOVE the chart to match app style
+# - Section-style title/subtitle rendered ABOVE the chart (no internal plot title)
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -341,7 +341,6 @@ def _plot_forecast_unified(country: str,
       • 2024 forecast drawn in light grey (single tooltip: "CAPEX: …")
       • Dark blue for 2025–2028 forecasts
       • Every year tick (dtick=1), no gridlines
-      • NO internal title: outer H3+subtitle is used for consistent page style
     """
     # Prepare data
     hist_years = [int(y) for y in actual.index if start_year <= int(y) <= 2023]
@@ -398,7 +397,7 @@ def _plot_forecast_unified(country: str,
     if f_years_2528:
         f_vals_2528 = [float(f_pred.loc[y]) for y in f_years_2528]
 
-        # Draw a connector from 2024 (if forecasted) or 2023 (if no 2024 forecast) to 2025 with NO hover
+        # Draw a connector with NO hover
         if has_f_2024:
             anchor_year, anchor_val = 2024, float(f_pred.loc[2024])
         elif 2023 in actual.index:
@@ -418,7 +417,7 @@ def _plot_forecast_unified(country: str,
                 )
             )
 
-        # Main blue forecast line 2025–2028 (with forecast tooltip)
+        # Main forecast line 2025–2028
         fig.add_trace(
             go.Scatter(
                 x=f_years_2528, y=f_vals_2528,
@@ -452,11 +451,12 @@ def _plot_forecast_unified(country: str,
         title_text=""
     )
 
-    # IMPORTANT: no figure title; we align axes under the external H3 by widening left margin
+    # No internal Plotly title: we render a section-style title above the chart.
     fig.update_layout(
+        title_text="",
         hovermode="x",
         hoverlabel=dict(bgcolor="white", font_size=12, font_color="black"),
-        margin=dict(l=90, r=10, t=10, b=10),  # left margin ensures y-axis lines up with H3 start
+        margin=dict(l=10, r=10, t=10, b=10),  # left=10 aligns axis with section header
         height=520,
         xaxis=dict(tickfont=dict(size=12), automargin=True),
         yaxis=dict(tickfont=dict(size=12), automargin=True),
@@ -481,6 +481,19 @@ def render_forecasting_tab():
 
     countries = sorted(panel["Country"].dropna().unique().tolist())
     sel_country = st.selectbox("Country", countries, index=0, key="forecast_country_unified")
+
+    # Section-style Title + Subtitle (matches other tabs)
+    st.markdown(
+        f"""
+        <div style="font-size:28px; font-weight:800; line-height:1.2; margin:0;">
+          Forecasted FDI Trends (2024–2028)
+        </div>
+        <div style="color:#6b7280; margin:.35rem 0 1rem;">
+          Projects the CAPEX evolution of {sel_country} from 2024 to 2028 based on historical investment patterns.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     try:
         prep = _prep_country_notebook(panel, sel_country)
@@ -517,7 +530,6 @@ def render_forecasting_tab():
     
     if show_more_hist:
         _init_hist_slider_state(fixed_end, default_start=2015)
-    
         st.slider(
             "Range of Years shown",
             min_value=2004,
@@ -529,23 +541,9 @@ def render_forecasting_tab():
             args=(fixed_end,),
             help="Left handle moves (down to 2004, up to 2025). Right handle is fixed."
         )
-    
         start_year = int(st.session_state.hist_range_locked[0])
     else:
         start_year = 2015
-
-    # ── Section heading + subtitle (matches style used elsewhere) ────────────
-    st.markdown(
-        f"""
-        <h3 style="margin:0; font-weight:800 !important; line-height:1.2; font-size:28px;">
-          Forecasted FDI Trends (2024–2028)
-        </h3>
-        <div style="color:#6b7280; margin:.35rem 0 1rem;">
-          Projects the CAPEX evolution of {sel_country} from 2024 to 2028 based on historical investment patterns.
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
 
     fig = _plot_forecast_unified(
         sel_country,
