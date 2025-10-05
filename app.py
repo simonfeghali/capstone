@@ -218,7 +218,7 @@ def load_world_bank() -> pd.DataFrame:
     if "score" not in df.columns: df["score"] = np.nan
     if "grade" not in df.columns: df["grade"] = np.nan
     df["country"]   = df["country"].astype(str).str.strip()
-    df["continent"] = df["continent"].astype(str).stripped if hasattr(df["continent"], "stripped") else df["continent"].astype(str).str.strip()
+    df["continent"] = df["continent"].astype(str).str.strip()
 
     order = ["A+", "A", "B", "C", "D"]
     df["grade"] = df["grade"].astype(str).str.strip()
@@ -492,34 +492,32 @@ with tab_overview:
     render_overview_tab()
 
 # =============================================================================
-# SCORING TAB (Country Attractiveness) — subtitle moved ABOVE filters
+# SCORING TAB (Country Attractiveness) — TITLES FULLY DYNAMIC BY YEAR/FILTER
 # =============================================================================
 with tab_scoring:
-    # ── 1) Create a placeholder ABOVE the filters
-    scoring_subtitle_container = st.container()
-
-    # ── 2) Render filters (this returns the selected year/cont/country)
     sel_year_sc, sel_cont_sc, sel_country_sc = scoring_filters_block(wb)
 
-    # ── 3) Now fill the placeholder with the subtitle that uses the selected year
-    with scoring_subtitle_container:
-        col1, col2 = st.columns([20, 1])
-        with col1:
-            st.caption(f"Country Attractiveness (World Bank–based) • {_year_token(sel_year_sc)}")
-        with col2:
-            info_button("score_trend")
+    # Caption + info button side by side
+    col1, col2 = st.columns([20,1])
+    with col1:
+        st.caption(f"Country Attractiveness (World Bank–based) • {_year_token(sel_year_sc)}")
+    with col2:
+        info_button("score_trend")
 
-    # ── Dynamic main title + subtitle, reflecting Year/Scope
+    # ── Dynamic main title + subtitle, fully reflecting Year/Scope
     scope_txt = _scope_token(sel_cont_sc, sel_country_sc)
     year_txt  = _year_token(sel_year_sc)
 
     if sel_country_sc != "All":
+        # Country-focused
         main_title = f"{sel_country_sc} — Investment Attractiveness {_subtitle_suffix(sel_year_sc)}"
         subtitle   = f"Viability score, grade, and comparison to {wb_cc.loc[wb_cc['country']==sel_country_sc,'continent'].dropna().iloc[0] if not wb_cc.loc[wb_cc['country']==sel_country_sc].empty else 'regional'} and global averages."
     elif sel_cont_sc != "All":
+        # Continent-focused
         main_title = f"{sel_cont_sc} — Investment Attractiveness Overview {_subtitle_suffix(sel_year_sc)}"
         subtitle   = "Scores summarising economic, governance, and infrastructure indicators across countries in the region."
     else:
+        # Global
         main_title = f"Global Country Attractiveness Rankings {_subtitle_suffix(sel_year_sc)}"
         subtitle   = "Cross-country comparison of the composite viability score."
 
@@ -639,7 +637,7 @@ with tab_scoring:
                 base = avg_scope[["country", "avg_score"]].rename(columns={"avg_score": "score"})
                 title_top = (
                     f"Top 10 Countries by Investment Attractiveness — {year_txt}"
-                    "<br><span style='font-size:0.9em;color:#555;'>Attractiveness analysis</span>"
+                    "<br><span style='font-size:0.9em;color:#555;'>Average composite scores based on economic, governance, and infrastructure metrics.</span>"
                 )
                 top10 = base.dropna().sort_values("score", ascending=False).head(10)
                 if top10.empty:
@@ -668,7 +666,7 @@ with tab_scoring:
                     cmap = {g:c for g, c in zip(grades, shades)}
                     donut_title = (
                         f"Grade Distribution — {year_txt}"
-                        "<br><span style='font-size:0.9em;color:#555;'>Attractiveness analysis</span>"
+                        "<br><span style='font-size:0.9em;color:#555;'>Share of countries by letter grade (A+ to D).</span>"
                     )
                     fig_donut = px.pie(donut, names="grade", values="count", hole=0.55,
                                        title=donut_title,
@@ -701,7 +699,7 @@ with tab_scoring:
                 else:
                     title_cont = (
                         f"Average Score by Continent — {year_txt}"
-                        "<br><span style='font-size:0.9em;color:#555;'>Attractiveness analysis</span>"
+                        "<br><span style='font-size:0.9em;color:#555;'>Regional comparison of mean attractiveness scores.</span>"
                     )
                     fig_cont = px.bar(cont_bar, x="score", y="continent", orientation="h",
                                       color="score", color_continuous_scale="Blues",
@@ -734,7 +732,7 @@ with tab_scoring:
                 label = f"{ctry_cont} Average ({year_txt})" if ctry_cont else f"Continent Average ({year_txt})"
                 st.metric(label, "-" if np.isnan(cont_avg) else f"{cont_avg:,.3f}")
 
-        # LEFT KPI (no country selected)
+        # LEFT: KPI only when NO specific country is selected
         t1, t2 = st.columns([1, 2], gap="large")
         with t1:
             if sel_country_sc == "All":
@@ -756,6 +754,7 @@ with tab_scoring:
                     """,
                     unsafe_allow_html=True,
                 )
+            # else: intentionally show nothing when a country is selected
 
         with t2:
             map_df = wb_scope[["country", "score"]].copy()
@@ -843,7 +842,7 @@ with tab_scoring:
                     st.plotly_chart(fig_cont, use_container_width=True)
 
 # =============================================================================
-# CAPEX TAB — (unchanged logic)
+# CAPEX TAB — show only your requested KPIs on TOP; suppress grade KPI when year+country chosen
 # =============================================================================
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
@@ -854,10 +853,13 @@ with tab_eda:
     with cap_right:
         info_button("capex_trend")
 
+
+    # De-dup helpers (CAPEX tab only)
     shown_kpi_keys: set = set()
     shown_series_keys: set = set()
 
     def _kpi_block(title: str, value: float, unit: str = ""):
+        """Render single-value KPIs *on top* in the two slots."""
         key = ("KPI", title)
         if key in shown_kpi_keys:
             return
@@ -896,6 +898,7 @@ with tab_eda:
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
 
+    # Contextual KPI title mapper
     def _pretty_kpi_title(orig_title: str, label: str) -> str:
         t = str(orig_title).strip()
         m = re.search(r"Top Countries by CAPEX Growth(.*)", t, flags=re.IGNORECASE)
@@ -944,6 +947,7 @@ with tab_eda:
         fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
 
+    # filters applied to CAPEX
     grade_options = ["All", "A+", "A", "B", "C", "D"]
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
@@ -956,9 +960,11 @@ with tab_eda:
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
     
+    # --- TOP KPI slots (only the small KPIs you trigger will render here) ---
     top_k1, top_k2 = st.columns([1, 1], gap="large")
     _top_slots = [top_k1, top_k2]
-    _top_i = [0]
+    _top_i = [0]  # mutable index
+    # A placeholder right under the Grade filter for the single KPI
     below_grade_kpi = st.empty()
 
     capx_eda = capx_enriched.copy()
@@ -969,14 +975,18 @@ with tab_eda:
     if isinstance(sel_year_any, int):
         capx_eda = capx_eda[capx_eda["year"] == sel_year_any]
         
+    # Scale to $B
     capx_eda["capex"], capx_enriched["capex"] = capx_eda["capex"] / 1000.0, capx_enriched["capex"] / 1000.0
 
+    # --- Special rule: when Year + Country chosen, show ONLY this KPI on top ---
     if isinstance(sel_year_any, int) and sel_country != "All":
         total_capex = float(capx_eda["capex"].sum()) if not capx_eda.empty else 0.0
         _kpi_block(f"{sel_country} — Total CAPEX — {sel_year_any}", total_capex, "$B")
 
+    # ── Main 2-up area ────────────────────────────────────────────────────────
     e1, e2 = st.columns([1.6, 2], gap="large")
     with e1:
+        # If a specific year is picked, we skip the left trend (you only want top KPI)
         if not isinstance(sel_year_any, int):
             trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
             if trend.empty: st.info("No CAPEX data for the selected filters.")
@@ -1010,9 +1020,12 @@ with tab_eda:
                               paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig, use_container_width=True)
 
+    # Grade views
+    # Hide the entire grade view when Year + Country are chosen (per your instruction)
     hide_grade_view = isinstance(sel_year_any, int) and sel_country != "All"
     show_grade_trend = (sel_grade_eda == "All") and (not hide_grade_view)
 
+    # Top-10 block: also skip when Year + Country chosen (it would collapse to 1 KPI)
     if not (isinstance(sel_year_any, int) and sel_country != "All"):
         if show_grade_trend:
             b1, b2, b3 = st.columns([1.2, 1.2, 1.6], gap="large")
@@ -1148,7 +1161,7 @@ with tab_eda:
                         )
 
 # =============================================================================
-# SECTORS TAB — (unchanged from your last version)
+# SECTORS TAB — UNCHANGED
 # =============================================================================
 
 SECTORS_CANON = [
@@ -1167,10 +1180,13 @@ def _canon_country(name: str) -> str:
     if not isinstance(name, str): return ""
     s = name.strip()
     swap = {
+        # existing mappings
         "usa":"United States","us":"United States","u.s.":"United States",
         "uk":"United Kingdom","u.k.":"United Kingdom",
         "south korea":"South Korea","republic of korea":"South Korea",
         "uae":"United Arab Emirates", "saudiarabia":"Saudi Arabia",
+
+        # NEW — ensure GCC stays uppercase everywhere
         "gcc":"GCC", "g.c.c.":"GCC", "gulf cooperation council":"GCC",
     }
     low = s.lower()
@@ -1192,6 +1208,7 @@ def _twemoji_url_from_iso2(iso2: str | None) -> str | None:
     if not iso2:
         return None
     iso2 = iso2.upper()
+    # Convert ISO2 -> regional indicator codepoints (e.g., BH -> 1f1e7-1f1ed)
     def cp(ch): return format(0x1F1E6 + (ord(ch) - ord('A')), 'x')
     code = f"{cp(iso2[0])}-{cp(iso2[1])}"
     return f"https://twemoji.maxcdn.com/v/latest/svg/{code}.svg"
@@ -1280,9 +1297,12 @@ with tab_sectors:
         sel_sector = st.selectbox("Sector", sector_opt, index=0, key="sector_sel")
     with sc2:
         countries = sorted(sectors_df["country"].dropna().unique().tolist())
+        # Normalize whatever might be in session state (e.g., old "Gcc") to the canonical form
         default_c = _canon_country(st.session_state.get("sector_country", countries[0]))
         if default_c not in countries:
             default_c = countries[0]
+    
+        # Display label fix: always show "GCC" (value stored remains canonical from the list)
         sel_sector_country = st.selectbox(
             "Source Country",
             countries,
@@ -1294,8 +1314,10 @@ with tab_sectors:
     metric = st.radio("Metric", ["Companies", "Jobs Created", "Capex", "Projects"],
                       horizontal=True, index=0, key="metric_sel")
 
-    sel_country_canon = _canon_country(sel_sector_country)
+    # Normalize the chosen country for data + display
+    sel_country_canon = _canon_country(sel_sector_country)         # e.g., "GCC"
     display_country   = "GCC" if sel_country_canon == "GCC" else sel_country_canon
+
 
     cdf = sectors_df[sectors_df["country"] == sel_country_canon].copy()
     if metric == "Capex": cdf["capex"] = cdf["capex"] / 1000.0
@@ -1314,6 +1336,7 @@ with tab_sectors:
             mime="text/csv",
             key="dl_country_sectors_csv",
         )
+
 
     value_col = {
         "Companies":"companies",
@@ -1358,11 +1381,12 @@ with tab_sectors:
                 height=520,
             )
             
+            # Add the flag image to the title area (only if we have one)
             if flag_url:
                 fig.update_layout(images=[dict(
                     source=flag_url,
                     xref="paper", yref="paper",
-                    x=-0.02, y=1.12,
+                    x=-0.02, y=1.12,      # a bit to the left of the title, tweak if needed
                     sizex=0.06, sizey=0.12,
                     xanchor="left", yanchor="top",
                     layer="above"
