@@ -1307,30 +1307,30 @@ with tab_sectors:
     dynamic_title = f"{flag} Sectoral Distribution of {metric_display} in {display_country}"
 
     if sel_sector == "All":
-    bars = cdf[["sector", value_col]].copy()
-    bars = bars.set_index("sector").reindex(SECTORS_CANON, fill_value=0).reset_index()
-    bars = bars.sort_values(value_col, ascending=True)
-
-    if bars[value_col].sum() == 0:
-        st.info("No data for this selection.")
-    else:
-        fig = px.bar(
-            bars, x=value_col, y="sector", orientation="h",
-            labels={value_col:"", "sector":""},
-            color=value_col, color_continuous_scale="Blues"
-        )
-        fig.update_coloraxes(showscale=False)
-
-        fig.update_layout(
-            title={
-                "text": dynamic_title,
-                "x": 0.0,            # left
-                "xanchor": "left",
-            },
-            margin=dict(l=10, r=10, t=60, b=10),
-            height=520,
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        bars = cdf[["sector", value_col]].copy()
+        bars = bars.set_index("sector").reindex(SECTORS_CANON, fill_value=0).reset_index()
+        bars = bars.sort_values(value_col, ascending=True)
+    
+        if bars[value_col].sum() == 0:
+            st.info("No data for this selection.")
+        else:
+            fig = px.bar(
+                bars, x=value_col, y="sector", orientation="h",
+                labels={value_col:"", "sector":""},
+                color=value_col, color_continuous_scale="Blues"
+            )
+            fig.update_coloraxes(showscale=False)
+    
+            fig.update_layout(
+                title={
+                    "text": dynamic_title,
+                    "x": 0.0,            # left
+                    "xanchor": "left",
+                },
+                margin=dict(l=10, r=10, t=60, b=10),
+                height=520,
+            )
+            st.plotly_chart(fig, use_container_width=True)
     else:
         val = float(cdf.loc[cdf["sector"] == sel_sector, value_col].sum()) if not cdf.empty else 0.0
         unit = {"Companies":"", "Jobs Created":"", "Capex":" (USD B)", "Projects":""}[metric]
