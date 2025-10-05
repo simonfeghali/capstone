@@ -505,7 +505,7 @@ def render_compare_tab():
         st.markdown(
             """
             <h3 style="margin:0; font-weight:800 !important; line-height:1.2; font-size:28px;">
-              Comparative Capex Trends (2021–2024)
+              Comparative Capex Trends
             </h3>
             <div style="color:#6b7280; margin:.35rem 0 1rem;">
               Tracks year-over-year CAPEX for selected countries.
