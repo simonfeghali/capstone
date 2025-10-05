@@ -1390,6 +1390,27 @@ with tab_sectors:
 
 GCC_MEMBERS = {"United Arab Emirates", "Bahrain", "Kuwait", "Saudi Arabia", "Qatar", "Oman"}
 
+def _demonym(country: str) -> str:
+    m = {
+        "Bahrain": "Bahraini",
+        "Kuwait": "Kuwaiti",
+        "Qatar": "Qatari",
+        "Oman": "Omani",
+        "Saudi Arabia": "Saudi",
+        "United Arab Emirates": "Emirati",
+        "United States": "American",
+        "United Kingdom": "British",
+        "Germany": "German",
+        "France": "French",
+        "China": "Chinese",
+        "Japan": "Japanese",
+        "South Korea": "South Korean",
+        "Canada": "Canadian",
+        "Netherlands": "Dutch",
+        "GCC": "GCC",  # leave as-is
+    }
+    return m.get(country, country)
+
 def _style_geo_white(fig: go.Figure, height: int = 360) -> go.Figure:
     fig.update_geos(
         projection_type="natural earth",
@@ -1583,6 +1604,17 @@ with tab_dest:
         "Projects":"projects",
     }[metric_dest]
 
+    # Phrase used in titles per metric
+    metric_phrase = {
+        "Companies": "number of companies",
+        "Jobs Created": "jobs created",
+        "Capex": "capex (USD B)",
+        "Projects": "number of projects",
+    }[metric_dest]
+    
+    # Use the label you already show in the UI (GCC stays "GCC")
+    src_adj = _demonym(shown_src_label)
+
     export = dest_df[dest_df["source_country"] == sel_src_country].copy()
     export = export[export["destination_country"].astype(str).str.strip().str.lower() != "total"]
 
@@ -1622,24 +1654,31 @@ with tab_dest:
 
         left, right = st.columns([1.2, 1], gap="large")
         with left:
-            title = f"Capex ($B) by Destination Country — {sel_src_country} (Top 15)" if metric_dest == "Capex" else f"{metric_dest} by Destination Country — {sel_src_country} (Top 15)"
+            title = f"Top Destination Countries for {src_adj} by {metric_phrase}"
             if bars.empty or (bars[value_col_dest].sum() == 0):
                 st.info("No data for this selection.")
             else:
                 fig = px.bar(
                     bars.sort_values(value_col_dest),
                     x=value_col_dest, y="destination_country",
-                    orientation="h", title=title,
+                    orientation="h",
                     labels={value_col_dest:"", "destination_country":""},
                     color=value_col_dest, color_continuous_scale="Blues"
                 )
                 fig.update_coloraxes(showscale=False)
-                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=520)
+                fig.update_layout(
+                    title={"text": title, "x": 0.0, "xanchor": "left"},
+                    margin=dict(l=10, r=10, t=60, b=10),
+                    height=520
+                )
                 st.plotly_chart(fig, use_container_width=True)
         with right:
             top_dests = bars["destination_country"].tolist()
             fig_top_map = make_top_map(sel_src_country, top_dests)
-            fig_top_map.update_layout(title=f"Top Destinations Map — {shown_src_label}")
+            fig_top_map.update_layout(
+                title={"text": f"Geographic Distribution of {src_adj} Expansions by {metric_phrase}",
+                       "x": 0.0, "xanchor": "left"}
+            )
             st.plotly_chart(fig_top_map, use_container_width=True)
 
     else:
