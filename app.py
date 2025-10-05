@@ -495,14 +495,20 @@ with tab_overview:
 # SCORING TAB (Country Attractiveness) — TITLES FULLY DYNAMIC BY YEAR/FILTER
 # =============================================================================
 with tab_scoring:
+    # Caption + info button ABOVE the filters
+    cap1, cap2 = st.columns([20, 1])
+    with cap1:
+        # Use the current session value (defaults to "All" on first run)
+        st.caption(
+            f"Country Attractiveness (World Bank–based) • "
+            f"{_year_token(st.session_state.get('sc_year', 'All'))}"
+        )
+    with cap2:
+        info_button("score_trend")
+
+    # Now render the filters
     sel_year_sc, sel_cont_sc, sel_country_sc = scoring_filters_block(wb)
 
-    # Caption + info button side by side
-    col1, col2 = st.columns([20,1])
-    with col1:
-        st.caption(f"Country Attractiveness (World Bank–based) • {_year_token(sel_year_sc)}")
-    with col2:
-        info_button("score_trend")
 
     # ── Dynamic main title + subtitle, fully reflecting Year/Scope
     scope_txt = _scope_token(sel_cont_sc, sel_country_sc)
