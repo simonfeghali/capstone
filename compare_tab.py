@@ -537,20 +537,24 @@ def render_compare_tab():
 
     # ======================= Sectors — ALL eligible selected countries =======================
     st.markdown("---")
-
+    
     if not sel_countries_allowed:
         st.caption("Select one or more **top**/allowed countries to see sector KPIs.")
     elif sec.empty:
         st.caption("No sectors data available.")
     else:
-        
+        # 1) Reserve a spot ABOVE the filters for the title/subtitle
+        sectors_title_ph = st.empty()
+    
+        # 2) Filters (these render BELOW the placeholder)
         sectors_list = sorted(sec["sector"].dropna().unique().tolist())
         c1, c2 = st.columns([1, 1], gap="small")
         with c1:
             sector_opt = st.selectbox("Sector", sectors_list, index=0, key="cmp_sector")
         with c2:
             sector_metric = st.selectbox("Metric", ["Companies","Jobs Created","Capex","Projects"], index=0, key="cmp_sector_metric")
-
+    
+        # 3) Build dynamic subtitle parts
         metric_label_map = {
             "Companies": "number of companies",
             "Jobs Created": "number of jobs created",
@@ -565,22 +569,24 @@ def render_compare_tab():
             countries_text = f"{sel_countries_allowed[0]} and {sel_countries_allowed[1]}"
         else:
             countries_text = ", ".join(sel_countries_allowed[:-1]) + f", and {sel_countries_allowed[-1]}"
-
-        st.markdown(
-            """
-            <div style="font-size:28px; font-weight:800; line-height:1.2; margin:0;">
+    
+        # 4) Fill the placeholder ABOVE the filters (note: f-string so braces evaluate)
+        sectors_title_ph.markdown(
+            f"""
+            <h3 style="margin:0; font-weight:800 !important; line-height:1.2; font-size:28px;">
               Sectoral Benchmarking
-            </div>
+            </h3>
             <div style="color:#6b7280; margin:.35rem 0 1rem;">
               Compares the {metric_label_map.get(sector_metric, sector_metric.lower())} in a chosen sector across {countries_text}.
             </div>
             """,
             unsafe_allow_html=True
         )
-        
+    
+        # 5) KPIs
         metric_map = {"Companies":"companies","Jobs Created":"jobs_created","Capex":"capex","Projects":"projects"}
         col = metric_map[sector_metric]
-
+    
         n = len(sel_countries_allowed)
         for cols, i in _responsive_columns(n, max_per_row=4):
             for j, country in enumerate(sel_countries_allowed[i:i+len(cols)]):
