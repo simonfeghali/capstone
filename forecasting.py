@@ -5,6 +5,7 @@
 # - 2024 is FORECASTED but drawn in light grey (with a single "CAPEX:" hover)
 # - 2025–2028 forecasts = dark blue
 # - Clean axis (every year tick), no gridlines, continuous line
+# - Section title/subtitle rendered ABOVE the chart to match app style
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -340,6 +341,7 @@ def _plot_forecast_unified(country: str,
       • 2024 forecast drawn in light grey (single tooltip: "CAPEX: …")
       • Dark blue for 2025–2028 forecasts
       • Every year tick (dtick=1), no gridlines
+      • NO internal title: outer H3+subtitle is used for consistent page style
     """
     # Prepare data
     hist_years = [int(y) for y in actual.index if start_year <= int(y) <= 2023]
@@ -376,7 +378,7 @@ def _plot_forecast_unified(country: str,
                     mode="lines",
                     line=dict(color="rgba(120,120,120,0.75)", width=2.0, shape="linear"),
                     showlegend=False,
-                    hoverinfo="skip"  # suppress connector hover
+                    hoverinfo="skip"
                 )
             )
         # a single grey marker at 2024 that carries the tooltip "CAPEX: …"
@@ -412,7 +414,7 @@ def _plot_forecast_unified(country: str,
                     mode="lines",
                     line=dict(color="#2E8EF7", width=2.4, shape="linear"),
                     showlegend=False,
-                    hoverinfo="skip"  # avoid a second tooltip at 2024 or 2025
+                    hoverinfo="skip"
                 )
             )
 
@@ -450,22 +452,13 @@ def _plot_forecast_unified(country: str,
         title_text=""
     )
 
-    title_main = "FDI Forecast (2024–2028) — Country-Level Projections"
-    subtitle_text = f"{country} | Modeled using {best_name} | Forecast horizon: 2024–2028 | Error metric: RMSE (Test)"
-    
+    # IMPORTANT: no figure title; we align axes under the external H3 by widening left margin
     fig.update_layout(
-        title={
-            "text": f"{title_main}<br><sup>{subtitle_text}</sup>",
-            "x": 0.0,            # align to the left
-            "xanchor": "left",   # anchor on the left
-            "y": 0.98,           # slightly below the top
-            "yanchor": "top",
-        },
         hovermode="x",
         hoverlabel=dict(bgcolor="white", font_size=12, font_color="black"),
-        margin=dict(l=10, r=10, t=90, b=10),  # increase left margin so axis and title line up
+        margin=dict(l=90, r=10, t=10, b=10),  # left margin ensures y-axis lines up with H3 start
         height=520,
-        xaxis=dict(tickfont=dict(size=12),automargin=True),
+        xaxis=dict(tickfont=dict(size=12), automargin=True),
         yaxis=dict(tickfont=dict(size=12), automargin=True),
     )
     return fig
@@ -512,7 +505,6 @@ def render_forecasting_tab():
         best, prep["endog_log"], prep["exog_full"], prep["future_index"], prep["future_exog"]
     )
 
-    
     # Fixed last year (right end) = last forecast year if available, else 2028
     fixed_end = int(prep["future_index"][-1]) if len(prep["future_index"]) else 2028
     
@@ -539,10 +531,21 @@ def render_forecasting_tab():
         )
     
         start_year = int(st.session_state.hist_range_locked[0])
-    
-    
     else:
         start_year = 2015
+
+    # ── Section heading + subtitle (matches style used elsewhere) ────────────
+    st.markdown(
+        f"""
+        <h3 style="margin:0; font-weight:800 !important; line-height:1.2; font-size:28px;">
+          Forecasted FDI Trends (2024–2028)
+        </h3>
+        <div style="color:#6b7280; margin:.35rem 0 1rem;">
+          Projects the CAPEX evolution of {sel_country} from 2024 to 2028 based on historical investment patterns.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     fig = _plot_forecast_unified(
         sel_country,
