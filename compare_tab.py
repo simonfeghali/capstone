@@ -453,6 +453,7 @@ def render_compare_tab():
         # Title left-align, add room for right labels and KPI
         fig_score.update_layout(
             title_text="",
+            legend_title_text="",
             margin=dict(l=10, r=10, t=10, b=10),
             yaxis=dict(automargin=True),
             xaxis=dict(automargin=True),
@@ -527,6 +528,7 @@ def render_compare_tab():
         _style_compare_line(fig_cap, unit="$B")
         fig_cap.update_layout(
             title_text="",
+            legend_title_text="",
             margin=dict(l=10, r=10, t=10, b=10),
             yaxis=dict(automargin=True),
             xaxis=dict(automargin=True),
