@@ -369,7 +369,7 @@ def render_compare_tab():
     # --- Top bar (compact) ---
     top_l, top_r = st.columns([30, 1], gap="small")
     with top_l:
-        st.caption("Benchmarking — multi-country / continent comparison")
+        st.caption("Benchmarking — Countries and Continents comparison")
     with top_r:
         info_button("compare")
     emit_auto_jump_script()
