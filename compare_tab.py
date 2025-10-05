@@ -543,8 +543,7 @@ def render_compare_tab():
     elif sec.empty:
         st.caption("No sectors data available.")
     else:
-        sectors_title_ph = st.empty()  # title/subtitle above filters
-
+        
         sectors_list = sorted(sec["sector"].dropna().unique().tolist())
         c1, c2 = st.columns([1, 1], gap="small")
         with c1:
@@ -567,11 +566,11 @@ def render_compare_tab():
         else:
             countries_text = ", ".join(sel_countries_allowed[:-1]) + f", and {sel_countries_allowed[-1]}"
 
-        sectors_title_ph.markdown(
-            f"""
-            <h3 style="margin:0; font-weight:800 !important; line-height:1.2; font-size:28px;">
+        st.markdown(
+            """
+            <div style="font-size:28px; font-weight:800; line-height:1.2; margin:0;">
               Sectoral Benchmarking
-            </h3>
+            </div>
             <div style="color:#6b7280; margin:.35rem 0 1rem;">
               Compares the {metric_label_map.get(sector_metric, sector_metric.lower())} in a chosen sector across {countries_text}.
             </div>
