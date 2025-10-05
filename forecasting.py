@@ -486,7 +486,7 @@ def render_forecasting_tab():
     st.markdown(
         f"""
         <div style="font-size:28px; font-weight:800; line-height:1.2; margin:0;">
-          Forecasted FDI Trends (2024–2028)
+          Forecasted FDI Trends
         </div>
         <div style="color:#6b7280; margin:.35rem 0 1rem;">
           Projects the CAPEX evolution of {sel_country} from 2024 to 2028 based on historical investment patterns.
