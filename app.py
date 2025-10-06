@@ -866,10 +866,16 @@ with tab_eda:
     def _compose_title(main: str, sub: str | None = None) -> str:
         if not sub:
             return main
-        # Insert <br> every ~70 characters to force subtitle wrapping
         import textwrap
+        # Wrap subtitle text every ~70 characters
         wrapped = "<br>".join(textwrap.wrap(sub, width=70))
-        return f"{main}<br><span style='font-size:0.9em;color:#6b7280;line-height:1.4'>{wrapped}</span>"
+        # Add smaller line-height and a bit of bottom padding to avoid overlap
+        return (
+            f"<b>{main}</b>"
+            f"<br><span style='font-size:0.9em; color:#6b7280; line-height:1.4; display:block; "
+            f"margin-top:4px;'>{wrapped}</span>"
+        )
+
 
 
     # De-dup (unchanged)
