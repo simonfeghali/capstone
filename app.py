@@ -848,15 +848,20 @@ with tab_scoring:
 # CAPEX TAB — show only your requested KPIs on TOP; suppress grade KPI when year+country chosen
 # =============================================================================
 with tab_eda:
-    # Subtitle above filters
-    top_left, top_right = st.columns([20, 1], gap="small")
-    with top_left:
-        st.caption("Analysis of FDI Capital Expenditure (2021–2024)")
-    with top_right:
+    # Caption + info button ABOVE the filters
+    cap1, cap2 = st.columns([20, 1])
+    with cap1:
+        # Small contextual subtitle, includes year token just like Country Attractiveness
+        st.caption(
+            f"Capital Investment (FDI CAPEX) • "
+            f"{_year_token(st.session_state.get('eda_year', 'All'))}"
+        )
+    with cap2:
         info_button("capex_trend")
 
-    # Filters come below
+    # Filters come below the caption
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
+
 
 
 
