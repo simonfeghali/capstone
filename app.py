@@ -912,7 +912,7 @@ with tab_eda:
         fig.update_traces(hovertemplate="Year: %{x}<br>Capex: %{y:,.3f} $B<extra></extra>")
         fig.update_xaxes(title=labels_x, type="category", showgrid=False)
         fig.update_yaxes(title=labels_y, showgrid=False)
-        fig.update_layout(margin=dict(l=10, r=10, t=140, b=10), height=height)
+        fig.update_layout(margin=dict(l=50, r=10, t=140, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
 
     # Map KPI titles when bars collapse to a single entry
