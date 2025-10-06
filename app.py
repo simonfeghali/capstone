@@ -864,9 +864,13 @@ with tab_eda:
         return str(sel_country).strip() != "All"
 
     def _compose_title(main: str, sub: str | None = None) -> str:
-        if sub:
-            return f"{main}<br><span style='font-size:0.9em;color:#6b7280;'>{sub}</span>"
-        return main
+        if not sub:
+            return main
+        # Insert <br> every ~70 characters to force subtitle wrapping
+        import textwrap
+        wrapped = "<br>".join(textwrap.wrap(sub, width=70))
+        return f"{main}<br><span style='font-size:0.9em;color:#6b7280;line-height:1.4'>{wrapped}</span>"
+
 
     # De-dup (unchanged)
     shown_kpi_keys: set = set()
