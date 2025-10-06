@@ -851,7 +851,6 @@ with tab_eda:
     # Subtitle above filters
     top_left, top_right = st.columns([20, 1], gap="small")
     with top_left:
-        st.markdown("### Capital Investment")
         st.caption("Analysis of FDI Capital Expenditure (2021–2024)")
     with top_right:
         info_button("capex_trend")
