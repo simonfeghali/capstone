@@ -90,7 +90,7 @@ st.markdown(f"""
 <div class="header-row">
   <div class="header-left">
     <img class="header-icon" src="data:image/png;base64,{icon_b64}" />
-    <div class="header-title">Country Viability & FDI Analytics Dashboard</div>
+    <div class="header-title">Country Viability & Foreign Direct Investment Analytics Dashboard</div>
   </div>
   <img class="header-logo" src="data:image/jpeg;base64,{logo_b64}" />
 </div>
