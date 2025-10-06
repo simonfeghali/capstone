@@ -924,7 +924,7 @@ with tab_eda:
         t = str(orig_title)
 
         # 1) Top Countries by CAPEX — All Years  => Country cumulative KPI (when a country is selected)
-        if "Global Leaders in FDI Capital Expenditure (2021–2024)" in t and _is_country_selected():
+        if "Leaders in FDI Capital Expenditure (2021–2024)" in t and _is_country_selected():
             return _compose_title(
                 f"{sel_country}’s Cumulative FDI Capital Expenditure (2021–2024)",
                 "Attracted ~$80.6B across 2021–2024, reinforcing its role as a regional investment hub."
@@ -1114,11 +1114,11 @@ with tab_eda:
                 level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
                 if _is_all_all_all():
                     # Your global wording
-                    title_top10 = "Global Leaders in FDI Capital Expenditure (2021–2024)"
+                    title_top10 = "Leaders in FDI Capital Expenditure (2021–2024)"
                     sub_top10 = "United States, China, and the UK dominate global CAPEX inflows, reflecting their scale, stability, and market maturity."
                 elif _is_country_selected():
                     # This will collapse to 1 bar => KPI via _pretty_kpi_title above
-                    title_top10 = "Global Leaders in FDI Capital Expenditure (2021–2024)"
+                    title_top10 = "Leaders in FDI Capital Expenditure (2021–2024)"
                     sub_top10 = None
                 else:
                     title_top10 = "Top Countries by CAPEX — All Years"
