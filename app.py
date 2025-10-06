@@ -13,7 +13,6 @@ from forecasting import render_forecasting_tab
 from overview import render_overview_tab, info_button, emit_auto_jump_script
 
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # App chrome / theme
 # ──────────────────────────────────────────────────────────────────────────────
@@ -846,7 +845,7 @@ with tab_scoring:
 
 
 # =============================================================================
-# CAPEX TAB — Titles/Subtitles per your spec (logic unchanged)
+# CAPEX TAB — show only your requested KPIs on TOP; suppress grade KPI when year+country chosen
 # =============================================================================
 with tab_eda:
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
@@ -857,31 +856,18 @@ with tab_eda:
     with cap_right:
         info_button("capex_trend")
 
-    # ── small helpers (no behavior changes—only text) ─────────────────────────
-    def _is_all_all_all() -> bool:
-        return sel_year_any == "All" and sel_cont == "All" and sel_country == "All"
 
-    def _is_country_selected() -> bool:
-        return str(sel_country).strip() != "All"
-
-    def _compose_title(main: str, sub: str | None = None) -> str:
-        if not sub:
-            return main
-        # Insert <br> every ~70 characters to force subtitle wrapping
-        import textwrap
-        wrapped = "<br>".join(textwrap.wrap(sub, width=55))
-        return f"{main}<br><span style='font-size:0.9em;color:#6b7280;line-height:1.4'>{wrapped}</span>"
-
-
-    # De-dup (unchanged)
+    # De-dup helpers (CAPEX tab only)
     shown_kpi_keys: set = set()
     shown_series_keys: set = set()
 
     def _kpi_block(title: str, value: float, unit: str = ""):
+        """Render single-value KPIs *on top* in the two slots."""
         key = ("KPI", title)
         if key in shown_kpi_keys:
             return
         shown_kpi_keys.add(key)
+
         slot = _top_slots[_top_i[0] % len(_top_slots)]
         with slot:
             st.markdown(
@@ -912,34 +898,21 @@ with tab_eda:
         fig.update_traces(hovertemplate="Year: %{x}<br>Capex: %{y:,.3f} $B<extra></extra>")
         fig.update_xaxes(title=labels_x, type="category", showgrid=False)
         fig.update_yaxes(title=labels_y, showgrid=False)
-        fig.update_layout(margin=dict(l=10, r=10, t=140, b=10), height=height)
+        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
 
-    # Map KPI titles when bars collapse to a single entry
+    # Contextual KPI title mapper
     def _pretty_kpi_title(orig_title: str, label: str) -> str:
-        """
-        Converts single-bar charts into KPI titles with your wording.
-        We look at the original chart title to decide which KPI this is.
-        """
-        t = str(orig_title)
-
-        # 1) Top Countries by CAPEX — All Years  => Country cumulative KPI (when a country is selected)
-        if "Leaders in FDI Capital Expenditure (2021–2024)" in t and _is_country_selected():
-            return _compose_title(
-                f"{sel_country}’s Cumulative FDI Capital Expenditure (2021–2024)",
-                "Attracted ~$80.6B across 2021–2024, reinforcing its role as a regional investment hub."
-            )
-
-        # 2) Fastest-Growing CAPEX Destinations (YYYY → YYYY) => Country growth KPI
-        m = re.search(r"Fastest-Growing CAPEX Destinations \((\d{4})\s*→\s*(\d{4})\)", t)
-        if m and _is_country_selected():
-            y1, y2 = m.group(1), m.group(2)
-            return _compose_title(
-                f"{sel_country}’s CAPEX Growth Momentum ({y1} → {y2})",
-                "Grew by ~$10.7B over the period, despite volatility in global flows."
-            )
-
-        # fallback (should rarely be used here)
+        t = str(orig_title).strip()
+        m = re.search(r"Top Countries by CAPEX Growth(.*)", t, flags=re.IGNORECASE)
+        if m:
+            tail = m.group(1).strip()
+            tail = tail.lstrip("—").strip()
+            return f"{label} — CAPEX Growth{(' ' + tail) if tail else ''}"
+        m = re.search(r"Top Countries by CAPEX\s*—\s*(.*)", t, flags=re.IGNORECASE)
+        if m:
+            tail = m.group(1).strip()
+            return f"{label} — Total CAPEX — {tail}" if tail else f"{label} — Total CAPEX"
         return f"{label} — {t}"
 
     def _bars_or_kpi(df: pd.DataFrame, value_col: str, name_col: str, title: str,
@@ -974,10 +947,10 @@ with tab_eda:
         h = f"%{{y}}: %{{x:,.0f}} {unit}<extra></extra>" if unit else "%{y}: %{x:,.0f}<extra></extra>"
         fig.update_traces(hovertemplate=h, text=None, texttemplate=None, textposition=None)
         fig.update_coloraxes(showscale=False)
-        fig.update_layout(margin=dict(l=10, r=10, t=140, b=10), height=height)
+        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
 
-    # filters applied to CAPEX (unchanged)
+    # filters applied to CAPEX
     grade_options = ["All", "A+", "A", "B", "C", "D"]
     auto_grade = st.session_state.get("grade_eda", "All")
     if sel_country != "All" and isinstance(sel_year_any, int):
@@ -990,10 +963,11 @@ with tab_eda:
                                  index=grade_options.index(auto_grade if auto_grade in grade_options else "All"),
                                  key="grade_eda")
     
-    # --- TOP KPI slots (unchanged)
+    # --- TOP KPI slots (only the small KPIs you trigger will render here) ---
     top_k1, top_k2 = st.columns([1, 1], gap="large")
     _top_slots = [top_k1, top_k2]
-    _top_i = [0]
+    _top_i = [0]  # mutable index
+    # A placeholder right under the Grade filter for the single KPI
     below_grade_kpi = st.empty()
 
     capx_eda = capx_enriched.copy()
@@ -1007,78 +981,34 @@ with tab_eda:
     # Scale to $B
     capx_eda["capex"], capx_enriched["capex"] = capx_eda["capex"] / 1000.0, capx_enriched["capex"] / 1000.0
 
-    # Special rule (existing)
+    # --- Special rule: when Year + Country chosen, show ONLY this KPI on top ---
     if isinstance(sel_year_any, int) and sel_country != "All":
         total_capex = float(capx_eda["capex"].sum()) if not capx_eda.empty else 0.0
-        # Keep the single-year KPI label; your country KPI for "All Years" appears via Top-10 collapse.
         _kpi_block(f"{sel_country} — Total CAPEX — {sel_year_any}", total_capex, "$B")
 
     # ── Main 2-up area ────────────────────────────────────────────────────────
     e1, e2 = st.columns([1.6, 2], gap="large")
-
-    # LEFT: Trend (rendered only when Year = All, per your existing logic)
     with e1:
+        # If a specific year is picked, we skip the left trend (you only want top KPI)
         if not isinstance(sel_year_any, int):
             trend = capx_eda.groupby("year", as_index=False)["capex"].sum().sort_values("year")
-            if trend.empty:
-                st.info("No CAPEX data for the selected filters.")
+            if trend.empty: st.info("No CAPEX data for the selected filters.")
             else:
                 x_vals = trend["year"].astype(int).astype(str).tolist()
                 y_vals = trend["capex"].astype(float).tolist()
-
-                if _is_all_all_all():
-                    # Slide 2 — Global CAPEX Trend ($B)
-                    title = _compose_title(
-                        "Global FDI Capital Expenditure Trend (2021–2024)",
-                        "Global CAPEX rebounded post-COVID, peaked in 2023, and corrected in 2024 due to tightening economic conditions."
-                    )
-                elif _is_country_selected():
-                    # Slide 3 — Country Trend (All years)
-                    title = _compose_title(
-                        f"Yearly CAPEX Flows into {sel_country} (2021–2024)",
-                        "Sharp post-COVID rebound in 2022, followed by moderation in 2023–2024."
-                    )
-                else:
-                    # Region or mixed filters: keep neutral title
-                    title = "CAPEX Trend ($B)"
-
+                title = (f"{sel_country} CAPEX Trend ($B)" if sel_country != "All"
+                         else "Global CAPEX Trend ($B)")
                 _plotly_line_once(x_vals, y_vals, title, labels_x="", labels_y="", height=360)
 
-    # RIGHT: Map (both for All years and single year)
     with e2:
         if isinstance(sel_year_any, int):
-            map_df = capx_eda.copy()
-            if _is_all_all_all():
-                map_title_text = f"CAPEX Map — {sel_year_any}"
-                map_sub = None
-            elif _is_country_selected():
-                map_title_text = f"{sel_country}’s Share of Global CAPEX — {sel_year_any}"
-                map_sub = f"Highlights {sel_country} within the selected year."
-            else:
-                map_title_text = f"CAPEX Map — {sel_year_any}"
-                map_sub = None
+            map_df = capx_eda.copy(); map_title = f"CAPEX Map — {sel_year_any}"
         else:
             map_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
-            if _is_all_all_all():
-                # Slide 2 — Global CAPEX Map (All years)
-                map_title_text = "Geographic Distribution of Global CAPEX (2021–2024)"
-                map_sub = "Investment flows are concentrated in North America, Europe, and selected Asian economies; lighter shades indicate lower inflows."
-            elif _is_country_selected():
-                # Slide 3 — Country map (All years)
-                map_title_text = f"{sel_country}’s Share of Global CAPEX"
-                map_sub = f"Map highlights {sel_country} as a key FDI destination within MENA, with consistent inflows over the period."
-            else:
-                map_title_text = "CAPEX Map — All Years"
-                map_sub = None
-
-        if map_df.empty:
-            st.info("No CAPEX data for this selection.")
+            map_title = "CAPEX Map — All Years"
+        if map_df.empty: st.info("No CAPEX data for this selection.")
         else:
-            fig = px.choropleth(
-                map_df, locations="country", locationmode="country names",
-                color="capex", color_continuous_scale="Blues",
-                title=_compose_title(map_title_text, map_sub),
-            )
+            fig = px.choropleth(map_df,locations="country",locationmode="country names",color="capex",color_continuous_scale="Blues",title=map_title,)
             fig.update_traces(hovertemplate="Country: %{location}<br>Capex: %{z:,.3f} $B<extra></extra>")
             fig.update_coloraxes(showscale=True)
             scope_map = {"Africa":"africa","Asia":"asia","Europe":"europe",
@@ -1088,42 +1018,29 @@ with tab_eda:
             fig.update_geos(scope=current_scope, projection_type="natural earth",
                             showcountries=True, showcoastlines=True,
                             landcolor="white", bgcolor="white")
-            if sel_cont != "All" or sel_country != "All":
-                fig.update_geos(fitbounds="locations")
-            fig.update_layout(margin=dict(l=10, r=10, t=140, b=10), height=420,
+            if sel_cont != "All" or sel_country != "All": fig.update_geos(fitbounds="locations")
+            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420,
                               paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig, use_container_width=True)
 
-    # ── Bottom row: Top-10 / Grade Trend / Growth (logic unchanged; titles customized)
+    # Grade views
+    # Hide the entire grade view when Year + Country are chosen (per your instruction)
     hide_grade_view = isinstance(sel_year_any, int) and sel_country != "All"
     show_grade_trend = (sel_grade_eda == "All") and (not hide_grade_view)
 
+    # Top-10 block: also skip when Year + Country chosen (it would collapse to 1 KPI)
     if not (isinstance(sel_year_any, int) and sel_country != "All"):
         if show_grade_trend:
             b1, b2, b3 = st.columns([1.2, 1.2, 1.6], gap="large")
         else:
             b1, b3 = st.columns([1.2, 1.6], gap="large")
 
-        # ── Chart 1: Top Countries by CAPEX — All Years (Global titles when All/All/All)
         with b1:
             if isinstance(sel_year_any, int):
-                level_df = capx_eda.copy()
-                title_top10 = f"Top Countries by CAPEX — {sel_year_any}"
-                sub_top10 = None
+                level_df = capx_eda.copy(); title_top10 = f"Top Countries by CAPEX — {sel_year_any}"
             else:
                 level_df = capx_eda.groupby("country", as_index=False)["capex"].sum()
-                if _is_all_all_all():
-                    # Your global wording
-                    title_top10 = "Leaders in FDI Capital Expenditure (2021–2024)"
-                    sub_top10 = "United States, China, and the UK dominate global CAPEX inflows, reflecting their scale, stability, and market maturity."
-                elif _is_country_selected():
-                    # This will collapse to 1 bar => KPI via _pretty_kpi_title above
-                    title_top10 = "Leaders in FDI Capital Expenditure (2021–2024)"
-                    sub_top10 = None
-                else:
-                    title_top10 = "Top Countries by CAPEX — All Years"
-                    sub_top10 = None
-
+                title_top10 = "Top Countries by CAPEX — All Years"
             top10 = level_df.dropna(subset=["capex"]).sort_values("capex", ascending=False).head(10)
             if top10.empty:
                 st.info("No CAPEX data for Top 10 with this filter.")
@@ -1132,13 +1049,12 @@ with tab_eda:
                     df=top10.sort_values("capex"),
                     value_col="capex",
                     name_col="country",
-                    title=_compose_title(title_top10, sub_top10),
+                    title=title_top10,
                     unit="$B",
                     height=420,
                     ascending_for_hbar=True
                 )
 
-        # ── Chart 2: CAPEX Trend by Grade ($B) — (Global phrasing when All/All/All)
         if show_grade_trend:
             with b2:
                 if "grade" in capx_eda.columns and not capx_eda.empty:
@@ -1156,19 +1072,16 @@ with tab_eda:
                             if nonzero.empty:
                                 st.info("No CAPEX data for grade view.")
                             else:
-                                _kpi_block(f"CAPEX by Grade — {sel_year_any}",
+                                _kpi_block(f"CAPEX by Grade — {sel_year_any} — {nonzero['grade'].iloc[0]}",
                                            float(nonzero["capex"].iloc[0]), "$B")
                         else:
-                            title_grade_single_year = (
-                                f"CAPEX by Grade — {sel_year_any}"
-                            )
                             fig = px.bar(gb_sorted, x="capex", y="grade", orientation="h",
                                          labels={"capex": "", "grade": ""},
-                                         title=title_grade_single_year,
+                                         title=f"CAPEX by Grade — {sel_year_any}",
                                          color="capex", color_continuous_scale="Blues")
                             fig.update_coloraxes(showscale=False)
                             fig.update_yaxes(categoryorder="array", categoryarray=gb_sorted["grade"].tolist())
-                            fig.update_layout(margin=dict(l=10, r=10, t=140, b=10), height=420)
+                            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                             st.plotly_chart(fig, use_container_width=True)
                     else:
                         tg = (capx_eda.assign(grade=capx_eda["grade"].astype(str))
@@ -1180,54 +1093,46 @@ with tab_eda:
                         else:
                             tg["year_str"] = tg["year"].astype(int).astype(str)
                             grades_present = tg["grade"].dropna().unique().tolist()
-
-                            grade_title = (
-                                _compose_title(
-                                    "CAPEX Flows by Country Grade (A+ to D), 2021–2024",
-                                    "A+ and A countries consistently attract the largest capital inflows; lower-graded countries show minor, volatile flows."
-                                )
-                                if _is_all_all_all() else
-                                "CAPEX Trend by Grade ($B)"
-                            )
-
                             if len(grades_present) == 1:
-                                fig_single = px.line(
-                                    tg, x="year_str", y="capex", color="grade",
-                                    labels={"year_str": "", "capex": "", "grade": "Grade"},
-                                    title=grade_title
-                                )
-                                fig_single.update_xaxes(type="category",
-                                                        categoryorder="array",
-                                                        categoryarray=sorted(tg["year_str"].unique().tolist()),
-                                                        showgrid=False)
-                                fig_single.update_yaxes(showgrid=False)
-                                fig_single.update_layout(margin=dict(l=10, r=10, t=60, b=10),
-                                                         height=420, legend_title_text="Grade")
-                                st.plotly_chart(fig_single, use_container_width=True)
+                                x_vals = tg["year_str"].tolist()
+                                y_vals = tg["capex"].astype(float).tolist()
+                                sig = _series_key("LINE", x_vals, y_vals)
+                                if sig not in shown_series_keys:
+                                    fig_single = px.line(
+                                        tg, x="year_str", y="capex", color="grade",
+                                        labels={"year_str": "", "capex": "", "grade": "Grade"},
+                                        title="CAPEX Trend by Grade ($B)"
+                                    )
+                                    fig_single.update_xaxes(type="category",
+                                                            categoryorder="array",
+                                                            categoryarray=sorted(tg["year_str"].unique().tolist() ),
+                                                            showgrid=False)
+                                    fig_single.update_yaxes(showgrid=False)
+                                    fig_single.update_layout(margin=dict(l=10, r=10, t=60, b=10),
+                                                             height=420, legend_title_text="Grade")
+                                    st.plotly_chart(fig_single, use_container_width=True)
                             else:
                                 blues = px.colors.sequential.Blues
                                 shades = [blues[-1], blues[-2], blues[-3], blues[-4], blues[-5]]
                                 grade_order = ["A+", "A", "B", "C", "D"]
-                                cmap = {g: c for g, c in zip(grade_order, shades)}
+                                cmap = {g:c for g,c in zip(grade_order, shades)}
                                 fig = px.line(
                                     tg, x="year_str", y="capex", color="grade",
                                     color_discrete_map=cmap,
                                     category_orders={"grade": grade_order},
                                     labels={"year_str": "", "capex": "", "grade": "Grade"},
-                                    title=grade_title
+                                    title="CAPEX Trend by Grade ($B)"
                                 )
-                                fig.update_traces(mode="lines+markers",
-                                                  hovertemplate="Year: %{x}<br>Capex: %{y:,.3f} $B<br>Grade: %{fullData.name}<extra></extra>")
+                                fig.update_traces(mode="lines+markers",hovertemplate="Year: %{x}<br>Capex: %{y:,.3f} $B<br>Grade: %{fullData.name}<extra></extra>")
                                 fig.update_xaxes(type="category",
                                                  categoryorder="array",
                                                  categoryarray=sorted(tg["year_str"].unique().tolist()),
                                                  showgrid=False)
                                 fig.update_yaxes(showgrid=False)
-                                fig.update_layout(margin=dict(l=10, r=10, t=140, b=10),
+                                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10),
                                                   height=420, legend_title_text="Grade")
                                 st.plotly_chart(fig, use_container_width=True)
 
-        # ── Chart 3: Top Countries by CAPEX Growth (All Grades)
         with b3:
             growth_base = capx_eda.copy()
             if growth_base.empty:
@@ -1243,16 +1148,7 @@ with tab_eda:
                     end   = agg[agg["year"] == last_year][["country", "capex"]].rename(columns={"capex": "capex_end"})
                     joined = start.merge(end, on="country", how="inner")
                     joined["growth_abs"] = joined["capex_end"] - joined["capex_start"]
-
-                    if _is_all_all_all():
-                        growth_title = _compose_title(
-                            f"Fastest-Growing CAPEX Destinations ({first_year} → {last_year})",
-                            "UAE and China show the strongest growth momentum, highlighting emerging hotspots alongside advanced economies."
-                        )
-                    else:
-                        # For country selection this will collapse to KPI via _pretty_kpi_title
-                        growth_title = f"Fastest-Growing CAPEX Destinations ({first_year} → {last_year})"
-
+                    label_grade = f"(Grade {sel_grade_eda})" if sel_grade_eda != "All" else "(All Grades)"
                     top_growth = joined.sort_values("growth_abs").tail(10)
                     if top_growth.empty:
                         st.info("No CAPEX data for growth ranking.")
@@ -1261,13 +1157,11 @@ with tab_eda:
                             df=top_growth.sort_values("growth_abs"),
                             value_col="growth_abs",
                             name_col="country",
-                            title=growth_title,
+                            title=f"Top Countries by CAPEX Growth {label_grade} [{first_year} → {last_year}]",
                             unit="$B",
                             height=420,
                             ascending_for_hbar=True
                         )
-
-
 
 # =============================================================================
 # SECTORS TAB — UNCHANGED
