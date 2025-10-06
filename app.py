@@ -865,19 +865,9 @@ with tab_eda:
         return str(sel_country).strip() != "All"
 
     def _compose_title(main: str, sub: str | None = None) -> str:
-        if not sub:
-            return main
-        import textwrap
-        # Wrap subtitle text every ~70 characters
-        wrapped = "<br>".join(textwrap.wrap(sub, width=70))
-        # Add smaller line-height and a bit of bottom padding to avoid overlap
-        return (
-            f"<b>{main}</b>"
-            f"<br><span style='font-size:0.9em; color:#6b7280; line-height:1.4; display:block; "
-            f"margin-top:4px;'>{wrapped}</span>"
-        )
-
-
+        if sub:
+            return f"{main}<br><span style='font-size:0.9em;color:#6b7280;'>{sub}</span>"
+        return main
 
     # De-dup (unchanged)
     shown_kpi_keys: set = set()
@@ -918,7 +908,7 @@ with tab_eda:
         fig.update_traces(hovertemplate="Year: %{x}<br>Capex: %{y:,.3f} $B<extra></extra>")
         fig.update_xaxes(title=labels_x, type="category", showgrid=False)
         fig.update_yaxes(title=labels_y, showgrid=False)
-        fig.update_layout(margin=dict(l=20, r=120, t=110, b=10), height=height)
+        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
 
     # Map KPI titles when bars collapse to a single entry
@@ -980,7 +970,7 @@ with tab_eda:
         h = f"%{{y}}: %{{x:,.0f}} {unit}<extra></extra>" if unit else "%{y}: %{x:,.0f}<extra></extra>"
         fig.update_traces(hovertemplate=h, text=None, texttemplate=None, textposition=None)
         fig.update_coloraxes(showscale=False)
-        fig.update_layout(margin=dict(l=10, r=10, t=100, b=10), height=height)
+        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
 
     # filters applied to CAPEX (unchanged)
@@ -1068,7 +1058,7 @@ with tab_eda:
             if _is_all_all_all():
                 # Slide 2 — Global CAPEX Map (All years)
                 map_title_text = "Geographic Distribution of Global CAPEX (2021–2024)"
-                map_sub = "Investment flows are concentrated in North America, Europe, and selected Asian economies; lighter shades indicate lower inflows."
+                map_sub = "Investment flows are concentrated in North America, Europe, and select Asian economies; lighter shades indicate lower inflows."
             elif _is_country_selected():
                 # Slide 3 — Country map (All years)
                 map_title_text = f"{sel_country}’s Share of Global CAPEX"
@@ -1096,7 +1086,7 @@ with tab_eda:
                             landcolor="white", bgcolor="white")
             if sel_cont != "All" or sel_country != "All":
                 fig.update_geos(fitbounds="locations")
-            fig.update_layout(margin=dict(l=10, r=10, t=100, b=10), height=420,
+            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420,
                               paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig, use_container_width=True)
 
@@ -1121,7 +1111,7 @@ with tab_eda:
                 if _is_all_all_all():
                     # Your global wording
                     title_top10 = "Global Leaders in FDI Capital Expenditure (2021–2024)"
-                    sub_top10 = "United States, China and the UK lead global investment inflows, showcasing scale and stability."
+                    sub_top10 = "United States, China, and the UK dominate global CAPEX inflows, reflecting their scale, stability, and market maturity."
                 elif _is_country_selected():
                     # This will collapse to 1 bar => KPI via _pretty_kpi_title above
                     title_top10 = "Global Leaders in FDI Capital Expenditure (2021–2024)"
@@ -1174,7 +1164,7 @@ with tab_eda:
                                          color="capex", color_continuous_scale="Blues")
                             fig.update_coloraxes(showscale=False)
                             fig.update_yaxes(categoryorder="array", categoryarray=gb_sorted["grade"].tolist())
-                            fig.update_layout(margin=dict(l=10, r=10, t=100, b=10), height=420)
+                            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
                             st.plotly_chart(fig, use_container_width=True)
                     else:
                         tg = (capx_eda.assign(grade=capx_eda["grade"].astype(str))
@@ -1207,7 +1197,7 @@ with tab_eda:
                                                         categoryarray=sorted(tg["year_str"].unique().tolist()),
                                                         showgrid=False)
                                 fig_single.update_yaxes(showgrid=False)
-                                fig_single.update_layout(margin=dict(l=10, r=10, t=100, b=10),
+                                fig_single.update_layout(margin=dict(l=10, r=10, t=60, b=10),
                                                          height=420, legend_title_text="Grade")
                                 st.plotly_chart(fig_single, use_container_width=True)
                             else:
@@ -1229,7 +1219,7 @@ with tab_eda:
                                                  categoryarray=sorted(tg["year_str"].unique().tolist()),
                                                  showgrid=False)
                                 fig.update_yaxes(showgrid=False)
-                                fig.update_layout(margin=dict(l=10, r=10, t=100, b=10),
+                                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10),
                                                   height=420, legend_title_text="Grade")
                                 st.plotly_chart(fig, use_container_width=True)
 
@@ -1272,6 +1262,7 @@ with tab_eda:
                             height=420,
                             ascending_for_hbar=True
                         )
+
 
 
 # =============================================================================
