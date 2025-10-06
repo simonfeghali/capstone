@@ -901,7 +901,7 @@ with tab_eda:
         y_tuple = tuple([None if pd.isna(v) else round(float(v), 4) for v in y])
         return (kind, x_tuple, y_tuple)
 
-    def _plotly_line_once(x_vals, y_vals, title, labels_x, labels_y, height=360, color=None):
+    def _plotly_line_once(x_vals, y_vals, title, labels_x, labels_y, height=420, color=None):
         sig = _series_key("LINE", x_vals, y_vals)
         if sig in shown_series_keys:
             return
