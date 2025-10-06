@@ -11,6 +11,11 @@ from urllib.parse import quote
 from urllib.error import URLError, HTTPError
 from forecasting import render_forecasting_tab
 from overview import render_overview_tab, info_button, emit_auto_jump_script
+import plotly.io as pio
+pio.templates.default = "plotly_white"
+pio.templates["plotly_white"]["layout"].update(
+    title_x=0.0, title_xanchor="left", margin=dict(l=20, r=120, t=110, b=10)
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
