@@ -1067,7 +1067,7 @@ with tab_eda:
             if _is_all_all_all():
                 # Slide 2 — Global CAPEX Map (All years)
                 map_title_text = "Geographic Distribution of Global CAPEX (2021–2024)"
-                map_sub = "Investment flows are concentrated in North America, Europe, and select Asian economies; lighter shades indicate lower inflows."
+                map_sub = "Investment flows are concentrated in North America, Europe, and selected Asian economies; lighter shades indicate lower inflows."
             elif _is_country_selected():
                 # Slide 3 — Country map (All years)
                 map_title_text = f"{sel_country}’s Share of Global CAPEX"
