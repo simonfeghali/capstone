@@ -917,7 +917,7 @@ with tab_eda:
         fig.update_traces(hovertemplate="Year: %{x}<br>Capex: %{y:,.3f} $B<extra></extra>")
         fig.update_xaxes(title=labels_x, type="category", showgrid=False)
         fig.update_yaxes(title=labels_y, showgrid=False)
-        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
+        fig.update_layout(margin=dict(l=10, r=10, t=100, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
 
     # Map KPI titles when bars collapse to a single entry
@@ -979,7 +979,7 @@ with tab_eda:
         h = f"%{{y}}: %{{x:,.0f}} {unit}<extra></extra>" if unit else "%{y}: %{x:,.0f}<extra></extra>"
         fig.update_traces(hovertemplate=h, text=None, texttemplate=None, textposition=None)
         fig.update_coloraxes(showscale=False)
-        fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=height)
+        fig.update_layout(margin=dict(l=10, r=10, t=100, b=10), height=height)
         st.plotly_chart(fig, use_container_width=True)
 
     # filters applied to CAPEX (unchanged)
@@ -1095,7 +1095,7 @@ with tab_eda:
                             landcolor="white", bgcolor="white")
             if sel_cont != "All" or sel_country != "All":
                 fig.update_geos(fitbounds="locations")
-            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420,
+            fig.update_layout(margin=dict(l=10, r=10, t=100, b=10), height=420,
                               paper_bgcolor="white", plot_bgcolor="white")
             st.plotly_chart(fig, use_container_width=True)
 
@@ -1173,7 +1173,7 @@ with tab_eda:
                                          color="capex", color_continuous_scale="Blues")
                             fig.update_coloraxes(showscale=False)
                             fig.update_yaxes(categoryorder="array", categoryarray=gb_sorted["grade"].tolist())
-                            fig.update_layout(margin=dict(l=10, r=10, t=60, b=10), height=420)
+                            fig.update_layout(margin=dict(l=10, r=10, t=100, b=10), height=420)
                             st.plotly_chart(fig, use_container_width=True)
                     else:
                         tg = (capx_eda.assign(grade=capx_eda["grade"].astype(str))
@@ -1206,7 +1206,7 @@ with tab_eda:
                                                         categoryarray=sorted(tg["year_str"].unique().tolist()),
                                                         showgrid=False)
                                 fig_single.update_yaxes(showgrid=False)
-                                fig_single.update_layout(margin=dict(l=10, r=10, t=60, b=10),
+                                fig_single.update_layout(margin=dict(l=10, r=10, t=100, b=10),
                                                          height=420, legend_title_text="Grade")
                                 st.plotly_chart(fig_single, use_container_width=True)
                             else:
@@ -1228,7 +1228,7 @@ with tab_eda:
                                                  categoryarray=sorted(tg["year_str"].unique().tolist()),
                                                  showgrid=False)
                                 fig.update_yaxes(showgrid=False)
-                                fig.update_layout(margin=dict(l=10, r=10, t=60, b=10),
+                                fig.update_layout(margin=dict(l=10, r=10, t=100, b=10),
                                                   height=420, legend_title_text="Grade")
                                 st.plotly_chart(fig, use_container_width=True)
 
