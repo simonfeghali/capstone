@@ -1120,7 +1120,7 @@ with tab_eda:
                 if _is_all_all_all():
                     # Your global wording
                     title_top10 = "Global Leaders in FDI Capital Expenditure (2021–2024)"
-                    sub_top10 = "United States, China, and the UK dominate global CAPEX inflows, reflecting their scale, stability, and market maturity."
+                    sub_top10 = "United States, China and the UK lead global investment inflows, showcasing scale and stability."
                 elif _is_country_selected():
                     # This will collapse to 1 bar => KPI via _pretty_kpi_title above
                     title_top10 = "Global Leaders in FDI Capital Expenditure (2021–2024)"
