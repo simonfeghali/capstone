@@ -90,7 +90,7 @@ st.markdown(f"""
 <div class="header-row">
   <div class="header-left">
     <img class="header-icon" src="data:image/png;base64,{icon_b64}" />
-    <div class="header-title">Country Viability & Foreign Direct Investment Analytics Dashboard</div>
+    <div class="header-title">Country Viability & FDI Analytics Dashboard</div>
   </div>
   <img class="header-logo" src="data:image/jpeg;base64,{logo_b64}" />
 </div>
@@ -848,21 +848,13 @@ with tab_scoring:
 # CAPEX TAB — show only your requested KPIs on TOP; suppress grade KPI when year+country chosen
 # =============================================================================
 with tab_eda:
-    # Caption + info button ABOVE the filters
-    cap1, cap2 = st.columns([20, 1])
-    with cap1:
-        # Small contextual subtitle, includes year token just like Country Attractiveness
-        st.caption(
-            f"Capital Investment (FDI CAPEX) • "
-            f"{_year_token(st.session_state.get('eda_year', 'All'))}"
-        )
-    with cap2:
-        info_button("capex_trend")
-
-    # Filters come below the caption
     sel_year_any, sel_cont, sel_country, _filt = render_filters_block("eda")
-
-
+    
+    cap_left, cap_right = st.columns([20, 1], gap="small")
+    with cap_left:
+        st.caption("CAPEX Analysis for 2021-2024")
+    with cap_right:
+        info_button("capex_trend")
 
 
     # De-dup helpers (CAPEX tab only)
