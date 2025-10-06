@@ -869,7 +869,7 @@ with tab_eda:
             return main
         # Insert <br> every ~70 characters to force subtitle wrapping
         import textwrap
-        wrapped = "<br>".join(textwrap.wrap(sub, width=50))
+        wrapped = "<br>".join(textwrap.wrap(sub, width=60))
         return f"{main}<br><span style='font-size:0.9em;color:#6b7280;line-height:1.4'>{wrapped}</span>"
 
 
